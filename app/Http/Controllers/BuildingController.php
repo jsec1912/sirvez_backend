@@ -34,8 +34,10 @@ class BuildingController extends Controller
             $building['upload_img']  = $fileName;
         }
 
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined" ||strlen($request->id) > 10){
             $building['created_by']  = $request->user->id;
+            if(strlen($request->id) > 10)
+            $building['off_id'] = $request->id;
             Building::create($building);
         }
         else{
@@ -48,7 +50,10 @@ class BuildingController extends Controller
     }
     public function deleteBuilding(Request $request){
         //$stiker = {stiker_id}
-        Building::where(['id'=>$request->id])->delete();
+        if(strlen($request->id) > 10)
+            Building::where(['off_id'=>$request->id])->delete();
+        else
+            Building::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
         
         return response()->json($res);

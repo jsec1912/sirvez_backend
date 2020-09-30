@@ -43,8 +43,10 @@ class ProductController extends Controller
             $product['upload_file']  = $fileName;
         }
         
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
             $product['created_by']  = $request->user->id;
+            if(strlen($request->id) > 10)
+                $product['off_id'] = $request->id;
             Product::create($product);
         }
         else{
@@ -58,7 +60,10 @@ class ProductController extends Controller
     public function deleteProduct(Request $request)
     {
         //$request = {'id':{}}
-        Product::where(['id'=>$request->id])->delete();
+        if(strlen($request->id) > 10)
+            Product::where(['off_id'=>$request->id])->delete();
+        else
+            Product::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
         return response()->json($res);
     }

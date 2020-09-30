@@ -31,8 +31,10 @@ class DepartmentController extends Controller
         $department['company_id']  = $request->user->company_id;
         $department['department_name']  = $request->department_name;
         $department['colour']  = $request->colour;
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
             $department['created_by']  = $request->user->id;
+            if(strlen($request->id) > 10)
+            $department['off_id'] = $request->id;
             Department::create($department);
         }
         else{
@@ -44,7 +46,10 @@ class DepartmentController extends Controller
     }
     public function deleteDepartment(Request $request){
         //$stiker = {stiker_id}
-        Department::where(['id'=>$request->id])->delete();
+        if(strlen($request->id) > 10)
+            Department::where(['off_id'=>$request->id])->delete();
+        else
+            Department::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
         
         return response()->json($res);

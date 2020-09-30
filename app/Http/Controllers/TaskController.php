@@ -61,8 +61,10 @@ class TaskController extends Controller
             $request->task_img->move(public_path('upload/img/'), $fileName);
             $task['task_img']  = $fileName;
         }
-        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"){
+        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"||strlen($request->id)>10){
             $task['created_by']  = $request->user->id;
+            if(strlen($request->id)>10)
+            $task['off_id'] = $request->id;
             $result = Task::create($task);
             $id = $result->id;
             $action = "created";
@@ -128,7 +130,11 @@ class TaskController extends Controller
     public function setCompleted(Request $request)
     {
         $id = $request->id;
-        Task::whereId($id)->update(['archived'=>$request->archived,'archived_day'=>date('Y-m-d')]);
+        if(strlen($id)>10){
+            Task::where('off_id',$id)->update(['archived'=>$request->archived,'archived_day'=>date('Y-m-d')]);
+        }
+        else
+            Task::whereId($id)->update(['archived'=>$request->archived,'archived_day'=>date('Y-m-d')]);
         //Task::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
 
@@ -136,64 +142,59 @@ class TaskController extends Controller
     }
     public function taskList(Request $request){
         $res = array();
-        // if($request->archived ==0){
-        //     if($request->user->user_type > 1)
-        //         $tasks = Task::where('tasks.archived','0')
-        //             ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-30 days")))
-        //             ->where('tasks.company_id',$request->user->company_id)
-        //             ->leftJoin('projects','projects.id','=','tasks.project_id')
-        //             ->leftJoin('sites','sites.id','=','tasks.site_id')
-        //             ->leftJoin('rooms','rooms.id','=','tasks.room_id')
-        //             ->leftJoin('companies','companies.id','=','tasks.company_id')
-        //             ->join('users','users.id','=','tasks.created_by')
-        //             ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','users.first_name AS account_manager','users.profile_pic')
-        //             ->orderBy('tasks.id','desc')
-        //             ->get();
-        //     else{
-        //         $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-        //         $tasks = Task::where('tasks.archived','0')
-        //             ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-30 days")))
-        //             ->whereIn('tasks.company_id',$customer_id)
-        //             ->leftJoin('projects','projects.id','=','tasks.project_id')
-        //             ->leftJoin('sites','sites.id','=','tasks.site_id')
-        //             ->leftJoin('rooms','rooms.id','=','tasks.room_id')
-        //             ->leftJoin('companies','companies.id','=','tasks.company_id')
-        //             ->join('users','users.id','=','tasks.created_by')
-        //             ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','users.first_name AS account_manager','users.profile_pic')
-        //             ->orderBy('tasks.id','desc')
-        //             ->get();
-        //     }
-        // }
-        // else{
-        //     if($request->user->user_type > 1)
-        //         $tasks = Task::where('tasks.archived','1')
-        //             ->where('tasks.archived_day', '<=', date('Y-m-d', strtotime("-30 days")))
-        //             ->where('tasks.company_id',$request->user->company_id)
-        //             ->leftJoin('projects','projects.id','=','tasks.project_id')
-        //             ->leftJoin('sites','sites.id','=','tasks.site_id')
-        //             ->leftJoin('rooms','rooms.id','=','tasks.room_id')
-        //             ->leftJoin('companies','companies.id','=','tasks.company_id')
-        //             ->join('users','users.id','=','tasks.created_by')
-        //             ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','users.first_name AS account_manager','users.profile_pic')
-        //             ->orderBy('tasks.id','desc')
-        //             ->get();
-        //     else{
-        //         $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-        //         $tasks = Task::where('tasks.archived','1')
-        //             ->where('tasks.archived_day', '<=', date('Y-m-d', strtotime("-30 days")))
-        //             ->whereIn('tasks.company_id',$customer_id)
-        //             ->leftJoin('projects','projects.id','=','tasks.project_id')
-        //             ->leftJoin('sites','sites.id','=','tasks.site_id')
-        //             ->leftJoin('rooms','rooms.id','=','tasks.room_id')
-        //             ->leftJoin('companies','companies.id','=','tasks.company_id')
-        //             ->join('users','users.id','=','tasks.created_by')
-        //             ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','users.first_name AS account_manager','users.profile_pic')
-        //             ->orderBy('tasks.id','desc')
-        //             ->get();
-        //     }
-        // }
         
-        if($request->has('project_id') && $request->project_id != 'undefined' && $request->project_id > 0 ){
+        if($request->has('customer_id') && $request->customer_id != 'undefined' && $request->customer_id > 0 ){
+            $res['project_id'] = '';
+            if($request->user->user_type == 2||$request->user->user_type == 6){
+                $res["tasks"] = Task::where('tasks.company_id',$request->customer_id)
+                    ->where(function($q){
+                        return $q->where('tasks.archived',0)
+                        ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                    })
+                    ->leftJoin('projects','projects.id','=','tasks.project_id')
+                    ->leftJoin('sites','sites.id','=','tasks.site_id')
+                    ->leftJoin('rooms','rooms.id','=','tasks.room_id')
+                    ->leftJoin('buildings','buildings.id','=','rooms.building_id')
+                    ->leftJoin('floors','floors.id','=','rooms.floor_id')
+                    ->leftJoin('companies','companies.id','=','tasks.company_id')
+                    ->leftjoin('users','users.id','=','tasks.created_by')
+                    ->where('tasks.customer_id',$request->customer_id)
+                    ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','floors.floor_name','buildings.building_name','users.first_name AS account_manager','users.profile_pic')
+                    ->orderBy('archived','asc')
+                    ->orderBy('tasks.id','desc')
+                    ->get();
+
+                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                $res['customers'] = Company::where('id',$request->customer_id)->get();
+                $res['projects'] = Project::where('company_id',$request->customer_id)->get();
+                $res['customerId'] = $request->customer_id;
+            }
+            else{
+                
+                $res["tasks"] = Task::where('tasks.company_id',$request->customer_id)
+                    ->where(function($q){
+                        return $q->where('tasks.archived',0)
+                        ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                    })
+                    ->leftJoin('projects','projects.id','=','tasks.project_id')
+                    ->leftJoin('sites','sites.id','=','tasks.site_id')
+                    ->leftJoin('rooms','rooms.id','=','tasks.room_id')
+                    ->leftJoin('buildings','buildings.id','=','rooms.building_id')
+                    ->leftJoin('floors','floors.id','=','rooms.floor_id')
+                    ->leftJoin('companies','companies.id','=','tasks.company_id')
+                    ->leftjoin('users','users.id','=','tasks.created_by')
+                    ->where('tasks.company_id',$request->customer_id)
+                    ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','floors.floor_name','buildings.building_name','users.first_name AS account_manager','users.profile_pic')
+                    ->orderBy('archived','asc')
+                    ->orderBy('tasks.id','desc')
+                    ->get();
+                $res['users'] = User::/* whereIn('company_id',$customer_id)->or */Where('company_id',$request->user->company_id)->get();
+                $res['customers'] = Company::where('id',$request->customer_id)->get();
+                $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
+                $res['customerId'] = $request->customer_id;
+            }
+        }
+        else if($request->has('project_id') && $request->project_id != 'undefined' && $request->project_id > 0 ){
             $res['project_id'] = $request->project_id;
             if($request->user->user_type == 2||$request->user->user_type == 6){
                 $res["tasks"] = Task::where('tasks.company_id',$request->user->company_id)
@@ -412,7 +413,12 @@ class TaskController extends Controller
             ]);
         }
         $task = array();
-        $task['task_id'] = $request->id;
+        if(strlen($request->id)>10){
+            $task['task_id'] = Task::where('off_id',$request->id)->first()->id;
+        }else{
+            $task['task_id'] = $request->id;
+        }
+        
         $task['created_by'] = $request->user->id;
         $task['comment']  = $request->message;
         if($request->hasFile('file')){
@@ -422,9 +428,9 @@ class TaskController extends Controller
             $task['attach_file']  = $fileName;
         }
         TaskComment::create($task);
-        $task = Task::whereId($request->id)->first();
+        $task = Task::whereId($task['task_id'])->first();
         $res = array();
-        $res['comments'] = TaskComment::where('task_comments.task_id',$request->id)
+        $res['comments'] = TaskComment::where('task_comments.task_id',$task['task_id'])
             ->leftJoin('users','users.id','=','task_comments.created_by')
             ->select('task_comments.*','users.first_name','users.last_name','users.profile_pic')
             ->get();

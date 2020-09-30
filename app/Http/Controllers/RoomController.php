@@ -50,9 +50,11 @@ class RoomController extends Controller
         if($request->has('asbestos'))
             $room['asbestos']  = $request->asbestos;
         $action = "updated";
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
             $room['created_by']  = $request->user->id;
             $room['signed_off'] = 0;
+            if(strlen($request->id) > 10)
+                $room['off_id'] = $request->id;
             $room = Room::create($room);
             $id = $room->id;
             $action = "created";
@@ -103,9 +105,13 @@ class RoomController extends Controller
     public function deleteRoom(Request $request)
     {
         //$request = {'id':{}}
-        Room::where(['id'=>$request->id])->delete();
-        Room_photo::where(['room_id'=>$request->id])->delete();
-        Task::where(['room_id'=>$request->id])->delete();
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::where(['id'=>$id])->delete();
+        Room_photo::where(['room_id'=>$id])->delete();
+        Task::where(['room_id'=>$id])->delete();
         $res["status"] = "success";
         return response()->json($res);
     }

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Notification;
 use Illuminate\Support\Facades\Validator;
 use App\Sticker;
+use App\Sticker_category;
 
 class StickerController extends Controller
 {
@@ -30,12 +31,14 @@ class StickerController extends Controller
         $stiker_info = array();
         $id = $request->id;
         $path = 'pixie/assets/images/stickers/'.$request->category;
-        
-        $stiker_info['category_id'] = $request->category_id;
+        if(strlen($request->category_id)>10)
+            $stiker_info['category_id'] = Sticker_category::where('off_id',$request->category_id)->first()->id;
+        else
+            $stiker_info['category_id'] = $request->category_id;
         $stiker_info['name']  = $request->name;
         $stiker_info['user_id']  = $request->user->id;
         $stiker_info['status']  = $request->status;
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="0"||strlen($request->id)>10){
             $count = Sticker::where('category_id',$request->category_id)->where('name',$request->name)->count();            if($count>0)
             {
                 return response()->json([
@@ -53,6 +56,8 @@ class StickerController extends Controller
                     'msg' => 'You must input image file!'
                 ]);
             }
+            if(strlen($request->id)>10)
+                $stiker_info['off_id'] = $request->id;
             sticker::create($stiker_info);
         }
         else{
@@ -76,7 +81,10 @@ class StickerController extends Controller
     }
     public function DeleteStiker(Request $request){
         //$stiker = {stiker_id}
-        sticker::where(['id'=>$request->id])->delete();
+        if(strlen($request->id)>10)
+            sticker::where(['off_id'=>$request->id])->delete();
+        else
+            sticker::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
         return response()->json($res);
     }

@@ -29,7 +29,7 @@ class StickerCategoryController extends Controller
         $category['name']  = $request->name;
         $category['description']  = $request->description;
         $category['created_by']  = $request->user->id;
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id)>10){
             $v = Validator::make($request->all(), [
                 'name' => 'unique:sticker_categories',
             ]);
@@ -44,6 +44,8 @@ class StickerCategoryController extends Controller
             if (! File::exists($sticker_path)) {
                 File::makeDirectory($sticker_path);
             }
+            if(strlen($request->id)>10)
+                $category['off_id'] = $request->id;
 
             if ($request->has('category_img') && isset($request->category_img) && $request->category_img!='null') {
                 $fileName = time().'category.'.$request->category_img->extension();  
@@ -78,7 +80,10 @@ class StickerCategoryController extends Controller
     }
     public function deleteCategory(Request $request){
         //$stiker = {stiker_id}
-        Sticker_category::where(['id'=>$request->id])->delete();
+        if(strlen($request->id)>10)
+            Sticker_category::where(['off_id'=>$request->id])->delete();
+        else
+            Sticker_category::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
         
         return response()->json($res);

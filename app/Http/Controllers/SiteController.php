@@ -79,9 +79,15 @@ class SiteController extends Controller
     public function deleteSite(Request $request)
     {
         //$request = {'id':{}}
-       
-        Site::where(['id'=>$request->id])->delete();
-        $site_id = Project_site::where('site_id',$request->id)->pluck('id');
+        if(strlen($request->id)>10){
+            Site::where(['off_id'=>$request->id])->delete();
+            $id = Site::where('off_id',$request->id)->first()->id;
+        }
+        else{
+            Site::where(['id'=>$request->id])->delete();
+            $id = $request->id;
+        }
+        $site_id = Project_site::where('site_id',$id)->pluck('id');
         Project_site::whereIn('id',$site_id)->delete();
         Room::whereIn('site_id',$site_id)->delete();
         $res["status"] = "success";

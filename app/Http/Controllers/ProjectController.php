@@ -19,6 +19,7 @@ use Mail;
 class ProjectController extends Controller
 {
     public function updateProject(Request $request){
+        
         $v = Validator::make($request->all(), [
             //company info
             'customer_id' => 'required',
@@ -53,7 +54,9 @@ class ProjectController extends Controller
         $project['created_by']  = $request->user->id;
         $project['project_summary']  = $request->project_summary;
         $action = "updated";
-        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"){
+        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"||strlen($request->id) > 10){
+            if(strlen($request->id) > 10)
+            $project['off_id'] = $request->id;
             $project = Project::create($project);
             $action = "created";
             $id = $project->id;
@@ -114,6 +117,8 @@ class ProjectController extends Controller
     public function deleteProject(Request $request)
     {
         $id = $request->id;
+        if(strlen($request->id)>10)
+            $id = Project::where('off_id',$request->id)->first()->id;
         Project::whereId($id)->update(['archived'=>1,'archived_day'=>date('Y-m-d')]);
         $project = Project::whereId($id)->first();
         $insertnotificationndata = array(

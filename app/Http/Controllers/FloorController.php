@@ -37,8 +37,10 @@ class FloorController extends Controller
             $floor['upload_img']  = $fileName;
         }
 
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
             $floor['created_by']  = $request->user->id;
+            if(strlen($request->id) > 10)
+            $floor['off_id'] = $request->id;
             Floor::create($floor);
         }
         else{
@@ -50,7 +52,10 @@ class FloorController extends Controller
     }
     public function deleteFloor(Request $request){
         //$stiker = {stiker_id}
-        Floor::where(['id'=>$request->id])->delete();
+        if(strlen($request->id) > 10)
+            Floor::where(['off_id'=>$request->id])->delete();
+        else
+            Floor::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
         
         return response()->json($res);
