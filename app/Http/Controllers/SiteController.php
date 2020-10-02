@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Site;
+use App\Site_room;
 use App\Project_site;
 use App\Room;
 use App\Building;
@@ -40,7 +41,11 @@ class SiteController extends Controller
         }
         $site = array();
         $id = $request->id;
-        $site['company_id'] = $request->customer_id;
+        if(strlen($request->customer_id) > 10){
+            $site['company_id'] = Company::where('off_id',$request->customer_id)->first()->id;
+        }
+        else
+            $site['company_id'] = $request->customer_id;
         $site['site_name']  = $request->site_name;
         $site['contact_number']  = $request->contact_number;
         $site['contact_name']  = $request->contact_name;
@@ -53,7 +58,9 @@ class SiteController extends Controller
         $site['comment']  = $request->comment;
         $site['status']  = $request->status;
         $action = "updated";
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+            if (strlen($request->id) > 10)
+                $site['off_id']  = $request->id;
             $site['created_by']  = $request->user->id;
             $site = Site::create($site);
             $id = $site->id;
@@ -68,7 +75,7 @@ class SiteController extends Controller
             'notice_id'			=> $id,
             'notification'		=> $site['site_name'].' have been '.$action.' by  '.$request->user->first_name.').',
             'created_by'		=> $request->user->id,
-            'company_id'		=> $request->customer_id,
+            'company_id'		=> $site['company_id'],
             'created_date'		=> date("Y-m-d H:i:s"),
             'is_read'	    	=> 0,
         );

@@ -29,13 +29,30 @@ class ProductController extends Controller
         }
         $product = array();
         $id = $request->id;
-        $product['room_id'] = $request->room_id;
+        if(strlen($request->room_id) > 10){
+            $product['room_id'] = Room::where('off_id',$request->room_id)->first()->id;
+        }
+        else
+            $product['room_id'] = $request->room_id;
+        //$product['room_id'] = $request->room_id;
         $product['product_name']  = $request->product_name;
         $product['description']  = $request->description;
         $product['action']  = $request->action;
         $product['qty']  = $request->qty;
-        $product['to_site_id']  = $request->to_site_id;
-        $product['to_room_id']  = $request->to_room_id;
+        if(strlen($request->to_room_id) > 10){
+            $product['to_room_id'] = Room::where('off_id',$request->to_room_id)->first()->id;
+        }
+        else
+            $product['to_room_id'] = $request->to_room_id;
+
+        if(strlen($request->to_site_id) > 10){
+            $product['to_site_id'] = Site::where('off_id',$request->to_site_id)->first()->id;
+        }
+        else
+            $product['to_site_id'] = $request->to_site_id;
+
+        //$product['to_site_id']  = $request->to_site_id;
+        //$product['to_room_id']  = $request->to_room_id;
         
         if($request->hasFile('upload_file')){
             $fileName = time().'product.'.$request->upload_file->extension();  

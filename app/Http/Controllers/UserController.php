@@ -221,7 +221,7 @@ class UserController extends Controller
         }
         
         if($request->has('customer_id')){
-            if(strlen($request->id) > 10){
+            if(strlen($request->customer_id) > 10){
                 $off_data = Company::where('off_id',$request->customer_id)->first();
                 $user_info['company_id'] = $off_data->id;
                 $user_info['company_name'] = $off_data->name;

@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
 {
     public function updateRoom(Request $request){
-       
         $room = array();
         $id = $request->id;
         if($request->has('project_id'))
@@ -62,6 +61,7 @@ class RoomController extends Controller
         else{
             $room['updated_by'] = $request->user->id;
             Room::whereId($id)->update($room);
+            $room = Room::whereId($id)->first();
         }
         
         //remove room_photh using room_array
@@ -178,7 +178,7 @@ class RoomController extends Controller
             }
             else{
                 $res['sites'] = Site::where('id',$request->user->company_id)->orderBy('id','desc')->get();
-                $res['projects'] = Project::where('company_id',$request->user->$company_id)->orderBy('id','desc')->get();
+                $res['projects'] = Project::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
                 $res['departments'] = Department::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
             }
             

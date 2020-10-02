@@ -45,7 +45,12 @@ class ProjectController extends Controller
             $request->upload_doc->move(public_path('upload/file/'), $fileName);
             $project['upload_doc']  = $fileName;
         }
-        $project['company_id'] = $request->customer_id;
+        if(strlen($request->customer_id) > 10){
+            $project['company_id'] = Company::where('off_id',$request->customer_id)->first()->id;
+        }
+        else
+            $project['company_id'] = $request->customer_id;
+        //$project['company_id'] = $request->customer_id;
         $project['project_name']  = $request->project_name;
         $project['user_id']  = $request->user_id;
         $project['manager_id']  = $request->manager_id;
@@ -56,7 +61,7 @@ class ProjectController extends Controller
         $action = "updated";
         if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"||strlen($request->id) > 10){
             if(strlen($request->id) > 10)
-            $project['off_id'] = $request->id;
+                $project['off_id'] = $request->id;
             $project = Project::create($project);
             $action = "created";
             $id = $project->id;
