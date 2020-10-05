@@ -37,6 +37,7 @@ class CreateRoomsTable extends Migration
             $table->string('completed_date')->nullable();
             $table->string('edit_flag')->nullable();
             $table->string('off_id')->nullable();
+            $table->string('site_room_id')->nullable();
             
         });
     }

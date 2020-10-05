@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Project;
 use App\Project_site;
 use App\Site;
+use App\Site_room;
 use App\Task;
 use App\Notification;
 use App\User;
@@ -195,8 +196,10 @@ class ProjectController extends Controller
         $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
         $project['room_count'] = Room::where('project_id',$project['id'])->count();
         $project['user_notifications'] = Notification::where('notice_type','3')->where('notice_id',$request->id)->count();
-        $res['sites'] = Project_site::where('project_id',$project['id'])
-            ->leftJoin('sites','project_sites.site_id','=','sites.id')->select('project_sites.*','sites.site_name','sites.city','sites.address','sites.postcode')->withCount('rooms')->orderBy('project_sites.id','desc')->get();
+        $company_id = Project::whereId($request->id)->first()->company_id;
+        $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
+        // $res['sites'] = Project_site::where('project_id',$project['id'])
+        //     ->leftJoin('sites','project_sites.site_id','=','sites.id')->select('project_sites.*','sites.site_name','sites.city','sites.address','sites.postcode')->withCount('rooms')->orderBy('project_sites.id','desc')->get();
         $rooms = Room::where('rooms.project_id',$project['id'])
             ->leftJoin('sites','rooms.site_id','=','sites.id')
             ->leftJoin('buildings','rooms.building_id','=','buildings.id')
@@ -264,7 +267,8 @@ class ProjectController extends Controller
         else
             $com_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
         $res['assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[1,5])->where('status',1)->get();
-
+        $res['sites'] = Site::orderBy('id','desc')->get();
+        $res['rooms'] = Site_room::orderBy('id','desc')->get();
         $res['status'] = 'success';
         return response()->json($res);
     }

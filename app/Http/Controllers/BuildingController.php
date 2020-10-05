@@ -7,6 +7,7 @@ use App\Department;
 use App\Building;
 use App\Floor;
 use App\Room;
+use App\Site_room;
 use Illuminate\Support\Facades\Validator;
 class BuildingController extends Controller
 {
@@ -71,12 +72,15 @@ class BuildingController extends Controller
     public function buildingInfo(Request $request){
         $res = array();
         $res['building'] = Building::whereId($request->id)->first();
+        
         $floors =Floor::withCount('rooms')->where('building_id',$request->id)->orderBy('id','desc')->get();
         $res['floors'] = $floors;
-        $res['rooms'] = Room::where('building_id',$request->id)
-            ->leftJoin('departments','departments.id','=','rooms.department_id')
-            ->select('rooms.*','departments.department_name')
+        $res['rooms'] = Site_room::where('site_rooms.building_id',$request->id)
+            ->leftJoin('departments','departments.id','=','site_rooms.department_id')
+            ->leftJoin('floors','floors.id','=','site_rooms.floor_id')
+            ->select('site_rooms.*','departments.department_name','floors.floor_name')
             ->orderBy('id','desc')->get();
+            
         $res["status"] = "success";
         return response()->json($res);
     }

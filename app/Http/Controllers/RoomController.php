@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Project_site;
 use App\Room;
 use App\Site;
+use App\Site_room;
 use App\Task;
 use App\Product;
 use App\Project;
@@ -24,19 +25,28 @@ class RoomController extends Controller
     public function updateRoom(Request $request){
         $room = array();
         $id = $request->id;
+        if(strlen($request->project_id) > 10)
+            $room['project_id'] = Project::where('off_id',$request->project_id)->first()->id;
+        else
+            $room['project_id']  = $request->project_id;
         if($request->has('project_id'))
-            $room['company_id'] = Project::whereId($request->project_id)->first()->company_id;
+            $room['company_id'] = Project::whereId($room['project_id'])->first()->company_id;
         else if($request->has('building_id'))
         {
             $siteId = Building::whereId($request->building_id)->first()->site_id;
             $room['company_id'] = Site::whereId($siteId)->first()->company_id;
         }
         
-        $room['project_id']  = $request->project_id;
         $room['site_id']  = $request->site_id;
-        $room['department_id']  = $request->department_id;
-        $room['building_id']  = $request->building_id;
-        $room['floor_id']  = $request->floor_id;
+        if($request->room_site_id > 0){
+            $res_data = array();
+            $res_data = Site_room::whereId($request->room_site_id)->first();
+            $room['room_number'] = $res_data->room_number;
+            $room['department_id']  = $res_data->department_id;
+            $room['building_id']  = $res_data->building_id;
+            $room['floor_id']  = $res_data->floor_id;
+        }
+        $room['room_site_id'] = $request->room_site_id;
         if($request->room_number!==null&&$request->room_number!=="")
             $room['room_number']  = $request->room_number;
         $room['estimate_day']  = $request->estimate_day;
@@ -98,6 +108,7 @@ class RoomController extends Controller
         $res = array();
         $res['status'] = 'success';
         $res['msg'] = 'Room Saved Successfully!';
+        $res['room'] = $room;
         $res['rooms'] = Room_photo::where('room_id',$id)->get();
         //$response = ['status'=>'success', 'msg'=>'Room Saved Successfully!'];  
         return response()->json($res);
@@ -157,7 +168,7 @@ class RoomController extends Controller
             $site_id = Site::where('company_id',$company_id)->pluck('id');
             $res['departments'] = Department::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['buildings'] = Building::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
-            $res['rooms'] = Room::where('company_id',$company_id)/* ->whereNull('project_id') */->get();
+            $res['rooms'] = Site_room::where('company_id',$company_id)/* ->whereNull('project_id') */->get();
             $res['floors'] = Floor::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
         }
         else if(isset($request->customer_id)&& $request->customer_id>0){
@@ -167,7 +178,7 @@ class RoomController extends Controller
             $res['departments'] = Department::where('company_id',$request->customer_id)->orderBy('id','desc')->get();
             $res['buildings'] = Building::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
-            $res['rooms'] = Room::where('company_id',$request->customer_id)/* ->whereNull('project_id') */->get();
+            $res['rooms'] = Site_room::where('company_id',$request->customer_id)/* ->whereNull('project_id') */->get();
         }
         else{
             if($request->user->user_type ==1||$request->user->user_type ==3){

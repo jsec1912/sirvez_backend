@@ -51,6 +51,9 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/site/siteList','SiteController@siteList');
     Route::get('/site/siteInfo','SiteController@siteInfo');///
     Route::get('/site/getSiteInfo','SiteController@getSiteInfo');
+    Route::post('/siteroom/updateRoom','SiteController@updateRoom');
+    Route::post('/siteroom/deleteRoom','SiteController@deleteRoom');
+    Route::get('/siteroom/roomInfo','SiteController@roomInfo');
 
     Route::post('/department/updateDepartment','DepartmentController@updateDepartment');
     Route::post('/department/deleteDepartment','DepartmentController@deleteDepartment');

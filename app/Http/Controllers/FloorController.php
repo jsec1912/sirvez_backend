@@ -7,6 +7,7 @@ use App\Department;
 use App\Building;
 use App\Floor;
 use App\Room;
+use App\Site_room;
 use App\Site;
 use App\Company_customer;
 use Illuminate\Support\Facades\Validator;
@@ -70,13 +71,12 @@ class FloorController extends Controller
     public function floorInfo(Request $request){
         $res = array();
         $res['floor'] = Floor::whereId($request->id)->first();
-        $rooms = Room::where('rooms.floor_id',$request->id)
-        ->leftJoin('buildings','buildings.id','=','rooms.building_id')
-        ->leftJoin('floors','floors.id','=','rooms.floor_id')
-        ->leftJoin('projects','projects.id','=','rooms.project_id')
-        ->leftJoin('departments','departments.id','=','rooms.department_id')
-        ->select('rooms.*','buildings.building_name','floors.floor_name','departments.department_name','projects.project_name')
-        ->orderBy('rooms.id','desc')
+        $rooms = Site_room::where('site_rooms.floor_id',$request->id)
+        ->leftJoin('buildings','buildings.id','=','site_rooms.building_id')
+        ->leftJoin('floors','floors.id','=','site_rooms.floor_id')
+        ->leftJoin('departments','departments.id','=','site_rooms.department_id')
+        ->select('site_rooms.*','buildings.building_name','floors.floor_name','departments.department_name')
+        ->orderBy('site_rooms.id','desc')
         ->get();
         $res['rooms'] = $rooms;
         $res["status"] = "success";
