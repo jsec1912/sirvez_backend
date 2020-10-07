@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
 {
     public function updateRoom(Request $request){
+        
+        $project = array();
         $room = array();
         $id = $request->id;
         if(strlen($request->project_id) > 10)
@@ -128,18 +130,23 @@ class RoomController extends Controller
     }
     public function roomInfo(Request $request){
         $res = array();
-        if ($request->has('id')) {
-            $room = Room::where('rooms.id',$request->id)
+       
+        if ($request->has('id')||$request->has('room_number')) {
+            if((!$request->has('id') || $request->id =='null') && $request->has('room_number'))
+                $room_id = Room::where('room_number',$request->room_number)->first()->id;
+            else
+                $room_id = $request->id;
+            $room = Room::where('rooms.id',$room_id)
             ->leftJoin('departments','departments.id','=','rooms.department_id')
             ->leftJoin('projects','projects.id','=','rooms.project_id')
             ->leftJoin('companies','companies.id','=','rooms.company_id')
             ->select('rooms.*','projects.project_name','companies.name as company_name','departments.department_name')
             ->first(); 
             
-            $room['img_files'] = Room_photo::where('room_id',$request->id)->get();
+            $room['img_files'] = Room_photo::where('room_id',$room_id)->get();
             $res["room"] = $room;
             
-            $products= Product::where('room_id',$request->id)->orderBy('id','desc')->get();
+            $products= Product::where('room_id',$room_id)->orderBy('id','desc')->get();
             foreach($products as $key => $product)
             {
                 $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
@@ -147,29 +154,33 @@ class RoomController extends Controller
                 //$products[$key]['to_site_name'] = Site::whereId($product->to_site_id)->first()->site_name;
             }
             $res['products'] = $products;
-            $tasks = Task::where('room_id',$request->id)->get();
+            $tasks = Task::where('room_id',$room_id)->get();
             foreach($tasks as $key=>$row){
                 $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'type'=>'2'])->pluck('users.first_name');
             }
             $res['tasks'] = $tasks;
             $res['notification'] = Notification::where('notice_type',7)
-                                    ->where('notice_id',$request->id)
+                                    ->where('notice_id',$room_id)
                                     ->orderBy('id','desc')
                                     ->first();
+            $res['room_id'] = $room_id;
             
         }
-        
-        
-        if(isset($request->project_id)&& $request->project_id>0){
-            
-            $company_id = Project::whereId($request->project_id)->first()->company_id;
+        if($request->has('project_id')||$request->has('project_name')){
+            if((!$request->has('project_id') || $request->project_id =='null') && $request->has('project_name'))
+                $project_id = Project::where('project_name',$request->project_name)->first()->id;
+            else
+                $project_id = $request->project_id;
+            $company_id = Project::whereId($project_id)->first()->company_id;
             $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['projects'] = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
             $site_id = Site::where('company_id',$company_id)->pluck('id');
             $res['departments'] = Department::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['buildings'] = Building::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
+            
             $res['rooms'] = Site_room::where('company_id',$company_id)/* ->whereNull('project_id') */->get();
             $res['floors'] = Floor::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
+            $res['project_id'] = $project_id;
         }
         else if(isset($request->customer_id)&& $request->customer_id>0){
             $res['projects'] = Project::where('company_id',$request->customer_id)->orderBy('id','desc')->get();

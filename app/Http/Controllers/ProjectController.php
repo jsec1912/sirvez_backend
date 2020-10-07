@@ -24,7 +24,7 @@ class ProjectController extends Controller
         $v = Validator::make($request->all(), [
             //company info
             'customer_id' => 'required',
-            'project_name' => 'required',
+            'project_name' => 'required|unique:projects',
             'manager_id' => 'required',
             'user_id' => 'required',
             'contact_number' => 'required',
@@ -39,6 +39,7 @@ class ProjectController extends Controller
             ]);
         }
         $project = array();
+       
         $id = $request->id;
         if($request->hasFile('upload_doc')){
 
@@ -182,12 +183,16 @@ class ProjectController extends Controller
     }
     public function projectDetail(Request $request){
         $res = array();
-        $project = Project::where('projects.id',$request->id)
+        if(!$request->has('id') || $request->id =='null')
+            $id = Project::where('project_name',$request->project_name)->first()->id;
+        else
+            $id = $request->id;
+        $project = Project::where('projects.id',$id)
         ->leftJoin('companies','projects.company_id','=','companies.id')
         ->leftJoin('users','users.id','=','projects.created_by')
         ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
-        $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$request->id)->orderBy('id','desc')->get();
-        $user_cnt = User::where('id',$project->user_id)->get()->count();
+        $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
+        $user_cnt = User::where('id',$project->user_id)->count();
         if($user_cnt>0)
             $project['customer_user'] = User::where('id',$project->user_id)->first()->first_name;
         else
@@ -195,8 +200,8 @@ class ProjectController extends Controller
       
         $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
         $project['room_count'] = Room::where('project_id',$project['id'])->count();
-        $project['user_notifications'] = Notification::where('notice_type','3')->where('notice_id',$request->id)->count();
-        $company_id = Project::whereId($request->id)->first()->company_id;
+        $project['user_notifications'] = Notification::where('notice_type','3')->where('notice_id',$id)->count();
+        $company_id = Project::whereId($id)->first()->company_id;
         $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
         // $res['sites'] = Project_site::where('project_id',$project['id'])
         //     ->leftJoin('sites','project_sites.site_id','=','sites.id')->select('project_sites.*','sites.site_name','sites.city','sites.address','sites.postcode')->withCount('rooms')->orderBy('project_sites.id','desc')->get();
@@ -230,15 +235,16 @@ class ProjectController extends Controller
 
         $res['customer_sites']= Site::where('company_id',$project->company_id)->orderBy('id','desc')->get();
 
-        $res['assign_to'] = Project_user::where(['project_users.project_id'=>$request->id,'project_users.type'=>'1'])
+        $res['assign_to'] = Project_user::where(['project_users.project_id'=>$id,'project_users.type'=>'1'])
                                         ->leftjoin('users','users.id','=','project_users.user_id')
                                         ->select('users.*')
                                         ->get();
-        $assignId = Project_user::where(['project_id'=>$request->id,'type'=>1])->pluck('user_id');
+        $assignId = Project_user::where(['project_id'=>$id,'type'=>1])->pluck('user_id');
         $com_id = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
         $res['team'] = User::where('company_id',$com_id)->whereIn('user_type',[1,5])->where('status',1)->whereNotIn('id',$assignId)->get();
-        $res['signed_cnt'] = Room::where('project_id',$request->id)->count()-Room::where('project_id',$request->id)->where('signed_off','1')->count();
+        $res['signed_cnt'] = Room::where('project_id',$id)->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
         $res['status'] = "success";
+        $res['project_id'] = $id;
         return response()->json($res);
     }
     public function getProjectInfo(Request $request){
