@@ -10,6 +10,6 @@ class Floor extends Model
     ];
 
     public function rooms(){
-        return $this->hasMany('App\Room','floor_id');
+        return $this->hasMany('App\Site_room','floor_id');
     }
 }

@@ -59,8 +59,11 @@ class ProductController extends Controller
             $request->upload_file->move(public_path('upload/file/'), $fileName);
             $product['upload_file']  = $fileName;
         }
-        
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(Product::where('off_id',$request->id)->count() > 0)
+                $id = Product::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             $product['created_by']  = $request->user->id;
             if(strlen($request->id) > 10)
                 $product['off_id'] = $request->id;

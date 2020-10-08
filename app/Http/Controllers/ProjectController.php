@@ -12,6 +12,7 @@ use App\Task;
 use App\Notification;
 use App\User;
 use App\Room;
+use App\Room_photo;
 use App\Company;
 use App\Product;
 use App\Company_customer;
@@ -61,7 +62,11 @@ class ProjectController extends Controller
         $project['created_by']  = $request->user->id;
         $project['project_summary']  = $request->project_summary;
         $action = "updated";
-        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(Project::where('off_id',$request->id)->count() > 0)
+                $id = Project::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"){
             if(strlen($request->id) > 10)
                 $project['off_id'] = $request->id;
             $project = Project::create($project);
@@ -215,6 +220,7 @@ class ProjectController extends Controller
             $rooms[$key]['products'] = Product::where('room_id',$room->id)->count();
             $rooms[$key]['total_tasks'] = Task::where('room_id',$room->id)->count();
             $rooms[$key]['complete_tasks'] =Task::where('room_id',$room->id)->where('archived',1)->count();
+            $rooms[$key]['img_files'] = Room_photo::where('room_id',$room->id)->get();
         }
         $res['rooms'] = $rooms;
         $room_ids = Room::where('project_id',$project['id'])->pluck('id');

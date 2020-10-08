@@ -61,7 +61,11 @@ class TaskController extends Controller
             $request->task_img->move(public_path('upload/img/'), $fileName);
             $task['task_img']  = $fileName;
         }
-        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"||strlen($request->id)>10){
+        if(strlen($request->id) > 10)
+            if(Task::where('off_id',$request->id)->count() > 0)
+                $id = Task::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"){
             $task['created_by']  = $request->user->id;
             if(strlen($request->id)>10)
             $task['off_id'] = $request->id;

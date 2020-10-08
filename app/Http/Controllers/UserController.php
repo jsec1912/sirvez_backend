@@ -246,8 +246,11 @@ class UserController extends Controller
         $token = self::getToken($request->email, $request->password);
         $user_info['auth_token'] = $token;
         $id = $request->id;
-        
-        if(!isset($id) || $id==""|| $id=='null'|| $id=='undefined'|| $id < 1||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(User::where('off_id',$request->id)->count() > 0)
+                $id = User::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=='null'|| $id=='undefined'|| $id < 1){
             if(!$request->has('password'))
                 return response()->json([
                     'status' => 'error',
@@ -287,8 +290,11 @@ class UserController extends Controller
     public function DeleteUser(Request $request)
     {
         //$request = {'id':{},'company_id':{}}
-       
-        $data = user::where(['id'=>$request->id])->delete();
+        if(strlen($request->id)>10){
+            user::where(['off_id'=>$request->id])->delete();
+        }
+        else
+            user::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
         return response()->json($res);
     }

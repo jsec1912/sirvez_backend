@@ -7,6 +7,7 @@ use App\Department;
 use App\Building;
 use App\Floor;
 use App\Room;
+use App\Site;
 use App\Site_room;
 use Illuminate\Support\Facades\Validator;
 class BuildingController extends Controller
@@ -27,15 +28,22 @@ class BuildingController extends Controller
         }
         $building = array();
         $id = $request->id;
-        $building['site_id']  = $request->site_id;
+        if(strlen($request->site_id) > 10)
+            $building['site_id'] = Site::where('off_id',$request->site_id)->first()->id;
+        else
+            $building['site_id'] = $request->site_id;
         $building['building_name']  = $request->building_name;
         if($request->hasFile('upload_img')){
             $fileName = time().'.'.$request->upload_img->extension();  
             $request->upload_img->move(public_path('upload/img/'), $fileName);
             $building['upload_img']  = $fileName;
         }
+        if(strlen($request->id) > 10)
+            if(Building::where('off_id',$request->id)->count() > 0)
+                $id = Building::where('off_id',$request->id)->first()->id;
+            else $id = '';
 
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined" ||strlen($request->id) > 10){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined" ){
             $building['created_by']  = $request->user->id;
             if(strlen($request->id) > 10)
             $building['off_id'] = $request->id;
@@ -63,7 +71,7 @@ class BuildingController extends Controller
         $res = array();
         $buildings= Building::withCount('floors')->where('department_id',$request->department_id)->orderBy('id','desc')->get();
         foreach($buildings as $key =>$building){
-            $buildings[$key]['rooms_count'] = Room::where('building_id',$building->id)->count();
+            $buildings[$key]['rooms_count'] = Site_room::where('building_id',$building->id)->count();
         }
         $res['building'] = $buildings;
         $res["status"] = "success";
@@ -73,7 +81,10 @@ class BuildingController extends Controller
         $res = array();
         $res['building'] = Building::whereId($request->id)->first();
         
-        $floors =Floor::withCount('rooms')->where('building_id',$request->id)->orderBy('id','desc')->get();
+        $floors =Floor::where('building_id',$request->id)->orderBy('id','desc')->get();
+        foreach($floors as $key =>$floor){
+            $floors[$key]['rooms_count'] = Site_room::where('floor_id',$floor->id)->count();
+        }
         $res['floors'] = $floors;
         $res['rooms'] = Site_room::where('site_rooms.building_id',$request->id)
             ->leftJoin('departments','departments.id','=','site_rooms.department_id')

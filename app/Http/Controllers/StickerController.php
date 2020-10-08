@@ -38,7 +38,11 @@ class StickerController extends Controller
         $stiker_info['name']  = $request->name;
         $stiker_info['user_id']  = $request->user->id;
         $stiker_info['status']  = $request->status;
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="0"||strlen($request->id)>10){
+        if(strlen($request->id) > 10)
+            if(Sticker::where('off_id',$request->id)->count() > 0)
+                $id = Sticker::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="0"){
             $count = Sticker::where('category_id',$request->category_id)->where('name',$request->name)->count();            if($count>0)
             {
                 return response()->json([

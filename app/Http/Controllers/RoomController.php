@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
 {
     public function updateRoom(Request $request){
-        
+        $res = array();
         $project = array();
         $room = array();
         $id = $request->id;
@@ -61,7 +61,20 @@ class RoomController extends Controller
         if($request->has('asbestos'))
             $room['asbestos']  = $request->asbestos;
         $action = "updated";
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(Room::where('off_id',$request->id)->count() > 0)
+                $id = Room::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+            $room_cnt = Room::where('project_id',$room['project_id'])
+                        ->where('room_number',$room['room_number'])->count();
+            if($room_cnt > 0)
+            {
+                $res['status'] = 'error';
+                $res['msg'] = 'The room number is already exist!';
+                return response()->json($res);
+            }
             $room['created_by']  = $request->user->id;
             $room['signed_off'] = 0;
             if(strlen($request->id) > 10)
@@ -71,6 +84,15 @@ class RoomController extends Controller
             $action = "created";
         }
         else{
+            $room_cnt = Room::where('project_id',$room['project_id'])
+                            ->where('room_number',$room['room_number'])
+                            ->where('id','<>',$id)->count();
+            if($room_cnt > 0)
+            {
+                $res['status'] = 'error';
+                $res['msg'] = 'The room number is already exist!';
+                return response()->json($res);
+            }
             $room['updated_by'] = $request->user->id;
             Room::whereId($id)->update($room);
             $room = Room::whereId($id)->first();
@@ -89,8 +111,9 @@ class RoomController extends Controller
         if(isset($images) && count($images) > 0 ){
             foreach($images as $img_file) {
                 if (isset($img_file)) {
+                   
                     $n++;
-                    $fileName = time().'_'.$n.'.'.$img_file->extension();  
+                    $fileName = $img_file->getClientOriginalName();  
                     $img_file->move(public_path('upload/img/'), $fileName);
                     Room_photo::create(['room_id'=>$id,'user_id'=>$request->user->id,'img_name'=>$fileName]);
                 }
@@ -107,7 +130,7 @@ class RoomController extends Controller
             'created_date'		=> date("Y-m-d H:i:s"),
             'is_read'	    	=> 0,
         );
-        $res = array();
+        
         $res['status'] = 'success';
         $res['msg'] = 'Room Saved Successfully!';
         $res['room'] = $room;
@@ -132,8 +155,15 @@ class RoomController extends Controller
         $res = array();
        
         if ($request->has('id')||$request->has('room_number')) {
-            if((!$request->has('id') || $request->id =='null') && $request->has('room_number'))
+            if((!$request->has('id') || $request->id =='null') && $request->has('room_number')){
+                if($request->has('project_name')){
+                    $projectId = Project::where('project_name',$request->project_name)->first()->id;
+                    $room_id = Room::where('room_number',$request->room_number)->where('project_id',$projectId)->first()->id;
+                }
+                else
                 $room_id = Room::where('room_number',$request->room_number)->first()->id;
+
+            }
             else
                 $room_id = $request->id;
             $room = Room::where('rooms.id',$room_id)

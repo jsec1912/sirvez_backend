@@ -31,7 +31,11 @@ class DepartmentController extends Controller
         $department['company_id']  = $request->user->company_id;
         $department['department_name']  = $request->department_name;
         $department['colour']  = $request->colour;
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(Department::where('off_id',$request->id)->count() > 0)
+                $id = Department::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             $department['created_by']  = $request->user->id;
             if(strlen($request->id) > 10)
             $department['off_id'] = $request->id;
@@ -58,16 +62,19 @@ class DepartmentController extends Controller
         $res = array();
         if($request->user->user_type ==1){
             $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-            $departments= Department::withCount('rooms')->whereIn('company_id',$customer_id)->orderBy('id','desc')->get();
+            $departments= Department::whereIn('company_id',$customer_id)->orderBy('id','desc')->get();
         }
         else
-            $departments= Department::withCount('rooms')->where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
+            $departments= Department::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
         // foreach($departments as $key =>$department){
         //     $departments[$key]['customer_name'] = Company::whereId($department->company_id)->first()->name;
         //     $departments[$key]['site_name'] = Site::whereId($department->site_id)->first()->site_name;
         //     $departments[$key]['floors_count'] = Floor::where('department_id',$department->id)->count();
         //     $departments[$key]['rooms_count'] = Room::where('department_id',$department->id)->count();
         // }
+        foreach($departments as $key =>$department){
+            $department[$key]['rooms_count'] = Site_room::where('department_id',$department->id)->count();
+        }
         $res['departments'] = $departments;
         $res["status"] = "success";
         return response()->json($res);

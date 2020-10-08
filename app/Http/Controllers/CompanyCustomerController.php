@@ -8,6 +8,7 @@ use App\Company_customer;
 use App\Site;
 use App\User;
 use App\Task;
+use App\Site_room;
 use App\Project;
 use App\Product;
 use App\Room;
@@ -55,7 +56,11 @@ class CompanyCustomerController extends Controller
         $company['status']  = 1;
         $company['manager']  = $request->post("manager");
         //return response()->json(strlen($request->id));
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(company::where('off_id',$request->id)->count() > 0)
+                $id = company::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             
             $v = Validator::make($request->all(), [
                 'website' => 'required|unique:companies',
@@ -96,7 +101,7 @@ class CompanyCustomerController extends Controller
         $companyCustomer['company_id'] = $request->user->company_id;
         $companyCustomer['customer_id'] = $id;
         $action = "";
-        if(!isset($request->id) || $request->id==""|| $request->id=='null'||strlen($request->id)>10){
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             $companyCustomer['created_by'] = $request->user->id;
             $companyCustomer = Company_customer::create($companyCustomer);
             $action = "created";
@@ -159,7 +164,7 @@ class CompanyCustomerController extends Controller
             $row['user_count'] = User::where('company_id',$row['id'])->where('status',1)->count();
             $row['project_count'] = Project::where('company_id',$row['id'])->count();
             $row['site_count'] = Site::where('company_id',$row['id'])->count();
-            $row['room_count'] = Room::where('company_id',$row['id'])->count();
+            $row['room_count'] = Site_room::where('company_id',$row['id'])->count();
             $customers[$key] = $row;
         }
         // $customers = Company::with(['company_customers'=> function ($query) use($userid) {
@@ -179,7 +184,7 @@ class CompanyCustomerController extends Controller
             Company_customer::where('company_id',$company_id)->delete();
             Project::where('company_id',$company_id)->delete();
             Site::where('company_id',$company_id)->delete();
-            Room::where('company_id',$company_id)->delete();
+            Site_room::where('company_id',$company_id)->delete();
         }
         $res['status'] = "success";
         return response()->json($res);
@@ -208,13 +213,13 @@ class CompanyCustomerController extends Controller
         $sites = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
         foreach($sites as $key=>$site){
            
-            $sites[$key]['rooms'] = Room::where('site_id',$site->id)->count();    
+            $sites[$key]['rooms'] = Site_room::where('site_id',$site->id)->count();    
             $sites[$key]['projects'] = Project::where('company_id',$company_id)->count();    
         }
 
         $res['sites'] =$sites;
-        $res['rooms'] = Room::where('rooms.company_id',$company_id)
-            ->leftJoin('sites','rooms.site_id','=','sites.id')->select('rooms.*','sites.site_name')->orderBy('id','desc')->get();
+        $res['rooms'] = Site_room::where('site_rooms.company_id',$company_id)
+            ->leftJoin('sites','site_rooms.site_id','=','sites.id')->select('site_rooms.*','sites.site_name')->orderBy('id','desc')->get();
         $tasks = Task::where('company_id',$company_id)->orderBy('id','desc')->get();
         foreach($tasks as $key=>$row){
             $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'project_users.type'=>'2'])->pluck('users.first_name');

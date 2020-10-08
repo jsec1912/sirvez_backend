@@ -10,6 +10,6 @@ class Department extends Model
     ];
 
     public function rooms(){
-        return $this->hasMany('App\Room','department_id');
+        return $this->hasMany('App\Site_room','department_id');
     }
 }

@@ -30,7 +30,7 @@ class SiteController extends Controller
             'site_instructions' => 'required',
             //'parking_instructions' => 'required',
             'access_hour' => 'required',
-            'comment' => 'required',
+            //'comment' => 'required',
             //'status' => 'required'
         ]);
         if ($v->fails())
@@ -59,7 +59,11 @@ class SiteController extends Controller
         $site['comment']  = $request->comment;
         $site['status']  = $request->status;
         $action = "updated";
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(Site::where('off_id',$request->id)->count() > 0)
+                $id = Site::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             if (strlen($request->id) > 10)
                 $site['off_id']  = $request->id;
             $site['created_by']  = $request->user->id;
@@ -158,10 +162,7 @@ class SiteController extends Controller
         $v = Validator::make($request->all(), [
             //company info
             'site_id' => 'required',
-            'department_id' => 'required',
-            'building_id' => 'required',
-            'floor_id' => 'required',
-            
+            'room_number' => 'required'            
         ]);
         if ($v->fails())
         {
@@ -196,8 +197,11 @@ class SiteController extends Controller
         
         $room['company_id'] = Site::whereId($room['site_id'])->first()->company_id;
         
-        
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(Site_room::where('off_id',$request->id)->count() > 0)
+                $id = Site_room::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             if (strlen($request->id) > 10)
                 $room['off_id']  = $request->id;
             $room['created_by']  = $request->user->id;
@@ -232,6 +236,13 @@ class SiteController extends Controller
             $id = $request->id;
         
         $res['departments'] = Department::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
+        if(strlen($request->customer_id)>10)
+            $company_id = Company::where('off_id',$request->customer_id)->first()->id;
+        else if($request->customer_id > 0)
+            $company_id = $request->customer_id;
+        else
+            $company_id = $request->user->company_id;
+        $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
         $res['room'] = Site_room::where('site_rooms.id',$request->id)->first(); 
         $res['status'] = 'success';
         return response()->json($res);

@@ -30,15 +30,21 @@ class FloorController extends Controller
         $floor = array();
         $id = $request->id;
         $floor['site_id']  = $request->site_id;
-        $floor['building_id']  = $request->building_id;
+        if(strlen($request->building_id) > 10)
+            $floor['building_id'] = Building::where('off_id',$request->building_id)->first()->id;
+        else
+            $floor['building_id'] = $request->building_id;
         $floor['floor_name']  = $request->floor_name;
         if($request->hasFile('upload_img')){
             $fileName = time().'floor.'.$request->upload_img->extension();  
             $request->upload_img->move(public_path('upload/img/'), $fileName);
             $floor['upload_img']  = $fileName;
         }
-
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"||strlen($request->id) > 10){
+        if(strlen($request->id) > 10)
+            if(Floor::where('off_id',$request->id)->count() > 0)
+                $id = Floor::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             $floor['created_by']  = $request->user->id;
             if(strlen($request->id) > 10)
             $floor['off_id'] = $request->id;
@@ -63,7 +69,10 @@ class FloorController extends Controller
     }
     public function FloorList(Request $request){
         $res = array();
-        $floors= Floor::withCount('rooms')->where('building_id',$request->building_id)->orderBy('id','desc')->get();
+        $floors= Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
+        foreach($floors as $key =>$floor){
+            $floors[$key]['rooms_count'] = Site_room::where('floor_id',$floor->id)->count();
+        }
         $res['floors'] = $floors;
         $res["status"] = "success";
         return response()->json($res);
