@@ -82,6 +82,8 @@ class RoomController extends Controller
             $room = Room::create($room);
             $id = $room->id;
             $action = "created";
+            if(!$request->room_site_id)
+            Site_room::create(['company_id'=>$room['company_id'],'site_id'=>$room['site_id'],'room_number'=>$room['room_number']]);
         }
         else{
             $room_cnt = Room::where('project_id',$room['project_id'])
