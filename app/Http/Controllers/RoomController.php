@@ -177,15 +177,12 @@ class RoomController extends Controller
             
             $room['img_files'] = Room_photo::where('room_id',$room_id)->get();
             $res["room"] = $room;
-            
-            $products= Product::where('room_id',$room_id)->orderBy('id','desc')->get();
-            foreach($products as $key => $product)
-            {
-                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
-                //$products[$key]['to_room_name'] = Room::whereId($product->to_room_id)->first()->room_number;
-                //$products[$key]['to_site_name'] = Site::whereId($product->to_site_id)->first()->site_name;
-            }
-            $res['products'] = $products;
+            // $products= Product::where('room_id',$room_id)->orderBy('id','desc')->get();
+            // foreach($products as $key => $product)
+            // {
+            //     $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+            // }
+            // $res['products'] = $products;
             $tasks = Task::where('room_id',$room_id)->get();
             foreach($tasks as $key=>$row){
                 $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'type'=>'2'])->pluck('users.first_name');
@@ -203,13 +200,20 @@ class RoomController extends Controller
                 $project_id = Project::where('project_name',$request->project_name)->first()->id;
             else
                 $project_id = $request->project_id;
+            $room_ids = Room::where('project_id',$project_id)->pluck('id');
+            $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
+            foreach($products as $key => $product)
+            {
+                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+            }
+            $res['products'] = $products;
             $company_id = Project::whereId($project_id)->first()->company_id;
             $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['projects'] = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
             $site_id = Site::where('company_id',$company_id)->pluck('id');
             $res['departments'] = Department::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['buildings'] = Building::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
-            
+            $res['project_rooms'] = Room::where('project_id',$project_id)->get();
             $res['rooms'] = Site_room::where('company_id',$company_id)/* ->whereNull('project_id') */->get();
             $res['floors'] = Floor::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
             $res['project_id'] = $project_id;
@@ -285,6 +289,13 @@ class RoomController extends Controller
             'is_read'	    	=> 0,
         );
         Notification::create($insertnotificationdata);
+        return response()->json($res);
+    }
+    public function setFavourite(request $request)
+    {
+        Room::whereId($request->id)->update(['favourite'=>$request->favourite]);
+        $res = array();
+        $res['status'] = 'success';
         return response()->json($res);
     }
 }

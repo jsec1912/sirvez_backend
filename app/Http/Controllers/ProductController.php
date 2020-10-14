@@ -9,16 +9,19 @@ use App\Project;
 use App\Room;
 use App\Site;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\ProductImport;
+
 class ProductController extends Controller
 {
     public function updateProduct(Request $request){
         $v = Validator::make($request->all(), [
             //company info
             'room_id' => 'required',
-            'product_name' => 'required',  
-            //'description' => 'required',  
-            'action' => 'required',       
-            'qty' => 'required', 
+            'product_name' => 'required',
+            //'description' => 'required',
+            'action' => 'required',
+            'qty' => 'required',
         ]);
         if ($v->fails())
         {
@@ -53,9 +56,9 @@ class ProductController extends Controller
 
         //$product['to_site_id']  = $request->to_site_id;
         //$product['to_room_id']  = $request->to_room_id;
-        
+
         if($request->hasFile('upload_file')){
-            $fileName = time().'product.'.$request->upload_file->extension();  
+            $fileName = time().'product.'.$request->upload_file->extension();
             $request->upload_file->move(public_path('upload/file/'), $fileName);
             $product['upload_file']  = $fileName;
         }
@@ -74,7 +77,7 @@ class ProductController extends Controller
             Product::whereId($id)->update($product);
         }
 
-        $response = ['status'=>'success', 'msg'=>'Product Saved Successfully!'];  
+        $response = ['status'=>'success', 'msg'=>'Product Saved Successfully!'];
         return response()->json($response);
     }
     public function deleteProduct(Request $request)
@@ -96,7 +99,7 @@ class ProductController extends Controller
     }
     public function productInfo(Request $request){
         $res = array();
-        $product = product::where('id',$request->id)->first();       
+        $product = product::where('id',$request->id)->first();
         $res["product"] = $product;
         $res['status'] = "success";
         return response()->json($res);
@@ -112,8 +115,19 @@ class ProductController extends Controller
             $res['sites'] = Site::where('company_id',$company_id)->get();
             $res['rooms'] = Room::where('project_id',$request->project_id)->get();
         }
-            
+
         $res['status'] = "success";
         return response()->json($res);
+    }
+    public function importProduct(Request $request) {
+        return request()->json($request);
+        if ($request->has('csv_file')) {
+            $this->validate($request, [
+                'csv_file' => 'required|mimes:xls,xlsx,csv'
+            ]);
+            $path = $request->file('csv_file')->getRealPath();
+            $filename = $request->file('csv_file')->getClientOriginalName();
+            Excel::import(new ProductImport, $path);
+        }
     }
 }

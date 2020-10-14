@@ -40,6 +40,7 @@ class CompanyCustomerController extends Controller
         }
         $company = array();
         $id = $request->id;
+        $flag = 0;
         if($request->hasFile('logo_img')){
             $fileName = time().'.'.$request->logo_img->extension();  
             $request->logo_img->move(public_path('upload/img/'), $fileName);
@@ -77,6 +78,7 @@ class CompanyCustomerController extends Controller
                 $company['off_id']  = $request->id;
             $company = company::create($company);
             $id = $company->id;
+            $flag = 1;
         }
         else{
            
@@ -101,7 +103,8 @@ class CompanyCustomerController extends Controller
         $companyCustomer['company_id'] = $request->user->company_id;
         $companyCustomer['customer_id'] = $id;
         $action = "";
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+       
+        if($flag > 0){
             $companyCustomer['created_by'] = $request->user->id;
             $companyCustomer = Company_customer::create($companyCustomer);
             $action = "created";
@@ -137,7 +140,7 @@ class CompanyCustomerController extends Controller
             $site['postcode'] = $request->post("postcode");
             $site['created_by'] = $request->user->id;
             $site['updated_by'] = $request->user->id;
-            if(!isset($request->id) || $request->id==""|| $request->id=='null'||strlen($request->id)>10){
+            if($flag > 0){
                 if (strlen($request->id)>10)
                     $site['off_id'] = $request->site_off_id;
                 $site = Site::create($site);

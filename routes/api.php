@@ -14,7 +14,7 @@ Route::group(['middleware' => ['api-header', 'cors']], function () {
     Route::post('/room/saveimage','RoomController@saveimage');
     Route::post('user/checkValidate', 'UserController@checkValidate');
     Route::post('companyuser/register', 'UserController@companyUserRegister');
-    
+
 
 });
 
@@ -82,12 +82,14 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/product/productList','ProductController@productList');
     Route::get('/product/productInfo','ProductController@productInfo');
     Route::get('/product/getProductInfo','ProductController@getProductInfo');
+    Route::post('/product/import-product', 'ProductController@importProduct');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///
     Route::get('/room/roomInfo','RoomController@roomInfo');///
     Route::get('/room/editPhoto','RoomController@editPhoto');///
     Route::post('/room/signoff','RoomController@signoff');///
+    Route::post('/room/setFavourite','RoomController@setFavourite');
 
 
     Route::post('/task/updateTask','TaskController@updateTask');///
