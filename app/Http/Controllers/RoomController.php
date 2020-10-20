@@ -9,6 +9,7 @@ use App\Room;
 use App\Site;
 use App\Site_room;
 use App\Task;
+use App\TaskComment;
 use App\Product;
 use App\Project;
 use App\Project_user;
@@ -172,7 +173,8 @@ class RoomController extends Controller
             ->leftJoin('departments','departments.id','=','rooms.department_id')
             ->leftJoin('projects','projects.id','=','rooms.project_id')
             ->leftJoin('companies','companies.id','=','rooms.company_id')
-            ->select('rooms.*','projects.project_name','companies.name as company_name','departments.department_name')
+            ->leftJoin('sites','sites.id','=','rooms.site_id')
+            ->select('rooms.*','projects.project_name','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name')
             ->first(); 
             
             $room['img_files'] = Room_photo::where('room_id',$room_id)->get();
@@ -205,6 +207,12 @@ class RoomController extends Controller
             foreach($products as $key => $product)
             {
                 $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                if($product['action'] ==0)
+                    $products[$key]['product_action'] = "New Product";
+                else if($product['action'] ==1)
+                    $products[$key]['product_action'] = "Dispose";
+                else
+                    $products[$key]['product_action'] = "Move To Room";
             }
             $res['products'] = $products;
             $company_id = Project::whereId($project_id)->first()->company_id;

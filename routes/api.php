@@ -45,6 +45,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/project/deleteAssignUser','ProjectController@deleteAssignUser');
     Route::post('/project/signOff','ProjectController@signOff');
     Route::post('/project/addAssignUser','ProjectController@addAssignUser');
+    Route::post('/project/changeSummary','ProjectController@changeSummary');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///

@@ -66,6 +66,7 @@ class TaskController extends Controller
                 $id = Task::where('off_id',$request->id)->first()->id;
             else $id = '';
         if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"){
+            
             $task['created_by']  = $request->user->id;
             if(strlen($request->id)>10)
             $task['off_id'] = $request->id;
@@ -119,12 +120,15 @@ class TaskController extends Controller
         foreach($users as $pending_user){
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
-            $content = $request->user->first_name.' has been '.$action.' task as '.$request->task;
-            $data = ['name'=>$pending_user['first_name'], "content" => $content];
-            Mail::send('basicmail', $data, function($message) use ($to_name, $to_email) {
+            $content = $request->user->first_name.' '.$request->user->last_name.' has assigned you a task.';
+            $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
+            $invitationURL = "app.sirvez.com/app/task-manager/my-task";
+            $data = ['name'=>$pending_user['first_name'], "content" => $content,"task" =>$task,"task_img"=>$task_img,"invitationURL"=>$invitationURL];
+            
+            Mail::send('task', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez notification.');
-                $message->from('support@sirvez.com','sirvez supprot team');
+                $message->from('support@sirvez.com','sirvez support team');
             });
         }
 
@@ -149,7 +153,7 @@ class TaskController extends Controller
         if($request->has('room_id') && $request->room_id != 'undefined' && $request->room_id){
             $res['room_id'] = $request->room_id;
             if($request->user->user_type == 2||$request->user->user_type == 6){
-                $res["tasks"] = Task::where('tasks.company_id',$request->user->company_id)
+                $tasks = Task::where('tasks.company_id',$request->user->company_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -166,7 +170,6 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-
                 $res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->user->company_id)->get();
                 //$res['projects'] = Project::where('id',$request->project_id)->get();
@@ -175,7 +178,7 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-                $res["tasks"] = Task::whereIn('tasks.company_id',$customer_id)
+                $tasks = Task::whereIn('tasks.company_id',$customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -199,11 +202,12 @@ class TaskController extends Controller
                 $res['projects'] = array();
                 $res['customerId'] = Room::where('id',$request->room_id)->first()->company_id;
             }
+            
         }
         else if($request->has('customer_id') && $request->customer_id != 'undefined' && $request->customer_id){
             $res['project_id'] = '';
             if($request->user->user_type == 2||$request->user->user_type == 6){
-                $res["tasks"] = Task::where('tasks.company_id',$request->customer_id)
+                $tasks = Task::where('tasks.company_id',$request->customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -228,7 +232,7 @@ class TaskController extends Controller
             }
             else{
                 
-                $res["tasks"] = Task::where('tasks.company_id',$request->customer_id)
+                $tasks = Task::where('tasks.company_id',$request->customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -254,7 +258,7 @@ class TaskController extends Controller
         else if($request->has('project_id') && $request->project_id != 'undefined' && $request->project_id){
             $res['project_id'] = $request->project_id;
             if($request->user->user_type == 2||$request->user->user_type == 6){
-                $res["tasks"] = Task::where('tasks.company_id',$request->user->company_id)
+                $tasks = Task::where('tasks.company_id',$request->user->company_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -279,7 +283,7 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-                $res["tasks"] = Task::whereIn('tasks.company_id',$customer_id)
+                $tasks = Task::whereIn('tasks.company_id',$customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -305,7 +309,7 @@ class TaskController extends Controller
         
         else{
              if($request->user->user_type == 2||$request->user->user_type == 6){
-                $res["tasks"] = Task::where('tasks.company_id',$request->user->company_id)
+                $tasks = Task::where('tasks.company_id',$request->user->company_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -328,7 +332,7 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-                $res["tasks"] = Task::whereIn('tasks.company_id',$customer_id)
+                $tasks = Task::whereIn('tasks.company_id',$customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -349,6 +353,37 @@ class TaskController extends Controller
                 $res['projects'] = Project::whereIn('company_id',$customer_id)->get();
             }
         }
+        foreach($tasks as $key=>$row){
+            $room = Room::where('id',$row->room_id)->first();
+            $tasks[$key]['site_name'] = Site::where('id',$room->site_id)->first()->site_name;
+            $assign_to= Project_user::where(['project_users.project_id'=>$row->id,'type'=>'2'])
+            ->leftJoin('users','users.id','=','project_users.user_id')
+            ->select('users.first_name as assign_name')->pluck('assign_name');
+            $assign = array();
+            foreach($assign_to as $assign_item) {
+                array_push($assign, (string)$assign_item);
+            }
+            $assign_str = implode(',',$assign);
+            $tasks[$key]['assign_to'] = $assign_str;
+            $comment_number = TaskComment::where('task_id',$tasks[$key]['id'])->count();
+            $tasks[$key]['comment_number'] = $comment_number;
+            $task_comments = TaskComment::where('task_comments.task_id',$tasks[$key]['id'])
+                ->leftJoin('users','users.id','=','task_comments.created_by')
+                ->select('task_comments.*','users.first_name as created_user_f','users.last_name as created_user_l')
+                ->get();
+            for($i = 1;$i<=3;$i++){
+                $tasks[$key]['comment'.$i] = '';
+                $tasks[$key]['comment'.$i.'_date'] = '';
+                $tasks[$key]['comment'.$i.'_user'] = '';
+            }
+            for($i = 1;$i<=$comment_number;$i++){
+                if($i>3) break;
+                $tasks[$key]['comment'.$i] = $task_comments[$i-1]['comment'];
+                $tasks[$key]['comment'.$i.'_date'] = date('d-m-Y',strtotime($task_comments[$i-1]['created_at']));
+                $tasks[$key]['comment'.$i.'_user'] = $task_comments[$i-1]['created_user_f'].' '.$task_comments[$i-1]['created_user_l'];
+            }
+        }
+        $res['tasks'] = $tasks;
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -460,7 +495,7 @@ class TaskController extends Controller
             Mail::send('basicmail', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez notification.');
-                $message->from('support@sirvez.com','sirvez supprot team');
+                $message->from('support@sirvez.com','sirvez support team');
             });
         }
 

@@ -25,7 +25,7 @@ class ProjectController extends Controller
         $v = Validator::make($request->all(), [
             //company info
             'customer_id' => 'required',
-            'project_name' => 'required|unique:projects',
+            'project_name' => 'required',
             'manager_id' => 'required',
             'user_id' => 'required',
             'contact_number' => 'required',
@@ -119,7 +119,7 @@ class ProjectController extends Controller
         Mail::send('basicmail', $data, function($message) use ($to_name, $to_email) {
             $message->to($to_email, $to_name)
                     ->subject('sirvez notification.');
-            $message->from('support@sirvez.com','sirvez supprot team');
+            $message->from('support@sirvez.com','sirvez support team');
         });
         
 
@@ -154,7 +154,7 @@ class ProjectController extends Controller
             Mail::send('basicmail', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez notification.');
-                $message->from('support@sirvez.com','sirvez supprot team');
+                $message->from('support@sirvez.com','sirvez support team');
             });
         }
 
@@ -178,6 +178,7 @@ class ProjectController extends Controller
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
         }
         foreach($project_array as $key => $row){
+            $project_array[$key]['survey_start_date'] = date('d-m-Y', strtotime($row['survey_start_date']));
             $project_array[$key]['site_count'] = Project_site::where('project_id',$row['id'])->count();
             $project_array[$key]['room_count'] = Room::where('project_id',$row['id'])->count();
             $project_array[$key]['messages'] = Notification::where('notice_type','3')->where('notice_id',$row['id'])->count();
@@ -196,6 +197,7 @@ class ProjectController extends Controller
         ->leftJoin('companies','projects.company_id','=','companies.id')
         ->leftJoin('users','users.id','=','projects.created_by')
         ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
+        $project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
         $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
         $user_cnt = User::where('id',$project->user_id)->count();
         if($user_cnt>0)
@@ -212,8 +214,9 @@ class ProjectController extends Controller
         //     ->leftJoin('sites','project_sites.site_id','=','sites.id')->select('project_sites.*','sites.site_name','sites.city','sites.address','sites.postcode')->withCount('rooms')->orderBy('project_sites.id','desc')->get();
         $rooms = Room::where('rooms.project_id',$project['id'])
             ->leftJoin('sites','rooms.site_id','=','sites.id')
+            ->leftJoin('companies','rooms.company_id','=','companies.id')
             ->leftJoin('buildings','rooms.building_id','=','buildings.id')
-            ->select('rooms.*','sites.site_name','buildings.building_name')
+            ->select('rooms.*','sites.site_name','companies.name as company_name','buildings.building_name')
             ->orderBy('rooms.id','desc')->get();
         foreach($rooms as $key => $room)
         {
@@ -228,6 +231,16 @@ class ProjectController extends Controller
         foreach($products as $key => $product)
         {
             $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+            foreach($products as $key => $product)
+            {
+                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                if($product['action'] ==0)
+                    $products[$key]['product_action'] = "New Product";
+                else if($product['action'] ==1)
+                    $products[$key]['product_action'] = "Dispose";
+                else
+                    $products[$key]['product_action'] = "Move To Room";
+            }
             //$products[$key]['to_room_name'] = Room::whereId($product->to_room_id)->first()->room_number;
             //$products[$key]['to_site_name'] = Site::whereId($product->to_site_id)->first()->site_name;
         }
@@ -347,7 +360,7 @@ class ProjectController extends Controller
         Mail::send('basicmail', $data, function($message) use ($to_name, $to_email,$project) {
             $message->to($to_email, $to_name)
                     ->subject('sirvez notification.');
-            $message->from('support@sirvez.com','supprot team');
+            $message->from('support@sirvez.com','support team');
         });
        
 
@@ -361,5 +374,17 @@ class ProjectController extends Controller
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
+    }
+    public function changeSummary(request $request){
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+            
+        Project::whereId($id)->update(['project_summary'=>$request->project_summary]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+
     }
 }

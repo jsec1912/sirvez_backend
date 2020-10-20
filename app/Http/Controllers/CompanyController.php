@@ -46,7 +46,8 @@ class CompanyController extends Controller
         $company['city']  = $request->post("city");
         $company['postcode']  = $request->post("postcode");
         $company['status']  = $request->post("status");
-        $company['telephone']  = $request->post("telephone");
+        $company['telephone']  = $request->post("telephone"); 
+        $company['is_upload']  = $request->post("is_upload");
         
         //return response()->json($company );
         $count = Company::where('id','<>',$id)->where('website',$request->website)->count() +
@@ -60,7 +61,7 @@ class CompanyController extends Controller
             return response()->json($res);
         }
         company::whereId($id)->update($company);
-        return response()->json(['status'=>'success']);
+        return response()->json(['status'=>'success','company'=>$company]);
            
             
          

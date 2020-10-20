@@ -56,6 +56,7 @@ class CompanyCustomerController extends Controller
         $company['company_type']  = 3;
         $company['status']  = 1;
         $company['manager']  = $request->post("manager");
+       
         //return response()->json(strlen($request->id));
         if(strlen($request->id) > 10)
             if(company::where('off_id',$request->id)->count() > 0)
@@ -309,7 +310,7 @@ class CompanyCustomerController extends Controller
             Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez support team invite you. please join our site.');
-                $message->from('support@sirvez.com','supprot team');
+                $message->from('support@sirvez.com','support team');
             });
         }
        

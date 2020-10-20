@@ -62,12 +62,14 @@ class UserController extends Controller
                 $user->co_name = str_replace(' ','-',Company::where('id',$user->company_id)->first()->name);
                 $user->logo_img = Company::where('id',$user->company_id)->first()->logo_img;
                 $user->bg_image = Company::where('id',$user->company_id)->first()->bg_image;
+                $user->is_upload = Company::where('id',$user->company_id)->first()->is_upload;
             }
             else{
                 $company_id = Company_customer::where('customer_id',$user->company_id)->first()->company_id;
                 $user->co_name = str_replace(' ','-',Company::where('id',$company_id)->first()->name);
                 $user->logo_img = Company::where('id',$company_id)->first()->logo_img;
                 $user->bg_image = Company::where('id',$company_id)->first()->bg_image;
+                $user->is_upload = Company::where('id',$company_id)->first()->is_upload;
             }
             $response = ['status'=>'success', 'data'=>$user];           
         }

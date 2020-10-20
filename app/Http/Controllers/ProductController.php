@@ -10,7 +10,6 @@ use App\Room;
 use App\Site;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\ProductImport;
 
 class ProductController extends Controller
 {
@@ -120,14 +119,60 @@ class ProductController extends Controller
         return response()->json($res);
     }
     public function importProduct(Request $request) {
-        return request()->json($request);
         if ($request->has('csv_file')) {
-            $this->validate($request, [
-                'csv_file' => 'required|mimes:xls,xlsx,csv'
-            ]);
             $path = $request->file('csv_file')->getRealPath();
             $filename = $request->file('csv_file')->getClientOriginalName();
-            Excel::import(new ProductImport, $path);
+            $ext = $request->file('csv_file')->getClientOriginalExtension();
+            $excel_data = Excel::toCollection(null, $request->file('csv_file'));
+
+            $idx = 0;
+            $cnt = 0;
+            $product = array();
+            foreach($excel_data[0] as $row) {
+                $idx ++;
+                if ($idx == 1) continue;
+                // $row->count()
+                if ($row->count() > 5) {
+                    if ($row[0] == '')
+                        continue;
+                    $product['product_name'] = $row[0];
+                    $product['description'] = $row[1];
+
+                    if ($row[2] == 'New Product')
+                        $product['action'] = 0;
+                    else if ($row[2] == 'Dispose')
+                        $product['action'] = 1;
+                    else if ($row[2] == 'Move To Room')
+                        $product['action'] = 2;
+                    else
+                        continue;
+
+                    $project_id = Project::where('project_name', $request->project_name)->first()->id;
+                    $product_room = Room::where('project_id', $project_id)->where('room_number', $row[3])->get();
+                    if ($product_room->count() != 1)
+                        continue;
+                    $product['room_id'] = $product_room->first()->id;
+
+
+                    $product['qty'] = $row[4];
+                    if ($row[5] == 'N/A')
+                        $product['signed_off'] = 0;
+                    else
+                        $product['signed_off'] = 1;
+
+                    $product['created_by']  = $request->user->id;
+
+                    Product::create($product);
+                    $cnt ++;
+                }
+            }
+            $res['total'] = $idx - 1;
+            $res['cnt'] = $cnt;
+            $res['status'] = "success";
+        } else {
+            $res['status'] = "error";
+            $res['msg'] = 'The excel format is not correct.';
         }
+        return response()->json($res);
     }
 }

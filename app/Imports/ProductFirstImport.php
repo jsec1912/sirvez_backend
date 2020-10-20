@@ -14,13 +14,15 @@ class ProductFirstImport implements ToCollection
     {
         //
         $nrow = 0;
+        $content = '';
         foreach($collection as $row) {
             $ncol = 0;
             foreach($row as $cell) {
-                $cell;
                 $ncol ++;
+                $content .= 'row=' . $nrow . ', col=' . $ncol . ', value=' . $cell . '<BR>';
             }
             $nrow ++;
         }
+        return 'excel data yes';
     }
 }
