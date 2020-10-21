@@ -79,6 +79,18 @@ class ProjectController extends Controller
                 foreach($array_res as $row)
                 {
                     Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>1]);
+                    $client = User::where('id',$row)->first()->first_name;
+                    $insertnotificationndata = array(
+                        'notice_type'		=> '3',
+                        'notice_id'			=> $id,
+                        'notification'		=> $request->user->first_name.' '.$request->user->last_name.' added you as a team member for a new project.['.$client.']',
+                        'created_by'		=> $request->user->id,
+                        'company_id'		=> $project['company_id'],
+                        'project_id'		=> $id,
+                        'created_date'		=> date("Y-m-d H:i:s"),
+                        'is_read'	    	=> 0,
+                    );
+                    Notification::create($insertnotificationndata);
                 }
             }
         }
@@ -101,9 +113,11 @@ class ProjectController extends Controller
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $project['project_name'].' have been '.$action.' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
+            //'notification'		=> $project['project_name'].' have been '.$action.' by  '.$request->user->first_name.' '.$request->user->last_name.' ('.$request->user->company_name.').',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' have been '.$action.' project['.$project['project_name'].']',
             'created_by'		=> $request->user->id,
-            'company_id'		=> $request->company_id,
+            'company_id'		=> $project['company_id'],
+            'project_id'		=> $id,
             'created_date'		=> date("Y-m-d H:i:s"),
             'is_read'	    	=> 0,
         );
@@ -136,9 +150,11 @@ class ProjectController extends Controller
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $project['project_name'].' have been completed by  '.$request->user->first_name.' ('.$request->user->company_name.').',
+            //'notification'		=> 'Project '.$project['project_name'].' have been completed by  '.$request->user->first_name.' '.$request->user->last_name.' ('.$request->user->company_name.').',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has been completed project['.$project['project_name'].']',
             'created_by'		=> $request->user->id,
             'company_id'		=> $request->user->company_id,
+            'project_id'		=> $id,
             'created_date'		=> date("Y-m-d H:i:s"),
             'is_read'	    	=> 0,
         );
@@ -306,14 +322,59 @@ class ProjectController extends Controller
     }
     public function deleteAssignUser(request $request)
     {
-        Project_user::where('project_id',$request->project_id)->where('user_id',$request->user_id)->where('type',1)->delete();
+        $id = $request->project_id;
+        if(strlen($request->project_id)>10)
+            $id = Project::where('off_id',$request->project_id)->first()->id;
+        Project_user::where('project_id',$id)->where('user_id',$request->user_id)->where('type',1)->delete();
+        $project = Project::where('id',$id)->first();
+        $client = User::where('id',$request->user_id)->first()->first_name;
+        $insertnotificationndata = array(
+            'notice_type'		=> '3',
+            'notice_id'			=> $id,
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' removed you as a team member for a new project.['.$client.']',
+            'created_by'		=> $request->user->id,
+            'company_id'		=> $project['company_id'],
+            'project_id'		=> $id,
+            'created_date'		=> date("Y-m-d H:i:s"),
+            'is_read'	    	=> 0,
+        );
+        Notification::create($insertnotificationndata);
+        
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addAssignUser(request $request)
+    {
+        $id = $request->project_id;
+        if(strlen($request->project_id)>10)
+            $id = Project::where('off_id',$request->project_id)->first()->id;
+        Project_user::create(['user_id'=>$request->user_id,'project_id'=>$id,'type'=>1]);
+        $project = Project::where('id',$id)->first();
+        $client = User::where('id',$request->user_id)->first()->first_name;
+        $insertnotificationndata = array(
+            'notice_type'		=> '3',
+            'notice_id'			=> $id,
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' added you as a team member for a new project.['.$client.']',
+            'created_by'		=> $request->user->id,
+            'company_id'		=> $project['company_id'],
+            'project_id'		=> $id,
+            'created_date'		=> date("Y-m-d H:i:s"),
+            'is_read'	    	=> 0,
+        );
+        Notification::create($insertnotificationndata);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
     }
     public function signOff(request $request)
     {
-        Project::whereId($request->id)->update(['signed_off'=>1]);
+        if($request->hasFile('sign_file')){
+            $fileName = time().'.'.$request->sign_file->extension();
+            $request->sign_file->move(public_path('upload/file/'), $fileName);
+            $project['sign_file']  = $fileName;
+        }
+        Project::whereId($request->id)->update(['signed_off'=>1,'sign_file'=>$fileName]);
         $project=Project::where('projects.id',$request->id)
                 ->leftJoin('companies','companies.id','=','projects.company_id')
                 ->leftJoin('users','users.id','=','projects.created_by')
@@ -325,21 +386,27 @@ class ProjectController extends Controller
             $insertnotificationdata = array(
                 'notice_type'		=> '6',
                 'notice_id'			=> $request->id,
-                'notification'		=> "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s"),
+                //'notification'		=> "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s").'['.$project['project_name'].']',
+                //'notification'		=> "Scope of works signed off on ".date("d-m-Y H:i:s")." by ".$request->user->first_name.".",
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested signed off on ".date("d-m-Y H:i:s").".",
                 'created_by'		=> $request->user->id,
-                'company_id'		=> $project->company_id,
+                'company_id'		=> $project['company_id'],
+                'project_id'		=> $project->id,
                 'created_date'		=> date("Y-m-d H:i:s"),
                 'is_read'	    	=> 0,
+                'is_signed'	    	=> 0,
             );
         else
             $insertnotificationdata = array(
                 'notice_type'		=> '6',
                 'notice_id'			=> $request->id,
-                'notification'		=> "Project was signed off by ".$request->user->first_name.". ".date("d-m-Y H:i:s"),
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has signed off scope of works for ".$project['project_name'].". ".date("d-m-Y H:i:s"),
                 'created_by'		=> $request->user->id,
-                'company_id'		=> $project->company_id,
+                'company_id'		=> $project['company_id'],
+                'project_id'		=> $project->id,
                 'created_date'		=> date("Y-m-d H:i:s"),
-                'is_read'	    	=> 1,
+                'is_read'	    	=> 0,
+                'is_signed'	    	=> 1,
             );
         Notification::create($insertnotificationdata);
         
@@ -347,7 +414,10 @@ class ProjectController extends Controller
         $content = "";
         if($request->user->user_type <6){
             $pending_user = $project['customer_user'];
-            $content = "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s");
+            //$content = "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s");
+            //$content = "Scope of works signed off on ".date("d-m-Y H:i:s")." by ".$request->user->first_name.".";
+            $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
+
         }
         else{
             $pending_user = User::where('id',$project->created_by)->first();
@@ -356,8 +426,9 @@ class ProjectController extends Controller
 
         $to_name = $pending_user['first_name'];
         $to_email = $pending_user['email'];
-        $data = ['name'=>$pending_user['first_name'], "content" => $content];
-        Mail::send('basicmail', $data, function($message) use ($to_name, $to_email,$project) {
+        $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
+        $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
+        Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
             $message->to($to_email, $to_name)
                     ->subject('sirvez notification.');
             $message->from('support@sirvez.com','support team');
@@ -368,13 +439,7 @@ class ProjectController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
-    public function addAssignUser(request $request)
-    {
-        Project_user::create(['user_id'=>$request->user_id,'project_id'=>$request->project_id,'type'=>1]);
-        $res = array();
-        $res['status'] = 'success';
-        return response()->json($res);
-    }
+   
     public function changeSummary(request $request){
         if(strlen($request->id) > 10)
             $id = Project::where('off_id',$request->id)->first()->id;

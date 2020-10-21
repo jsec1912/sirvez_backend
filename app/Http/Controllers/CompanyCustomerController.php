@@ -325,9 +325,47 @@ class CompanyCustomerController extends Controller
         $id = $request->user->company_id;
         if($request->user->user_type ==1||$request->user->user_type ==3){}
         $customerId = Company_customer::where('company_id',$id)->pluck('customer_id');
+        $projects = Project::whereNull('projects.signed_off')
+                                ->where(function($q) use($customerId,$id){
+                                    return $q->whereIn('projects.company_id',$customerId)
+                                    ->orwhere('projects.company_id',$id);
+                                })->leftJoin('companies','companies.id','=','projects.company_id')
+                                ->select('projects.*','companies.name as company_name')
+                                ->get();
+        foreach($projects as $key => $row){
+            $projects[$key]['survey_start_date'] = date('d-m-Y', strtotime($row['survey_start_date']));
+            $projects[$key]['room_count'] = Room::where('project_id',$row['id'])->count();
+        }
+        $res['project_list'] = $projects;
         $res['lives'] = Project::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
         $res['messages'] = Notification::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
+        $recent_messages = Notification::where('notifications.notice_type','>',2)
+                                                ->where(function($q) use($customerId,$id){
+                                                    return $q->whereIn('notifications.company_id',$customerId)
+                                                    ->orwhere('notifications.company_id',$id);
+                                                })->orderBy('id','desc')->take(10)
+                                                ->leftJoin('projects','projects.id','=','notifications.project_id')
+                                                ->leftJoin('users','users.id','=','projects.user_id')
+                                                ->select('notifications.*','projects.project_name','users.first_name','users.last_name')
+                                                ->get();
+        foreach($recent_messages as $key => $row){
+            $user = User::where('id',$row['created_by'])->first();
+            $recent_messages[$key]['user_img'] = $user['profile_pic'];
+            $recent_messages[$key]['current_time'] = date("Y-m-d H:i:s");
+            
+        }
+        $res['recent_messages'] = $recent_messages;
         $res['tasks'] = Task::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
+        $res['tasks_favourite'] = Task::where('tasks.favourite',1)
+                                    ->where(function($q) use($customerId,$id){
+                                        return $q->whereIn('tasks.company_id',$customerId)
+                                        ->orwhere('tasks.company_id',$id);
+                                    })
+                                    ->leftJoin('projects','projects.id','=','tasks.project_id')
+                                    ->leftJoin('companies','companies.id','=','tasks.company_id')
+                                    ->leftjoin('users','users.id','=','tasks.created_by')
+                                    ->select('tasks.*','projects.project_name','companies.name as company_name','users.profile_pic')
+                                    ->get();
         $res['archives'] = Task::where('tasks.archived','1')
             ->where('tasks.archived_day', '<=', date('Y-m-d', strtotime("-30 days")))
             ->whereIn('company_id',$customerId)->count();

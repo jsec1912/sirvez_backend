@@ -39,30 +39,24 @@
                                         </tr>
                                 
                                         <tr>
-                                            <td colspan="2">- {{$task['task']}}</td>
+                                            <td colspan="2">- {{$project['project_name']}}</td>
                                         </tr>
                                         <tr>
-                                            <td colspan="2">- {{$task['description']}}</td>
+                                            <td colspan="2">- {{$project['project_summary']}}</td>
                                         </tr>
-                                        <tr>
-                                            <td colspan="2" align="center">
-                                            <span><img src="{{$task_img}}" style="width:125px"></span>
-                                            </td>
-                                        </tr>
-        
                                         <tr>
                                         <td colspan="2">&nbsp;</td>
                                         </tr>
             
                                         <tr>
-                                            <td colspan="2" align="center"><a href="{{$invitationURL}}" style="background-color: #3f51b5; 
+                                            <td colspan="2" align="center"><a href="{{$Link_pdf}}" style="background-color: #3f51b5; 
                                                 border: none;
                                                 color: white;
                                                 padding: 15px 32px;
                                                 text-align: center;
                                                 text-decoration: none;
                                                 display: inline-block;
-                                                font-size: 16px;border-radius: 4px;">Click here to view task</a>
+                                                font-size: 16px;border-radius: 4px;">Click here to download PDF</a>
                                             </td>
                                         </tr>
         

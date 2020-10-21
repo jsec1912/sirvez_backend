@@ -10,6 +10,7 @@ use App\Room;
 use App\Site;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Notification;
 
 class ProductController extends Controller
 {
@@ -69,7 +70,21 @@ class ProductController extends Controller
             $product['created_by']  = $request->user->id;
             if(strlen($request->id) > 10)
                 $product['off_id'] = $request->id;
-            Product::create($product);
+            $product = Product::create($product);
+            $room = Room::where('id',$product['room_id'])->first();
+            $insertnotificationdata = array(
+                'notice_type'		=> '8',
+                'notice_id'			=> $id,
+                //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' have been added new product to['.$room['room_number'].']',
+                'created_by'		=> $request->user->id,
+                'company_id'		=> $room->company_id,
+                'project_id'        =>$room['project_id'],
+                'created_date'		=> date("Y-m-d H:i:s"),
+                'is_read'	    	=> 0,
+            );
+            Notification::create($insertnotificationdata);
+            
         }
         else{
             $product['updated_by'] = $request->user->id;

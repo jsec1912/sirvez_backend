@@ -103,17 +103,20 @@ class TaskController extends Controller
             }
         }
        //$notice_type ={1:pending_user,2:createcustomer 3:project 4:task}
-       $insertnotificationndata = array(
-        'notice_type'		=> '4',
-        'notice_id'			=> $id,
-        'notification'		=> $task['task'].' have been '.$action.' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
-        'created_by'		=> $request->user->id,
-        'company_id'		=> $request->company_id,
-        'created_date'		=> date("Y-m-d H:i:s"),
-        'is_read'	    	=> 0,
-        );
-        Notification::create($insertnotificationndata);
-
+       if($action == "created"){
+        $insertnotificationndata = array(
+            'notice_type'		=> '4',
+            'notice_id'			=> $id,
+            //'notification'		=> $task['task'].' have been '.$action.' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' '.$action.' a new task['.$task['task'].']',
+            'created_by'		=> $request->user->id,
+            'company_id'		=> $request->company_id,
+            'project_id'		=> $request->project_id,
+            'created_date'		=> date("Y-m-d H:i:s"),
+            'is_read'	    	=> 0,
+            );
+            Notification::create($insertnotificationndata);
+        }
         //sending gmail to user
         $array_res =json_decode($request->assign_to,true);
         $users = User::whereIn('id',$array_res)->get();
@@ -475,11 +478,13 @@ class TaskController extends Controller
             ->get();
 
         $insertnotificationndata = array(
-            'notice_type'		=> '5',
+            'notice_type'		=> '4',
             'notice_id'			=> $request->id,
-            'notification'		=> 'New comment has been add in '.$task['task'].' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
+            //'notification'		=> 'New comment has been add in '.$task['task'].' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has been add a new comment in '.$task['task'].'.',
             'created_by'		=> $request->user->id,
-            'company_id'		=> $request->user->company_id,
+            'company_id'		=> $task->company_id,
+            'project_id'		=> $task->project_id,
             'created_date'		=> date("Y-m-d H:i:s"),
             'is_read'	    	=> 0,
             );

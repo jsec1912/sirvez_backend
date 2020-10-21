@@ -124,16 +124,18 @@ class RoomController extends Controller
         }
 
         //$notice_type ={1:pending_user,2:createcustomer 3:project 4:site 5:room}  
-        $insertnotificationndata = array(
-            'notice_type'		=> '4',
+        $insertnotificationdata = array(
+            'notice_type'		=> '5',
             'notice_id'			=> $id,
-            'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
+            //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' have been '.$action.' location['.$room['room_number'].']',
             'created_by'		=> $request->user->id,
-            'company_id'		=> $request->customer_id,
+            'company_id'		=> $room['company_id'],
+            'project_id'        => $room['project_id'],
             'created_date'		=> date("Y-m-d H:i:s"),
             'is_read'	    	=> 0,
         );
-        
+        Notification::create($insertnotificationdata);
         $res['status'] = 'success';
         $res['msg'] = 'Room Saved Successfully!';
         $res['room'] = $room;
@@ -192,6 +194,10 @@ class RoomController extends Controller
             $res['tasks'] = $tasks;
             $res['notification'] = Notification::where('notice_type',7)
                                     ->where('notice_id',$room_id)
+                                    ->orderBy('id','desc')
+                                    ->first();
+            $res['sign_request'] = Notification::where('notice_type',6)
+                                    ->where('notice_id',$room->project_id)
                                     ->orderBy('id','desc')
                                     ->first();
             $res['room_id'] = $room_id;
@@ -283,16 +289,22 @@ class RoomController extends Controller
 
     }
     public function signoff(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
         $res = array();
         $res['status'] = "success";
-        Room::whereId($request->id)->update(['signed_off'=>1,'completed_date'=>date("d-m-Y H:i:s")]);
-        $room = Room::whereId($request->id)->first();
+        Room::whereId($d)->update(['signed_off'=>1,'completed_date'=>date("d-m-Y H:i:s")]);
+        $room = Room::whereId($d)->first();
         $insertnotificationdata = array(
             'notice_type'		=> '7',
-            'notice_id'			=> $request->id,
-            'notification'		=> "The room(".$room->room_number.") was signed off by ".$request->user->first_name."  on date ".date("d-m-Y H:i:s"),
+            'notice_id'			=> $id,
+            //'notification'		=> "The room(".$room->room_number.") was signed off by ".$request->user->first_name."  on date ".date("d-m-Y H:i:s"),
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has signed off location[".$room->room_number."]",
             'created_by'		=> $request->user->id,
-            'company_id'		=> $request->user->company_id,
+            'company_id'		=> $room->company_id,
+            'project_id'		=> $room->project_id,
             'created_date'		=> date("Y-m-d H:i:s"),
             'is_read'	    	=> 0,
         );
@@ -301,7 +313,21 @@ class RoomController extends Controller
     }
     public function setFavourite(request $request)
     {
-        Room::whereId($request->id)->update(['favourite'=>$request->favourite]);
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::whereId($id)->update(['favourite'=>$request->favourite]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeNotes(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::whereId($id)->update(['notes'=>$request->notes]);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
