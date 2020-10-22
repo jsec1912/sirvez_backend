@@ -295,8 +295,8 @@ class RoomController extends Controller
             $id = $request->id;
         $res = array();
         $res['status'] = "success";
-        Room::whereId($d)->update(['signed_off'=>1,'completed_date'=>date("d-m-Y H:i:s")]);
-        $room = Room::whereId($d)->first();
+        Room::whereId($id)->update(['signed_off'=>1,'completed_date'=>date("d-m-Y H:i:s")]);
+        $room = Room::whereId($id)->first();
         $insertnotificationdata = array(
             'notice_type'		=> '7',
             'notice_id'			=> $id,

@@ -388,7 +388,7 @@ class ProjectController extends Controller
                 'notice_id'			=> $request->id,
                 //'notification'		=> "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s").'['.$project['project_name'].']',
                 //'notification'		=> "Scope of works signed off on ".date("d-m-Y H:i:s")." by ".$request->user->first_name.".",
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested signed off on ".date("d-m-Y H:i:s").".",
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested sign off on ".date("d-m-Y H:i:s").".",
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $project['company_id'],
                 'project_id'		=> $project->id,

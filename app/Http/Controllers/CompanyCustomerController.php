@@ -352,7 +352,19 @@ class CompanyCustomerController extends Controller
             $user = User::where('id',$row['created_by'])->first();
             $recent_messages[$key]['user_img'] = $user['profile_pic'];
             $recent_messages[$key]['current_time'] = date("Y-m-d H:i:s");
-            
+            $recent_messages[$key]['room_number'] = '';
+            if(($row->notice_type==5)||($row->notice_type==7))
+            {
+                $recent_messages[$key]['room_number'] = Room::whereId($row['notice_id'])->first()->room_number;
+            }
+            else if($row->notice_type==8){
+                $roomId = Product::whereId($row['notice_id'])->first()->room_id;
+                $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
+            }
+            else if($row->notice_type==4){
+                $roomId = Task::whereId($row['notice_id'])->first()->room_id;
+                $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
+            }
         }
         $res['recent_messages'] = $recent_messages;
         $res['tasks'] = Task::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
