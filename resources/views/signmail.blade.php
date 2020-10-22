@@ -7,15 +7,12 @@
                     <table width="100%" cellspacing="0px" cellpadding="0px" border="0px" align="center" style="height:50px">
                     <tbody>
                         <tr>
-                        <td width="100%" style="padding:10px 10px;background:#D5D6D5;text-align:left;vertical-align:middle;padding:10px">
+                        <td width="100%" style="padding:10px 10px;background:#D5D6D5;text-align:left;vertical-align:middle;">
                             <table width="100%">
                                 <tbody>
                                 <tr>
-                                    <td width="50%">
-                                    <span style="font-size:1em;color:#fff;font-weight:200;font-family:helvetica,arial"><strong>&nbsp;</strong></span>
-                                    </td>
-                                    <td style="text-align:right">
-                                    <span style="font-size:1em;color:#fff;font-weight:200;font-family:helvetica,arial"><img src="'.base_url().'logo192.png" style="width:125px"></span>
+                                    <td align="center">
+                                    <span style="font-size:1em;color:#fff;font-weight:200;font-family:helvetica,arial"><img src="https://huddio.img-us10.com/public//0c7f5ab463a287ef6000b392aa835456.png?r=170937347" style="width:125px"></span>
                                     </td>
                                 </tr>
                                 </tbody>

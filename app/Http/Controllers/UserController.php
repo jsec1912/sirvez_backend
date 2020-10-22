@@ -63,6 +63,8 @@ class UserController extends Controller
                 $user->logo_img = Company::where('id',$user->company_id)->first()->logo_img;
                 $user->bg_image = Company::where('id',$user->company_id)->first()->bg_image;
                 $user->is_upload = Company::where('id',$user->company_id)->first()->is_upload;
+                $user->back_cover = Company::where('id',$user->company_id)->first()->back_cover;
+                $user->front_cover = Company::where('id',$user->company_id)->first()->front_cover;
             }
             else{
                 $company_id = Company_customer::where('customer_id',$user->company_id)->first()->company_id;
@@ -70,6 +72,8 @@ class UserController extends Controller
                 $user->logo_img = Company::where('id',$company_id)->first()->logo_img;
                 $user->bg_image = Company::where('id',$company_id)->first()->bg_image;
                 $user->is_upload = Company::where('id',$company_id)->first()->is_upload;
+                $user->back_cover = Company::where('id',$company_id)->first()->back_cover;
+                $user->front_cover = Company::where('id',$company_id)->first()->front_cover;
             }
             $response = ['status'=>'success', 'data'=>$user];           
         }

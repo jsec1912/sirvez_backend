@@ -129,8 +129,9 @@ class ProjectController extends Controller
         $to_name = $pending_user['first_name'];
         $to_email = $pending_user['email'];
         $content = $request->user->first_name.' has been '.$action.' project as '.$request->project_name;
-        $data = ['name'=>$pending_user['first_name'], "content" => $content];
-        Mail::send('basicmail', $data, function($message) use ($to_name, $to_email) {
+        $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$project['project_name'];
+        $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
+        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
             $message->to($to_email, $to_name)
                     ->subject('sirvez notification.');
             $message->from('support@sirvez.com','sirvez support team');
@@ -166,8 +167,9 @@ class ProjectController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = 'Project('.$project->project_name.') has been archived by '.$request->user->first_name;
-            $data = ['name'=>$pending_user['first_name'], "content" => $content];
-            Mail::send('basicmail', $data, function($message) use ($to_name, $to_email) {
+            $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$project['project_name'];
+            $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
+            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez notification.');
                 $message->from('support@sirvez.com','sirvez support team');
@@ -369,6 +371,7 @@ class ProjectController extends Controller
     }
     public function signOff(request $request)
     {
+        $fileName = '';
         if($request->hasFile('sign_file')){
             $fileName = time().'.'.$request->sign_file->extension();
             $request->sign_file->move(public_path('upload/file/'), $fileName);

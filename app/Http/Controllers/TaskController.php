@@ -125,10 +125,10 @@ class TaskController extends Controller
             $to_email = $pending_user['email'];
             $content = $request->user->first_name.' '.$request->user->last_name.' has assigned you a task.';
             $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
-            $invitationURL = "app.sirvez.com/app/task-manager/my-task";
-            $data = ['name'=>$pending_user['first_name'], "content" => $content,"task" =>$task,"task_img"=>$task_img,"invitationURL"=>$invitationURL];
+            $invitationURL = "https://app.sirvez.com/app/task-manager/my-task";
+            $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$task['task'],"description" =>$task['description'],"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view task'];
             
-            Mail::send('task', $data, function($message) use ($to_name, $to_email) {
+            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez notification.');
                 $message->from('support@sirvez.com','sirvez support team');
@@ -496,8 +496,10 @@ class TaskController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = $request->user->first_name.' has been add new comment in the task('.$task['task'].') - '.$request->message;
-            $data = ['name'=>$pending_user['first_name'], "content" => $content];
-            Mail::send('basicmail', $data, function($message) use ($to_name, $to_email) {
+            $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
+            $invitationURL = "https://app.sirvez.com/app/task-manager/my-task";
+            $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$task['task'],"description" =>$task['description'],"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view task'];
+            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez notification.');
                 $message->from('support@sirvez.com','sirvez support team');

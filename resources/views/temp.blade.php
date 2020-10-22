@@ -7,11 +7,10 @@
                     <table width="100%" cellspacing="0px" cellpadding="0px" border="0px" align="center" style="height:50px">
                     <tbody>
                         <tr>
-                        <td width="100%" style="padding:10px 10px;background:#D5D6D5;text-align:left;vertical-align:middle;padding:10px">
+                        <td width="100%" style="background:#D5D6D5;" align="center">
                             <table width="100%">
                             <tbody><tr>
-                                <td width="50%">&nbsp;</td>
-                                <td align="left">
+                                <td align="center">
                                 <span style="font-size:1em;color:#fff;font-weight:200;font-family:helvetica,arial"><img src="https://huddio.img-us10.com/public//0c7f5ab463a287ef6000b392aa835456.png?r=170937347" style="width:125px"></span>
                                 </td>
                             </tr>
@@ -39,14 +38,14 @@
                                         </tr>
                                 
                                         <tr>
-                                            <td colspan="2">- {{$task['task']}}</td>
+                                            <td colspan="2">- {{$title}}</td>
                                         </tr>
                                         <tr>
-                                            <td colspan="2">- {{$task['description']}}</td>
+                                            <td colspan="2">- {{$description}}</td>
                                         </tr>
                                         <tr>
                                             <td colspan="2" align="center">
-                                            <span><img src="{{$task_img}}" style="width:125px"></span>
+                                            <span><img src="{{$img}}" style="width:125px"></span>
                                             </td>
                                         </tr>
         
@@ -62,7 +61,7 @@
                                                 text-align: center;
                                                 text-decoration: none;
                                                 display: inline-block;
-                                                font-size: 16px;border-radius: 4px;">Click here to view task</a>
+                                                font-size: 16px;border-radius: 4px;">{{$btn_caption}}</a>
                                             </td>
                                         </tr>
         

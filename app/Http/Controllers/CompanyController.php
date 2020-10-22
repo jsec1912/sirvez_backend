@@ -38,6 +38,16 @@ class CompanyController extends Controller
             $request->bg_image->move(public_path('upload/img/'), $fileName);
             $company['bg_image']  = $fileName;
         }
+        if($request->hasFile('front_cover')){
+            $fileName = $request->post("name").'_front.'.$request->front_cover->extension();  
+            $request->front_cover->move(public_path('upload/img/'), $fileName);
+            $company['front_cover']  = $fileName;
+        }
+        if($request->hasFile('back_cover')){
+            $fileName = $request->post("name").'_back.'.$request->back_cover->extension();  
+            $request->back_cover->move(public_path('upload/img/'), $fileName);
+            $company['back_cover']  = $fileName;
+        }
         $company['name'] = $request->post("name");
         $company['website']  = $request->post("website");
         $company['company_email']  = $request->post("company_email");
