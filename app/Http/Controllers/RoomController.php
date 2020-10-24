@@ -158,7 +158,7 @@ class RoomController extends Controller
     }
     public function roomInfo(Request $request){
         $res = array();
-       
+        $res['schedules'] = array();
         if ($request->has('id')||$request->has('room_number')) {
             if((!$request->has('id') || $request->id =='null') && $request->has('room_number')){
                 if($request->has('project_name')){

@@ -349,20 +349,27 @@ class CompanyCustomerController extends Controller
                                                 ->select('notifications.*','projects.project_name','users.first_name','users.last_name')
                                                 ->get();
         foreach($recent_messages as $key => $row){
-            $user = User::where('id',$row['created_by'])->first();
-            $recent_messages[$key]['user_img'] = $user['profile_pic'];
+            $recent_messages[$key]['user_img'] = '';
             $recent_messages[$key]['current_time'] = date("Y-m-d H:i:s");
             $recent_messages[$key]['room_number'] = '';
+            if(User::where('id',$row['created_by'])->count()==0) continue;
+            $user = User::where('id',$row['created_by'])->first();
+            $recent_messages[$key]['user_img'] = $user['profile_pic'];
             if(($row->notice_type==5)||($row->notice_type==7))
             {
+                if(Room::whereId($row['notice_id'])->count()==0) continue;
                 $recent_messages[$key]['room_number'] = Room::whereId($row['notice_id'])->first()->room_number;
             }
             else if($row->notice_type==8){
+                if(Product::whereId($row['notice_id'])->count()==0) continue;
                 $roomId = Product::whereId($row['notice_id'])->first()->room_id;
+                if(Room::whereId($roomId)->count()==0) continue;
                 $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
             }
             else if($row->notice_type==4){
+                if(Task::whereId($row['notice_id'])->count()==0) continue;
                 $roomId = Task::whereId($row['notice_id'])->first()->room_id;
+                if(Room::whereId($roomId)->count()==0) continue;
                 $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
             }
         }
@@ -378,15 +385,12 @@ class CompanyCustomerController extends Controller
                                     ->leftjoin('users','users.id','=','tasks.created_by')
                                     ->select('tasks.*','projects.project_name','companies.name as company_name','users.profile_pic')
                                     ->get();
-        $res['archives'] = Task::where('tasks.archived','1')
-            ->where('tasks.archived_day', '<=', date('Y-m-d', strtotime("-30 days")))
-            ->whereIn('company_id',$customerId)->count();
-        $res['customers'] = Company_customer::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
-        $res['users'] = User::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
-        $res['sites'] = Site::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
-        $res['rooms'] = Room::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
-        $room_idx = Room::whereIn('company_id',$customerId)->orwhere('company_id',$id)->pluck('id');
-        $res['products'] = Product::whereIn('room_id',$room_idx)->count();
+        //$res['project_list'] = array();
+        // $res['lives'] = array();
+        //$res['messages'] = array();
+        // $res['recent_messages'] = array();
+        // $res['tasks'] = array();
+        // $res['tasks_favourite'] = array();
        
         return response()->json($res);
     }

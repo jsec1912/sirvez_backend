@@ -74,7 +74,7 @@ class ProductController extends Controller
             $room = Room::where('id',$product['room_id'])->first();
             $insertnotificationdata = array(
                 'notice_type'		=> '8',
-                'notice_id'			=> $id,
+                'notice_id'			=> $product->id,
                 //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
                 'notification'		=> $request->user->first_name.' '.$request->user->last_name.' have been added new product to['.$room['room_number'].']',
                 'created_by'		=> $request->user->id,

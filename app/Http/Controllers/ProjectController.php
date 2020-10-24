@@ -207,6 +207,7 @@ class ProjectController extends Controller
     }
     public function projectDetail(Request $request){
         $res = array();
+        $res['schedules'] = array();
         if(!$request->has('id') || $request->id =='null')
             $id = Project::where('project_name',$request->project_name)->first()->id;
         else

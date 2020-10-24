@@ -70,8 +70,8 @@ class TaskController extends Controller
             $task['created_by']  = $request->user->id;
             if(strlen($request->id)>10)
             $task['off_id'] = $request->id;
-            $result = Task::create($task);
-            $id = $result->id;
+            $task = Task::create($task);
+            $id = $task->id;
             $action = "created";
             if($request->has('assign_to'))
             {
@@ -90,6 +90,7 @@ class TaskController extends Controller
             $task['updated_by'] = $request->user->id;
             if($request->created_by) $task['created_by'] = $request->created_by;
             Task::whereId($id)->update($task);
+            $task = Task::whereId($id)->first();
             if($request->has('assign_to'))
             {
                 Project_user::where(['project_id'=>$id,'type'=>'2'])->delete();
@@ -124,7 +125,7 @@ class TaskController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = $request->user->first_name.' '.$request->user->last_name.' has assigned you a task.';
-            $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
+           $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
             $invitationURL = "https://app.sirvez.com/app/task-manager/my-task";
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$task['task'],"description" =>$task['description'],"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view task'];
             
