@@ -17,6 +17,7 @@ use App\Company;
 use App\Product;
 use App\Company_customer;
 use App\Project_user;
+use App\Schedule;
 use Mail;
 class ProjectController extends Controller
 {
@@ -246,6 +247,12 @@ class ProjectController extends Controller
         }
         $res['rooms'] = $rooms;
         $room_ids = Room::where('project_id',$project['id'])->pluck('id');
+        $res['schedules'] = Schedule::whereIn('schedules.room_id',$room_ids)
+                    ->leftJoin('sites','sites.id','=','schedules.site_id')
+                    ->leftJoin('rooms','rooms.id','=','schedules.room_id')
+                    ->leftJoin('products','products.id','=','schedules.product_id')
+                    ->select('schedules.*','sites.site_name','rooms.room_number','products.product_name')
+                    ->get();
         $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
         foreach($products as $key => $product)
         {

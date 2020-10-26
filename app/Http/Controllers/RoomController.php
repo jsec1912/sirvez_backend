@@ -20,6 +20,7 @@ use App\Department;
 use App\Building;
 use App\Floor;
 use App\Sticker_category;
+use App\Schedule;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
 {
@@ -171,6 +172,7 @@ class RoomController extends Controller
             }
             else
                 $room_id = $request->id;
+            
             $room = Room::where('rooms.id',$room_id)
             ->leftJoin('departments','departments.id','=','rooms.department_id')
             ->leftJoin('projects','projects.id','=','rooms.project_id')
@@ -181,6 +183,10 @@ class RoomController extends Controller
             
             $room['img_files'] = Room_photo::where('room_id',$room_id)->get();
             $res["room"] = $room;
+            $res['assign_to'] = Project_user::where(['project_users.project_id'=>$room->project_id,'project_users.type'=>'1'])
+                                ->leftjoin('users','users.id','=','project_users.user_id')
+                                ->select('users.*')
+                                ->get();
             // $products= Product::where('room_id',$room_id)->orderBy('id','desc')->get();
             // foreach($products as $key => $product)
             // {
@@ -192,6 +198,12 @@ class RoomController extends Controller
                 $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'type'=>'2'])->pluck('users.first_name');
             }
             $res['tasks'] = $tasks;
+            $res['schedules'] = Schedule::where('schedules.room_id',$room_id)
+                    ->leftJoin('sites','sites.id','=','schedules.site_id')
+                    ->leftJoin('rooms','rooms.id','=','schedules.room_id')
+                    ->leftJoin('products','products.id','=','schedules.product_id')
+                    ->select('schedules.*','sites.site_name','rooms.room_number','products.product_name')
+                    ->get();
             $res['notification'] = Notification::where('notice_type',7)
                                     ->where('notice_id',$room_id)
                                     ->orderBy('id','desc')

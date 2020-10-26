@@ -121,6 +121,9 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/notification/deleteNotification','NotificationController@deleteNotification');
     Route::get('/notification/readNotification','NotificationController@readNotification');
 
+    Route::post('/schedule/updateSchedule','ScheduleController@updateSchedule');///
+    Route::post('/schedule/deleteSchedule','ScheduleController@deleteSchedule');///
+
 
 
 
