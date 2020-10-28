@@ -67,6 +67,8 @@ class ProductController extends Controller
                 $id = Product::where('off_id',$request->id)->first()->id;
             else $id = '';
         if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+            
+            $product['signed_off']  = $request->signed_off;
             $product['created_by']  = $request->user->id;
             if(strlen($request->id) > 10)
                 $product['off_id'] = $request->id;

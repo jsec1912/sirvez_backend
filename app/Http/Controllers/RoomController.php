@@ -21,6 +21,8 @@ use App\Building;
 use App\Floor;
 use App\Sticker_category;
 use App\Schedule;
+use App\ScheduleProduct;
+use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
 {
@@ -40,7 +42,7 @@ class RoomController extends Controller
             $siteId = Building::whereId($request->building_id)->first()->site_id;
             $room['company_id'] = Site::whereId($siteId)->first()->company_id;
         }
-        
+
         $room['site_id']  = $request->site_id;
         if($request->room_site_id > 0){
             $res_data = array();
@@ -67,7 +69,7 @@ class RoomController extends Controller
             if(Room::where('off_id',$request->id)->count() > 0)
                 $id = Room::where('off_id',$request->id)->first()->id;
             else $id = '';
-        
+
         if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             $room_cnt = Room::where('project_id',$room['project_id'])
                         ->where('room_number',$room['room_number'])->count();
@@ -78,7 +80,7 @@ class RoomController extends Controller
                 return response()->json($res);
             }
             $room['created_by']  = $request->user->id;
-            $room['signed_off'] = 0;
+            $room['signed_off']  = $request->signed_off;
             if(strlen($request->id) > 10)
                 $room['off_id'] = $request->id;
             $room = Room::create($room);
@@ -101,12 +103,12 @@ class RoomController extends Controller
             Room::whereId($id)->update($room);
             $room = Room::whereId($id)->first();
         }
-        
+
         //remove room_photh using room_array
         $imgs = Room_photo::where('room_id',$id)->get();
         $res_val = array();
         foreach($imgs as $key => $row){
-            if(strpos($request->img_array,$row->img_name)===false) 
+            if(strpos($request->img_array,$row->img_name)===false)
             Room_photo::whereId($row->id)->delete();
         }
 
@@ -115,16 +117,16 @@ class RoomController extends Controller
         if(isset($images) && count($images) > 0 ){
             foreach($images as $img_file) {
                 if (isset($img_file)) {
-                   
+
                     $n++;
-                    $fileName = $img_file->getClientOriginalName();  
+                    $fileName = $img_file->getClientOriginalName();
                     $img_file->move(public_path('upload/img/'), $fileName);
                     Room_photo::create(['room_id'=>$id,'user_id'=>$request->user->id,'img_name'=>$fileName]);
                 }
             }
         }
 
-        //$notice_type ={1:pending_user,2:createcustomer 3:project 4:site 5:room}  
+        //$notice_type ={1:pending_user,2:createcustomer 3:project 4:site 5:room}
         $insertnotificationdata = array(
             'notice_type'		=> '5',
             'notice_id'			=> $id,
@@ -141,7 +143,7 @@ class RoomController extends Controller
         $res['msg'] = 'Room Saved Successfully!';
         $res['room'] = $room;
         $res['rooms'] = Room_photo::where('room_id',$id)->get();
-        //$response = ['status'=>'success', 'msg'=>'Room Saved Successfully!'];  
+        //$response = ['status'=>'success', 'msg'=>'Room Saved Successfully!'];
         return response()->json($res);
     }
     public function deleteRoom(Request $request)
@@ -172,15 +174,15 @@ class RoomController extends Controller
             }
             else
                 $room_id = $request->id;
-            
+
             $room = Room::where('rooms.id',$room_id)
             ->leftJoin('departments','departments.id','=','rooms.department_id')
             ->leftJoin('projects','projects.id','=','rooms.project_id')
             ->leftJoin('companies','companies.id','=','rooms.company_id')
             ->leftJoin('sites','sites.id','=','rooms.site_id')
             ->select('rooms.*','projects.project_name','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name')
-            ->first(); 
-            
+            ->first();
+
             $room['img_files'] = Room_photo::where('room_id',$room_id)->get();
             $res["room"] = $room;
             $res['assign_to'] = Project_user::where(['project_users.project_id'=>$room->project_id,'project_users.type'=>'1'])
@@ -198,12 +200,17 @@ class RoomController extends Controller
                 $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'type'=>'2'])->pluck('users.first_name');
             }
             $res['tasks'] = $tasks;
-            $res['schedules'] = Schedule::where('schedules.room_id',$room_id)
+            $schedules = Schedule::where('schedules.room_id',$room_id)
                     ->leftJoin('sites','sites.id','=','schedules.site_id')
                     ->leftJoin('rooms','rooms.id','=','schedules.room_id')
                     ->leftJoin('products','products.id','=','schedules.product_id')
                     ->select('schedules.*','sites.site_name','rooms.room_number','products.product_name')
                     ->get();
+
+            foreach($schedules as $key => $row) {
+                $schedules[$key]['product_id'] = ScheduleProduct::where(['schedule_products.schedule_id' => $row->id])->get()->pluck('product_id');
+            }
+            $res['schedules'] = $schedules;
             $res['notification'] = Notification::where('notice_type',7)
                                     ->where('notice_id',$room_id)
                                     ->orderBy('id','desc')
@@ -213,7 +220,7 @@ class RoomController extends Controller
                                     ->orderBy('id','desc')
                                     ->first();
             $res['room_id'] = $room_id;
-            
+
         }
         if($request->has('project_id')||$request->has('project_name')){
             if((!$request->has('project_id') || $request->project_id =='null') && $request->has('project_name'))
@@ -243,6 +250,7 @@ class RoomController extends Controller
             $res['rooms'] = Site_room::where('company_id',$company_id)/* ->whereNull('project_id') */->get();
             $res['floors'] = Floor::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
             $res['project_id'] = $project_id;
+            $res['project_signoff'] = Project::whereId($project_id)->first()->signed_off;
         }
         else if(isset($request->customer_id)&& $request->customer_id>0){
             $res['projects'] = Project::where('company_id',$request->customer_id)->orderBy('id','desc')->get();
@@ -265,14 +273,14 @@ class RoomController extends Controller
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
                 $res['departments'] = Department::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
             }
-            
+
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
         $res['status'] = "success";
         return response()->json($res);
     }
-    
+
     public function editPhoto(request $request)
     {
         $res = array();
@@ -308,12 +316,16 @@ class RoomController extends Controller
         $res = array();
         $res['status'] = "success";
         Room::whereId($id)->update(['signed_off'=>1,'completed_date'=>date("d-m-Y H:i:s")]);
+
+        Product::where('room_id',$id)->update(['signed_off'=>1]);
         $room = Room::whereId($id)->first();
+        if(Room::where('project_id',$room->project_id)->where('signed_off','0')->count()==0)
+            Project::whereId($room->project_id)->update(['signed_off'=>2]);
         $insertnotificationdata = array(
             'notice_type'		=> '7',
             'notice_id'			=> $id,
             //'notification'		=> "The room(".$room->room_number.") was signed off by ".$request->user->first_name."  on date ".date("d-m-Y H:i:s"),
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has signed off location[".$room->room_number."]",
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has signed off location[".$room->room_number."] on [".date("d-m-Y H:i:s").']',
             'created_by'		=> $request->user->id,
             'company_id'		=> $room->company_id,
             'project_id'		=> $room->project_id,
@@ -323,6 +335,60 @@ class RoomController extends Controller
         Notification::create($insertnotificationdata);
         return response()->json($res);
     }
+
+    public function changeRequest(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        $res = array();
+        $res['status'] = "success";
+        $room = Room::where('rooms.id',$id)
+                ->leftJoin('projects','projects.id','=','rooms.project_id')
+                ->select('rooms.*','projects.project_name')->first();
+        $insertnotificationdata = array(
+            'notice_type'		=> '5',
+            'notice_id'			=> $id,
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has been sent request to change location[".$room->room_number."]",
+            'created_by'		=> $request->user->id,
+            'company_id'		=> $room->company_id,
+            'project_id'		=> $room->project_id,
+            'created_date'		=> date("Y-m-d H:i:s"),
+            'is_read'	    	=> 0,
+        );
+        Notification::create($insertnotificationdata);
+
+        //sending gmail to user
+        $pending_user = User::where('id',$room->created_by)->first();
+        $to_name = $pending_user['first_name'];
+        $to_email = $pending_user['email'];
+        $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
+        $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$room['project_name']+'/'+$room['room_number'];
+        $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
+        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+            $message->to($to_email, $to_name)
+                    ->subject('sirvez notification.');
+            $message->from('support@sirvez.com','sirvez support team');
+        });
+        
+        $team= Project_user::where(['project_id'=>$room->project_id,'type'=>'1'])->get();
+        foreach($team as $team_user){
+            $pending_user = User::where('id',$team_user->user_id)->first();
+            $to_name = $pending_user['first_name'];
+            $to_email = $pending_user['email'];
+            $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
+            $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$room['project_name']+'/'+$room['room_number'];
+            $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
+            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                $message->to($to_email, $to_name)
+                        ->subject('sirvez notification.');
+                $message->from('support@sirvez.com','sirvez support team');
+            });
+        }
+
+        return response()->json($res);
+    }
+
     public function setFavourite(request $request)
     {
         if(strlen($request->id) > 10)

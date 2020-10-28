@@ -11,6 +11,8 @@ use App\Site;
 use App\Task;
 use App\Product;
 use App\Project_user;
+use App\ScheduleProduct;
+use App\ScheduleEngineer;
 use Illuminate\Support\Facades\Validator;
 
 class ScheduleController extends Controller
@@ -22,10 +24,9 @@ class ScheduleController extends Controller
             'parent_id' => 'required',
             'site_id' => 'required',
             'room_id' => 'required',
-            'product_id' => 'required',
             'start_date' => 'required',
             'end_date' => 'required',
-           
+
         ]);
         if ($v->fails())
         {
@@ -36,7 +37,7 @@ class ScheduleController extends Controller
         }
         $schedule = array();
         $id = $request->id;
-        
+
         if(strlen($request->parent_id)>10)
             $schedule['parent_id'] = Schedule::where('off_id',$request->parent_id)->first()->id;
         else
@@ -52,16 +53,12 @@ class ScheduleController extends Controller
         else
             $schedule['room_id'] = $request->room_id;
 
-        if(strlen($request->product_id)>10)
-            $schedule['product_id'] = Product::where('off_id',$request->product_id)->first()->id;
-        else
-            $schedule['product_id'] = $request->product_id;
         $schedule['start_date'] = $request->start_date;
         if($request->progress)
             $schedule['progress'] = $request->progress;
         $schedule['end_date'] = $request->end_date;
         $schedule['notes'] = $request->notes;
-        
+
         if(strlen($request->id) > 10)
             if(Schedule::where('off_id',$request->id)->count() > 0)
                 $id = Schedule::where('off_id',$request->id)->first()->id;
@@ -72,6 +69,26 @@ class ScheduleController extends Controller
             if(strlen($request->id)>10)
                 $schedule['off_id'] = $request->id;
             $schedule = Schedule::create($schedule);
+            if ($request->has('product_id')) {
+                $array_res = array();
+                $array_res = json_decode($request->product_id, true);
+                foreach ($array_res as $row) {
+                    ScheduleProduct::create([
+                        'schedule_id' => $schedule->id,
+                        'product_id' => $row
+                    ]);
+                }
+            }
+            if ($request->has('engineer_id')) {
+                $array_res = array();
+                $array_res = json_decode($request->engineer_id, true);
+                foreach ($array_res as $row) {
+                    ScheduleEngineer::create([
+                        'schedule_id' => $schedule->id,
+                        'engineer_id' => $row
+                    ]);
+                }
+            }
             if($request->is_createTask)
             {
                 $room = Room::whereId($schedule->room_id)->first();
@@ -91,14 +108,34 @@ class ScheduleController extends Controller
                     foreach($array_res as $row)
                     {
                         Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>'2']);
-
                     }
                 }
             }
         }
         else{
-           
             Schedule::whereId($id)->update($schedule);
+            if ($request->has('product_id')) {
+                ScheduleProduct::where('schedule_id', $id)->delete();
+                $array_res = array();
+                $array_res = json_decode($request->product_id, true);
+                foreach($array_res as $row) {
+                    ScheduleProduct::create([
+                        'schedule_id' => $id,
+                        'product_id' => $row
+                    ]);
+                }
+            }
+            if ($request->has('engineer_id')) {
+                ScheduleEngineer::where('engineer_id', $id)->delete();
+                $array_res = array();
+                $array_res = json_decode($request->engineer_id, true);
+                foreach ($array_res as $row) {
+                    ScheduleEngineer::create([
+                        'schedule_id' => $id,
+                        'engineer_id' => $row
+                    ]);
+                }
+            }
         }
         $res["status"] = "success";
         return response()->json($res);
@@ -112,6 +149,7 @@ class ScheduleController extends Controller
         if(Schedule::where('parent_id',$id)->count()==0){
             Schedule::where(['id'=>$request->id])->delete();
             $res["status"] = "success";
+            ScheduleProduct::where('schedule_id', $id)->delete();
         }
         else{
             $res["status"] = 'error';
@@ -119,5 +157,5 @@ class ScheduleController extends Controller
         }
         return response()->json($res);
     }
-  
+
 }

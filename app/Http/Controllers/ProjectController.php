@@ -18,18 +18,21 @@ use App\Product;
 use App\Company_customer;
 use App\Project_user;
 use App\Schedule;
+use App\ScheduleProduct;
+use App\ScheduleEngineer;
 use Mail;
+
 class ProjectController extends Controller
 {
     public function updateProject(Request $request){
-        
+
         $v = Validator::make($request->all(), [
             //company info
             'customer_id' => 'required',
             'project_name' => 'required',
             'manager_id' => 'required',
             'user_id' => 'required',
-            'contact_number' => 'required',
+            //'contact_number' => 'required',
             'survey_start_date' => 'required',
             'project_summary' => 'required'
         ]);
@@ -41,7 +44,7 @@ class ProjectController extends Controller
             ]);
         }
         $project = array();
-       
+
         $id = $request->id;
         if($request->hasFile('upload_doc')){
 
@@ -126,18 +129,17 @@ class ProjectController extends Controller
 
         //sending gmail to user
         $pending_user = User::where('id',$request->user_id)->first();
-        
         $to_name = $pending_user['first_name'];
         $to_email = $pending_user['email'];
         $content = $request->user->first_name.' has been '.$action.' project as '.$request->project_name;
-        $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$project['project_name'];
+        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$project['project_name'];
         $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
         Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
             $message->to($to_email, $to_name)
                     ->subject('sirvez notification.');
             $message->from('support@sirvez.com','sirvez support team');
         });
-        
+
 
         $response = ['status'=>'success', 'msg'=>'Project Saved Successfully!'];
         return response()->json($response);
@@ -214,9 +216,9 @@ class ProjectController extends Controller
         else
             $id = $request->id;
         $project = Project::where('projects.id',$id)
-        ->leftJoin('companies','projects.company_id','=','companies.id')
-        ->leftJoin('users','users.id','=','projects.created_by')
-        ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
+            ->leftJoin('companies','projects.company_id','=','companies.id')
+            ->leftJoin('users','users.id','=','projects.created_by')
+            ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
         $project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
         $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
         $user_cnt = User::where('id',$project->user_id)->count();
@@ -224,7 +226,7 @@ class ProjectController extends Controller
             $project['customer_user'] = User::where('id',$project->user_id)->first()->first_name;
         else
             $project['customer_user'] = '';
-      
+
         $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
         $project['room_count'] = Room::where('project_id',$project['id'])->count();
         $project['user_notifications'] = Notification::where('notice_type','3')->where('notice_id',$id)->count();
@@ -247,12 +249,22 @@ class ProjectController extends Controller
         }
         $res['rooms'] = $rooms;
         $room_ids = Room::where('project_id',$project['id'])->pluck('id');
-        $res['schedules'] = Schedule::whereIn('schedules.room_id',$room_ids)
+        $schedules = Schedule::whereIn('schedules.room_id',$room_ids)
                     ->leftJoin('sites','sites.id','=','schedules.site_id')
                     ->leftJoin('rooms','rooms.id','=','schedules.room_id')
-                    ->leftJoin('products','products.id','=','schedules.product_id')
-                    ->select('schedules.*','sites.site_name','rooms.room_number','products.product_name')
+                    ->select('schedules.*','sites.site_name','rooms.room_number')
                     ->get();
+
+        foreach($schedules as $key => $row) {
+            $schedules[$key]['product_id'] = ScheduleProduct::where([
+                'schedule_products.schedule_id' => $row->id
+            ])->get()->pluck('product_id');
+            $schedules[$key]['engineer_id'] = ScheduleEngineer::where([
+                'schedule_engineers.schedule_id' => $row->id
+            ])->get()->pluck('engineer_id');
+        }
+
+        $res['schedules'] = $schedules;
         $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
         foreach($products as $key => $product)
         {
@@ -273,7 +285,9 @@ class ProjectController extends Controller
         $res['products'] = $products;
         $tasks = Task::where('project_id',$project['id'])->orderBy('id','desc')->get();
         foreach($tasks as $key=>$row){
-            $tasks[$key]['assign_to'] = Project_user::leftjoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'type'=>'2'])->pluck('users.first_name');
+            $tasks[$key]['assign_to'] = Project_user::leftjoin('users','users.id','=','project_users.user_id')
+                ->where(['project_users.project_id'=>$row->id,'type'=>'2'])
+                ->pluck('users.first_name');
         }
         $res['tasks'] = $tasks;
         $res["project"] = $project;
@@ -287,7 +301,10 @@ class ProjectController extends Controller
         $assignId = Project_user::where(['project_id'=>$id,'type'=>1])->pluck('user_id');
         $com_id = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
         $res['team'] = User::where('company_id',$com_id)->whereIn('user_type',[1,5])->where('status',1)->whereNotIn('id',$assignId)->get();
-        $res['signed_cnt'] = Room::where('project_id',$id)->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
+        $res['engineers'] = User::where('company_id',$com_id)->whereIn('user_type',[1,5])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+        $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+        $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
+        $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
         $res['status'] = "success";
         $res['project_id'] = $id;
         return response()->json($res);
@@ -349,7 +366,7 @@ class ProjectController extends Controller
             'is_read'	    	=> 0,
         );
         Notification::create($insertnotificationndata);
-        
+
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
@@ -380,12 +397,25 @@ class ProjectController extends Controller
     public function signOff(request $request)
     {
         $fileName = '';
+        $project = array();
+        $project['signed_off'] = 1;
         if($request->hasFile('sign_file')){
             $fileName = time().'.'.$request->sign_file->extension();
             $request->sign_file->move(public_path('upload/file/'), $fileName);
             $project['sign_file']  = $fileName;
         }
-        Project::whereId($request->id)->update(['signed_off'=>1,'sign_file'=>$fileName]);
+
+        if($request->sign_user_id) $project['sign_user_id'] = $requeste->sign_user_id;
+        if($request->sign_first_name) $project['sign_first_name'] = $requeste->sign_first_name;
+        if($request->sign_last_name) $project['sign_last_name'] = $requeste->sign_last_name;
+        if($request->sign_contact_email) $project['sign_contact_email'] = $requeste->sign_contact_email;
+        if($request->sign_contact_number) $project['sign_contact_number'] = $requeste->sign_contact_number;
+        if($request->sign_parking) $project['sign_parking'] = $requeste->sign_parking;
+        if($request->sign_ram_require) $project['sign_ram_require'] = $requeste->sign_ram_require;
+        if($request->sign_comments) $project['sign_comments'] = $requeste->sign_comments;
+        if($request->sign_print_name) $project['sign_print_name'] = $requeste->sign_print_name;
+
+        Project::whereId($request->id)->update($project);
         $project=Project::where('projects.id',$request->id)
                 ->leftJoin('companies','companies.id','=','projects.company_id')
                 ->leftJoin('users','users.id','=','projects.created_by')
@@ -420,14 +450,12 @@ class ProjectController extends Controller
                 'is_signed'	    	=> 1,
             );
         Notification::create($insertnotificationdata);
-        
+
         //send mail
         $content = "";
         if($request->user->user_type <6){
             $pending_user = $project['customer_user'];
-            //$content = "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s");
-            //$content = "Scope of works signed off on ".date("d-m-Y H:i:s")." by ".$request->user->first_name.".";
-            $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
+           $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
 
         }
         else{
@@ -444,19 +472,44 @@ class ProjectController extends Controller
                     ->subject('sirvez notification.');
             $message->from('support@sirvez.com','support team');
         });
-       
 
+        //invite user
+        if (!$request->sign_user_id){
+            $company_name = Company::whereId($project['company_id'])->first()->name;
+            $user = array();
+            $user['email'] = $project['sign_contact_email'];
+            $user['first_name'] = $project['sign_first_name'];
+            $user['user_type'] = 6;
+            $user['company_id'] = $project['company_id'];
+            $user['company_name'] = $company_name;
+            $invite_code = bcrypt($user['email'].$company_name);
+            $user['invite_code'] = str_replace('/', '___', $invite_code);
+            $user['status'] = '0';
+
+            $user = User::create($user);
+            $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
+
+            //sending gmail to user
+            $to_name = $user['first_name'];
+            $to_email = $user['email'];
+            $data = ['name'=>$user['first_name'], "pending_user" => $user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
+            Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
+                $message->to($to_email, $to_name)
+                        ->subject('sirvez support team invite you. please join our site.');
+                $message->from('support@sirvez.com','support team');
+            });
+        }
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
     }
-   
+
     public function changeSummary(request $request){
         if(strlen($request->id) > 10)
             $id = Project::where('off_id',$request->id)->first()->id;
         else
             $id = $request->id;
-            
+
         Project::whereId($id)->update(['project_summary'=>$request->project_summary]);
         $res = array();
         $res['status'] = 'success';

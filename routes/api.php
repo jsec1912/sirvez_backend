@@ -90,6 +90,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/room/roomInfo','RoomController@roomInfo');///
     Route::get('/room/editPhoto','RoomController@editPhoto');///
     Route::post('/room/signoff','RoomController@signoff');///
+    Route::post('/room/changeRequest','RoomController@changeRequest');///
     Route::post('/room/setFavourite','RoomController@setFavourite');
     Route::post('/room/changeNotes','RoomController@changeNotes');
 
