@@ -31,10 +31,10 @@ class ProjectController extends Controller
             'customer_id' => 'required',
             'project_name' => 'required',
             'manager_id' => 'required',
-            'user_id' => 'required',
+            //'user_id' => 'required',
             //'contact_number' => 'required',
             'survey_start_date' => 'required',
-            'project_summary' => 'required'
+            //'project_summary' => 'required'
         ]);
         if ($v->fails())
         {
@@ -64,6 +64,7 @@ class ProjectController extends Controller
         $project['contact_number']  = $request->contact_number;
         $project['survey_start_date']  = $request->survey_start_date;
         $project['created_by']  = $request->user->id;
+        $project['project_ref']  = $request->project_ref;
         $project['project_summary']  = $request->project_summary;
         $action = "updated";
         if(strlen($request->id) > 10)
@@ -128,17 +129,19 @@ class ProjectController extends Controller
         Notification::create($insertnotificationndata);
 
         //sending gmail to user
-        $pending_user = User::where('id',$request->user_id)->first();
-        $to_name = $pending_user['first_name'];
-        $to_email = $pending_user['email'];
-        $content = $request->user->first_name.' has been '.$action.' project as '.$request->project_name;
-        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$project['project_name'];
-        $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
-        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
-            $message->to($to_email, $to_name)
-                    ->subject('sirvez notification.');
-            $message->from('support@sirvez.com','sirvez support team');
-        });
+        if($request->user_id){
+            $pending_user = User::where('id',$request->user_id)->first();
+            $to_name = $pending_user['first_name'];
+            $to_email = $pending_user['email'];
+            $content = $request->user->first_name.' has been '.$action.' project as '.$request->project_name;
+            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$project['project_name'];
+            $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
+            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                $message->to($to_email, $to_name)
+                        ->subject('sirvez notification.');
+                $message->from('support@sirvez.com','sirvez support team');
+            });
+        }
 
 
         $response = ['status'=>'success', 'msg'=>'Project Saved Successfully!'];
@@ -170,7 +173,7 @@ class ProjectController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = 'Project('.$project->project_name.') has been archived by '.$request->user->first_name;
-            $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$project['project_name'];
+            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$project['project_name'];
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
             Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
@@ -252,6 +255,7 @@ class ProjectController extends Controller
         $schedules = Schedule::whereIn('schedules.room_id',$room_ids)
                     ->leftJoin('sites','sites.id','=','schedules.site_id')
                     ->leftJoin('rooms','rooms.id','=','schedules.room_id')
+                    ->orderBy('schedules.root_id')
                     ->select('schedules.*','sites.site_name','rooms.room_number')
                     ->get();
 
@@ -259,6 +263,12 @@ class ProjectController extends Controller
             $schedules[$key]['product_id'] = ScheduleProduct::where([
                 'schedule_products.schedule_id' => $row->id
             ])->get()->pluck('product_id');
+            $product_name= Product::whereIn('id',$schedules[$key]['product_id'])->pluck('product_name');
+            $products = array();
+            foreach($product_name as $product_item) {
+                array_push($products, (string)$product_item);
+            }
+            $schedules[$key]['product_name'] = implode(',',$products);
             $schedules[$key]['engineer_id'] = ScheduleEngineer::where([
                 'schedule_engineers.schedule_id' => $row->id
             ])->get()->pluck('engineer_id');
@@ -301,7 +311,7 @@ class ProjectController extends Controller
         $assignId = Project_user::where(['project_id'=>$id,'type'=>1])->pluck('user_id');
         $com_id = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
         $res['team'] = User::where('company_id',$com_id)->whereIn('user_type',[1,5])->where('status',1)->whereNotIn('id',$assignId)->get();
-        $res['engineers'] = User::where('company_id',$com_id)->whereIn('user_type',[1,5])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+        $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
         $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
         $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
         $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
@@ -405,15 +415,15 @@ class ProjectController extends Controller
             $project['sign_file']  = $fileName;
         }
 
-        if($request->sign_user_id) $project['sign_user_id'] = $requeste->sign_user_id;
-        if($request->sign_first_name) $project['sign_first_name'] = $requeste->sign_first_name;
-        if($request->sign_last_name) $project['sign_last_name'] = $requeste->sign_last_name;
-        if($request->sign_contact_email) $project['sign_contact_email'] = $requeste->sign_contact_email;
-        if($request->sign_contact_number) $project['sign_contact_number'] = $requeste->sign_contact_number;
-        if($request->sign_parking) $project['sign_parking'] = $requeste->sign_parking;
-        if($request->sign_ram_require) $project['sign_ram_require'] = $requeste->sign_ram_require;
-        if($request->sign_comments) $project['sign_comments'] = $requeste->sign_comments;
-        if($request->sign_print_name) $project['sign_print_name'] = $requeste->sign_print_name;
+        if($request->sign_user_id) $project['sign_user_id'] = $request->sign_user_id;
+        if($request->sign_first_name) $project['sign_first_name'] = $request->sign_first_name;
+        if($request->sign_last_name) $project['sign_last_name'] = $request->sign_last_name;
+        if($request->sign_contact_email) $project['sign_contact_email'] = $request->sign_contact_email;
+        if($request->sign_contact_number) $project['sign_contact_number'] = $request->sign_contact_number;
+        if($request->sign_parking) $project['sign_parking'] = $request->sign_parking;
+        if($request->sign_ram_require) $project['sign_ram_require'] = $request->sign_ram_require;
+        if($request->sign_comments) $project['sign_comments'] = $request->sign_comments;
+        if($request->sign_print_name) $project['sign_print_name'] = $request->sign_print_name;
 
         Project::whereId($request->id)->update($project);
         $project=Project::where('projects.id',$request->id)
@@ -474,7 +484,21 @@ class ProjectController extends Controller
         });
 
         //invite user
-        if (!$request->sign_user_id){
+        if ($request->sign_user_id>0){
+            $pending_user = User::where($request->sign_user_id);
+            $to_name = $pending_user['first_name'];
+            $to_email = $pending_user['email'];
+            $content = 'you have been added as a site contact for '.$project['project name'].' please view details here.. ';
+            $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
+            $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
+            Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
+                $message->to($to_email, $to_name)
+                        ->subject('sirvez notification.');
+                $message->from('support@sirvez.com','support team');
+            });
+
+        }
+        else{
             $company_name = Company::whereId($project['company_id'])->first()->name;
             $user = array();
             $user['email'] = $project['sign_contact_email'];
@@ -514,6 +538,5 @@ class ProjectController extends Controller
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
-
     }
 }

@@ -19,13 +19,14 @@ class ScheduleController extends Controller
 {
     public function UpdateSchedule(Request $request){
         $res = array();
+        $product_name = '';
         $v = Validator::make($request->all(), [
             //company info
             'parent_id' => 'required',
             'site_id' => 'required',
             'room_id' => 'required',
             'start_date' => 'required',
-            'end_date' => 'required',
+            //'end_date' => 'required',
 
         ]);
         if ($v->fails())
@@ -42,6 +43,12 @@ class ScheduleController extends Controller
             $schedule['parent_id'] = Schedule::where('off_id',$request->parent_id)->first()->id;
         else
             $schedule['parent_id'] = $request->parent_id;
+        
+        if($schedule['parent_id']==0)
+            $schedule['root_id'] =$schedule['parent_id'];
+        else
+            $schedule['root_id'] =Schedule::whereId($schedule['parent_id'])->first()->root_id;
+            
 
         if(strlen($request->site_id)>10)
             $schedule['site_id'] = Site::where('off_id',$request->site_id)->first()->id;
@@ -54,17 +61,19 @@ class ScheduleController extends Controller
             $schedule['room_id'] = $request->room_id;
 
         $schedule['start_date'] = $request->start_date;
+        $schedule['end_date'] = $request->end_date;
         if($request->progress)
             $schedule['progress'] = $request->progress;
-        $schedule['end_date'] = $request->end_date;
+        $schedule['duration_day'] = $request->duration_day;
+        $schedule['duration_hour'] = $request->duration_hour;
         $schedule['notes'] = $request->notes;
+        $schedule['schedule_name'] = $request->schedule_name;
 
         if(strlen($request->id) > 10)
             if(Schedule::where('off_id',$request->id)->count() > 0)
                 $id = Schedule::where('off_id',$request->id)->first()->id;
             else $id = '';
         if(!isset($id) || $id==""|| $id=="null"|| $id=="0"){
-            $schedule['schedule_name'] = $request->schedule_name;
             $schedule['created_by'] = $request->user->id;
             if(strlen($request->id)>10)
                 $schedule['off_id'] = $request->id;
@@ -77,6 +86,7 @@ class ScheduleController extends Controller
                         'schedule_id' => $schedule->id,
                         'product_id' => $row
                     ]);
+                    $product_name.=Product::whereId($row)->first()->product_name.' ';
                 }
             }
             if ($request->has('engineer_id')) {
@@ -99,6 +109,7 @@ class ScheduleController extends Controller
                 $task['room_id']  = $room->id;
                 $task['due_by_date']  = $request->due_by_date;
                 $task['created_by']  = $request->user->id;
+                $task['description'] = $request->description;
                 $task = Task::create($task);
                 $id = $task->id;
                 if($request->has('assign_to'))

@@ -9,6 +9,7 @@ use App\Room;
 use App\Site;
 use App\Site_room;
 use App\Task;
+use App\User;
 use App\TaskComment;
 use App\Product;
 use App\Project;
@@ -22,6 +23,7 @@ use App\Floor;
 use App\Sticker_category;
 use App\Schedule;
 use App\ScheduleProduct;
+use App\ScheduleEngineer;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -204,11 +206,23 @@ class RoomController extends Controller
                     ->leftJoin('sites','sites.id','=','schedules.site_id')
                     ->leftJoin('rooms','rooms.id','=','schedules.room_id')
                     ->leftJoin('products','products.id','=','schedules.product_id')
+                    ->orderBy('schedules.root_id')
                     ->select('schedules.*','sites.site_name','rooms.room_number','products.product_name')
                     ->get();
 
             foreach($schedules as $key => $row) {
-                $schedules[$key]['product_id'] = ScheduleProduct::where(['schedule_products.schedule_id' => $row->id])->get()->pluck('product_id');
+                $schedules[$key]['product_id'] = ScheduleProduct::where([
+                    'schedule_products.schedule_id' => $row->id
+                ])->get()->pluck('product_id');
+                $product_name= Product::whereIn('id',$schedules[$key]['product_id'])->pluck('product_name');
+                $products = array();
+                foreach($product_name as $product_item) {
+                    array_push($products, (string)$product_item);
+                }
+                $schedules[$key]['product_name'] = implode(',',$products);
+                $schedules[$key]['engineer_id'] = ScheduleEngineer::where([
+                    'schedule_engineers.schedule_id' => $row->id
+                ])->get()->pluck('engineer_id');
             }
             $res['schedules'] = $schedules;
             $res['notification'] = Notification::where('notice_type',7)
@@ -241,6 +255,8 @@ class RoomController extends Controller
             }
             $res['products'] = $products;
             $company_id = Project::whereId($project_id)->first()->company_id;
+            $com_id = Company_customer::where('customer_id',$company_id)->first()->company_id;
+            $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
             $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['projects'] = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
             $site_id = Site::where('company_id',$company_id)->pluck('id');
@@ -337,6 +353,17 @@ class RoomController extends Controller
     }
 
     public function changeRequest(request $request){
+        $v = Validator::make($request->all(), [
+            'change_notes' =>'required',
+
+        ]);
+        if ($v->fails())
+        {
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'You must input require in the field!'
+            ]);
+        }
         if(strlen($request->id) > 10)
             $id = Room::where('off_id',$request->id)->first()->id;
         else
@@ -357,27 +384,44 @@ class RoomController extends Controller
             'is_read'	    	=> 0,
         );
         Notification::create($insertnotificationdata);
+        //add task
+        $task = array();
+        if($request->hasFile('task_img')){
+
+            $fileName = time().'task.'.$request->task_img->extension();
+            $request->task_img->move(public_path('upload/img/'), $fileName);
+            $task['task_img']  = $fileName;
+        }
+        $task['task'] = $request->change_notes;
+        $task['company_id'] = $room->company_id;
+        $task['project_id']  = $room->project_id;
+        $task['room_id']  = $room->id;
+        $task['due_by_date']  = date("Y-m-d H:i:s");
+        $task['description']  = $request->change_notes;
+        $task['created_by']  = $request->user->id;
+        $task['is_require'] = 1;
+        Task::create($task);
 
         //sending gmail to user
         $pending_user = User::where('id',$room->created_by)->first();
         $to_name = $pending_user['first_name'];
         $to_email = $pending_user['email'];
         $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
-        $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$room['project_name']+'/'+$room['room_number'];
+        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_name'].'/'.$room['room_number'];
         $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
         Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
             $message->to($to_email, $to_name)
                     ->subject('sirvez notification.');
             $message->from('support@sirvez.com','sirvez support team');
         });
-        
+
         $team= Project_user::where(['project_id'=>$room->project_id,'type'=>'1'])->get();
         foreach($team as $team_user){
             $pending_user = User::where('id',$team_user->user_id)->first();
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
-            $invitationURL = "https://app.sirvez.com/app/app/project/live/"+$room['project_name']+'/'+$room['room_number'];
+            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_name'].'/'.$room['room_number'];
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
             Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
