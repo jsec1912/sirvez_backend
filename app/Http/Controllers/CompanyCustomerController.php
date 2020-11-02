@@ -64,7 +64,7 @@ class CompanyCustomerController extends Controller
             else $id = '';
         if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             $count = 0;
-            if($reqeust->website)
+            if($request->website)
                 $count += Company::where('website',$request->website)->count();
             if($request->company_email)
                 $count+= Company::where('company_email',$request->company_email)->count();
@@ -97,7 +97,7 @@ class CompanyCustomerController extends Controller
         }
         else{
             $count = 0;
-            if($reqeust->website)
+            if($request->website)
                 $count += Company::where('id','<>',$id)->where('website',$request->website)->count();
             if($request->company_email)
                 $count += Company::where('id','<>',$id)->where('company_email',$request->company_email)->count();
