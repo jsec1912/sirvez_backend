@@ -253,7 +253,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::/* whereIn('company_id',$customer_id)->or */Where('company_id',$request->user->company_id)->get();
+                $res['users'] = User::whereIn('company_id',$customer_id)->orWhere('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->customer_id)->get();
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
                 $res['customerId'] = $request->customer_id;
@@ -304,7 +304,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::/* whereIn('company_id',$customer_id)->or */Where('company_id',$request->user->company_id)->get();
+                $res['users'] = User::whereIn('company_id',$customer_id)->orWhere('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
@@ -352,7 +352,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::/* whereIn('company_id',$customer_id)->or */Where('company_id',$request->user->company_id)->get();
+                $res['users'] = User::whereIn('company_id',$customer_id)->orWhere('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 $res['projects'] = Project::whereIn('company_id',$customer_id)->get();
             }
