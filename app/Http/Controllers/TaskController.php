@@ -66,7 +66,7 @@ class TaskController extends Controller
                 $id = Task::where('off_id',$request->id)->first()->id;
             else $id = '';
         if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"){
-            
+
             $task['created_by']  = $request->user->id;
             if(strlen($request->id)>10)
             $task['off_id'] = $request->id;
@@ -103,13 +103,12 @@ class TaskController extends Controller
                 }
             }
         }
-       //$notice_type ={1:pending_user,2:createcustomer 3:project 4:task}
-       if($action == "created"){
-        $insertnotificationndata = array(
+        //$notice_type ={1:pending_user,2:createcustomer 3:project 4:task}
+        if($action == "created"){
+            $insertnotificationndata = array(
             'notice_type'		=> '4',
             'notice_id'			=> $id,
-            //'notification'		=> $task['task'].' have been '.$action.' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' '.$action.' a new task['.$task['task'].']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new task : ['.$task['task'].']',
             'created_by'		=> $request->user->id,
             'company_id'		=> $request->company_id,
             'project_id'		=> $request->project_id,
@@ -128,7 +127,7 @@ class TaskController extends Controller
            $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
             $invitationURL = "https://app.sirvez.com/app/task-manager/my-task";
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$task['task'],"description" =>$task['description'],"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view task'];
-            
+
             Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
                         ->subject('sirvez notification.');
@@ -206,9 +205,9 @@ class TaskController extends Controller
                 $res['projects'] = array();
                 $res['customerId'] = Room::where('id',$request->room_id)->first()->company_id;
             }
-            
+
         }
-        else if($request->has('customer_id') && $request->customer_id != 'undefined' && $request->customer_id){
+        else if($request->has('customer_id') && $request->customer_id != 'undefined' && $request->customer_id != 'null' && $request->customer_id){
             $res['project_id'] = '';
             if($request->user->user_type == 2||$request->user->user_type == 6){
                 $tasks = Task::where('tasks.company_id',$request->customer_id)
@@ -235,7 +234,7 @@ class TaskController extends Controller
                 $res['customerId'] = $request->customer_id;
             }
             else{
-                
+
                 $tasks = Task::where('tasks.company_id',$request->customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
@@ -253,7 +252,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::whereIn('company_id',$customer_id)->orWhere('company_id',$request->user->company_id)->get();
+                $res['users'] = User::where('company_id',$request->customer_id)->orWhere('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->customer_id)->get();
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
                 $res['customerId'] = $request->customer_id;
@@ -310,7 +309,7 @@ class TaskController extends Controller
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
             }
         }
-        
+
         else{
              if($request->user->user_type == 2||$request->user->user_type == 6){
                 $tasks = Task::where('tasks.company_id',$request->user->company_id)
@@ -461,7 +460,7 @@ class TaskController extends Controller
         }else{
             $task['task_id'] = $request->id;
         }
-        
+
         $task['created_by'] = $request->user->id;
         $task['comment']  = $request->message;
         if($request->hasFile('file')){
@@ -482,7 +481,7 @@ class TaskController extends Controller
             'notice_type'		=> '4',
             'notice_id'			=> $request->id,
             //'notification'		=> 'New comment has been add in '.$task['task'].' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has been add a new comment in '.$task['task'].'.',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in task['.$task['task'].'].',
             'created_by'		=> $request->user->id,
             'company_id'		=> $task->company_id,
             'project_id'		=> $task->project_id,

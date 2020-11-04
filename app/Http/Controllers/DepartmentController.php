@@ -8,6 +8,7 @@ use App\Building;
 use App\Floor;
 use App\Room;
 use App\Site;
+use App\Site_room;
 use App\Company_customer;
 use App\Company;
 use Illuminate\Support\Facades\Validator;
@@ -73,7 +74,7 @@ class DepartmentController extends Controller
         //     $departments[$key]['rooms_count'] = Room::where('department_id',$department->id)->count();
         // }
         foreach($departments as $key =>$department){
-            $department[$key]['rooms_count'] = Site_room::where('department_id',$department->id)->count();
+            $departments[$key]['rooms_count'] = Site_room::where('department_id',$department->id)->count();
         }
         $res['departments'] = $departments;
         $res["status"] = "success";

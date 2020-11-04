@@ -78,7 +78,7 @@ class ProductController extends Controller
                 'notice_type'		=> '8',
                 'notice_id'			=> $product->id,
                 //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' have been added new product to['.$room['room_number'].']',
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new product in room['.$room['room_number'].']',
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $room->company_id,
                 'project_id'        =>$room['project_id'],

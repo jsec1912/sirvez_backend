@@ -14,6 +14,7 @@ use App\Project_user;
 use App\ScheduleProduct;
 use App\ScheduleEngineer;
 use Illuminate\Support\Facades\Validator;
+use DateTime;
 
 class ScheduleController extends Controller
 {
@@ -43,12 +44,6 @@ class ScheduleController extends Controller
             $schedule['parent_id'] = Schedule::where('off_id',$request->parent_id)->first()->id;
         else
             $schedule['parent_id'] = $request->parent_id;
-        
-        if($schedule['parent_id']==0)
-            $schedule['root_id'] =$schedule['parent_id'];
-        else
-            $schedule['root_id'] =Schedule::whereId($schedule['parent_id'])->first()->root_id;
-            
 
         if(strlen($request->site_id)>10)
             $schedule['site_id'] = Site::where('off_id',$request->site_id)->first()->id;
@@ -77,7 +72,15 @@ class ScheduleController extends Controller
             $schedule['created_by'] = $request->user->id;
             if(strlen($request->id)>10)
                 $schedule['off_id'] = $request->id;
-            $schedule = Schedule::create($schedule);
+            if($schedule['parent_id']!=0){
+                $schedule['root_id'] =Schedule::whereId($schedule['parent_id'])->first()->root_id;
+                $schedule = Schedule::create($schedule);
+            }
+            else{
+                $schedule = Schedule::create($schedule);
+                $schedule->root_id = $schedule->id;
+                $schedule->save();
+            }
             if ($request->has('product_id')) {
                 $array_res = array();
                 $array_res = json_decode($request->product_id, true);
@@ -166,6 +169,12 @@ class ScheduleController extends Controller
             $res["status"] = 'error';
             $res["msg"] = "This schedule has already child. Please first delete child!";
         }
+        return response()->json($res);
+    }
+    public function changeStart(Request $request){
+        Schedule::whereId($request->schedule_id)->update(['start_date'=>$request->start_date,'end_date'=>$request->end_date]);
+        $res = array();
+        $res['status'] = 'success';
         return response()->json($res);
     }
 

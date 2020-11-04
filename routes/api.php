@@ -124,6 +124,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
 
     Route::post('/schedule/updateSchedule','ScheduleController@updateSchedule');///
     Route::post('/schedule/deleteSchedule','ScheduleController@deleteSchedule');///
+    Route::post('/schedule/changeStart','ScheduleController@changeStart');///
 
 
 

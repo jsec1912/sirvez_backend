@@ -138,7 +138,8 @@ class CompanyCustomerController extends Controller
         $insertnotificationndata = array(
             'notice_type'		=> '2',
             'notice_id'			=> $companyCustomer->id,
-            'notification'		=> $company['name'].' have been '.$action.' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
+            //'notification'		=> $company['name'].' have been '.$action.' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new company['.$company['name'].'].',
             'created_by'		=> $request->user->id,
             'company_id'		=> $id,
             'created_date'		=> date("Y-m-d H:i:s"),
@@ -310,7 +311,7 @@ class CompanyCustomerController extends Controller
             $insertnotificationndata = array(
                 'notice_type'		=> '1',
                 'notice_id'			=> $user->id,
-                'notification'		=> $user['first_name'].' have been added as an account manager to '.$user_role[$pending_user['user_role']].' by  '.$request->user->first_name.' ('.$company_name.').',
+                'notification'		=> $user['first_name'].' '.$user['last_name'].' has added you as '.$user_role[$pending_user['user_role']].' by  '.$request->user->first_name.' ('.$company_name.').',
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $user['company_id'],
                 'created_date'		=> date("Y-m-d H:i:s"),

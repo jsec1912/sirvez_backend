@@ -88,7 +88,7 @@ class ProjectController extends Controller
                     $insertnotificationndata = array(
                         'notice_type'		=> '3',
                         'notice_id'			=> $id,
-                        'notification'		=> $request->user->first_name.' '.$request->user->last_name.' added you as a team member for a new project.['.$client.']',
+                        'notification'		=> $request->user->first_name.' '.$request->user->last_name.'has added you as a team member for a new project.['.$client.']',
                         'created_by'		=> $request->user->id,
                         'company_id'		=> $project['company_id'],
                         'project_id'		=> $id,
@@ -115,21 +115,42 @@ class ProjectController extends Controller
         }
 
         //$notice_type ={1:pending_user,2:createcustomer 3:project}
-        $insertnotificationndata = array(
-            'notice_type'		=> '3',
-            'notice_id'			=> $id,
-            //'notification'		=> $project['project_name'].' have been '.$action.' by  '.$request->user->first_name.' '.$request->user->last_name.' ('.$request->user->company_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' have been '.$action.' project['.$project['project_name'].']',
-            'created_by'		=> $request->user->id,
-            'company_id'		=> $project['company_id'],
-            'project_id'		=> $id,
-            'created_date'		=> date("Y-m-d H:i:s"),
-            'is_read'	    	=> 0,
-        );
+        if($request->user_id > 0){
+            $customer_user = User::whereId($request->user_id)->first();
+            $client_name = $customer_user->first_name.' '.$customer_user->last_name;
+        }else{
+            $client_name = ' ';
+        }
+
+
+        if($action =='created'){
+            $insertnotificationndata = array(
+                'notice_type'		=> '3',
+                'notice_id'			=> $id,
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new project : ['.$project['project_name'].'] for ['.$client_name.'].',
+                'created_by'		=> $request->user->id,
+                'company_id'		=> $project['company_id'],
+                'project_id'		=> $id,
+                'created_date'		=> date("Y-m-d H:i:s"),
+                'is_read'	    	=> 0,
+            );
+        }
+        else{
+            $insertnotificationndata = array(
+                'notice_type'		=> '3',
+                'notice_id'			=> $id,
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has updated project : ['.$project['project_name'].'] for ['.$client_name.'].',
+                'created_by'		=> $request->user->id,
+                'company_id'		=> $project['company_id'],
+                'project_id'		=> $id,
+                'created_date'		=> date("Y-m-d H:i:s"),
+                'is_read'	    	=> 0,
+            );
+        }
         Notification::create($insertnotificationndata);
 
         //sending gmail to user
-        if($request->user_id){
+        if($request->user_id > 0){
             $pending_user = User::where('id',$request->user_id)->first();
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
@@ -158,7 +179,7 @@ class ProjectController extends Controller
             'notice_type'		=> '3',
             'notice_id'			=> $id,
             //'notification'		=> 'Project '.$project['project_name'].' have been completed by  '.$request->user->first_name.' '.$request->user->last_name.' ('.$request->user->company_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has been completed project['.$project['project_name'].']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has completed project['.$project['project_name'].']',
             'created_by'		=> $request->user->id,
             'company_id'		=> $request->user->company_id,
             'project_id'		=> $id,
@@ -331,13 +352,13 @@ class ProjectController extends Controller
             $company_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['customer'] = Company::whereIn('id',$company_id)->orderBy('id','desc')->get();
             $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$request->user->company_id)->select('id','first_name','last_name')->get();
-            $res['customer_user'] = User::whereIn('user_type',[2,6])->where('status',1)->whereIn('company_id',$company_id)->select('id','first_name','last_name')->get();
+            $res['customer_user'] = User::whereIn('user_type',[2,6])->where('status',1)->whereIn('company_id',$company_id)->select('id','first_name','last_name','company_id')->get();
         }
         else{
             $res['customer'] = Company::where('id',$request->user->company_id)->orderBy('id','desc')->get();
             $com_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
             $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$com_id)->select('id','first_name','last_name')->get();
-            $res['customer_user'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$request->user->company_id)->select('id','first_name','last_name')->get();
+            $res['customer_user'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$request->user->company_id)->select('id','first_name','last_name','company_id')->get();
 
         }
         if($request->user->user_type ==1||$request->user->user_type ==3)
@@ -368,7 +389,7 @@ class ProjectController extends Controller
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' removed you as a team member for a new project.['.$client.']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed you from the team member of project['.$project['project_name'].'] for ['.$client.']',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -392,7 +413,7 @@ class ProjectController extends Controller
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' added you as a team member for a new project.['.$client.']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added you as a team member for a new project['.$project['project_name'].'] for ['.$client.']',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -439,7 +460,7 @@ class ProjectController extends Controller
                 'notice_id'			=> $request->id,
                 //'notification'		=> "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s").'['.$project['project_name'].']',
                 //'notification'		=> "Scope of works signed off on ".date("d-m-Y H:i:s")." by ".$request->user->first_name.".",
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested sign off on ".date("d-m-Y H:i:s").".",
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested sign off on [".date("d-m-Y H:i:s")."].",
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $project['company_id'],
                 'project_id'		=> $project->id,
@@ -451,7 +472,7 @@ class ProjectController extends Controller
             $insertnotificationdata = array(
                 'notice_type'		=> '6',
                 'notice_id'			=> $request->id,
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has signed off scope of works for ".$project['project_name'].". ".date("d-m-Y H:i:s"),
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has signed off scope of works for ".$project['project_name']." on [".date("d-m-Y H:i:s")."].",
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $project['company_id'],
                 'project_id'		=> $project->id,
@@ -462,33 +483,20 @@ class ProjectController extends Controller
         Notification::create($insertnotificationdata);
 
         //send mail
-        $content = "";
-        if($request->user->user_type <6){
-            $pending_user = $project['customer_user'];
-           $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
+        if(User::where('id',$project['user_id'])->count() > 0){
+            $content = "";
+            if($request->user->user_type <6){
+                $pending_user = $project['customer_user'];
+            $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
 
-        }
-        else{
-            $pending_user = User::where('id',$project->created_by)->first();
-            $content = "Project was signed off by ".$request->user->first_name.". ".date("d-m-Y H:i:s");
-        }
+            }
+            else{
+                $pending_user = User::where('id',$project->created_by)->first();
+                $content = "Project was signed off by ".$request->user->first_name.". ".date("d-m-Y H:i:s");
+            }
 
-        $to_name = $pending_user['first_name'];
-        $to_email = $pending_user['email'];
-        $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
-        $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
-        Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
-            $message->to($to_email, $to_name)
-                    ->subject('sirvez notification.');
-            $message->from('support@sirvez.com','support team');
-        });
-
-        //invite user
-        if ($request->sign_user_id>0){
-            $pending_user = User::where($request->sign_user_id);
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
-            $content = 'you have been added as a site contact for '.$project['project name'].' please view details here.. ';
             $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
             Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
@@ -496,32 +504,49 @@ class ProjectController extends Controller
                         ->subject('sirvez notification.');
                 $message->from('support@sirvez.com','support team');
             });
-
         }
-        else{
-            $company_name = Company::whereId($project['company_id'])->first()->name;
-            $user = array();
-            $user['email'] = $project['sign_contact_email'];
-            $user['first_name'] = $project['sign_first_name'];
-            $user['user_type'] = 6;
-            $user['company_id'] = $project['company_id'];
-            $user['company_name'] = $company_name;
-            $invite_code = bcrypt($user['email'].$company_name);
-            $user['invite_code'] = str_replace('/', '___', $invite_code);
-            $user['status'] = '0';
 
-            $user = User::create($user);
-            $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
+        //invite user
+        if($request->user->user_type ==6){
+            if ($request->sign_user_id>0){
+                $pending_user = User::whereId($request->sign_user_id)->first();
+                $to_name = $pending_user['first_name'];
+                $to_email = $pending_user['email'];
+                $content = 'you have been added as a site contact for '.$project['project name'].' Please view details here.. ';
+                $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
+                $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
+                Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
+                    $message->to($to_email, $to_name)
+                            ->subject('sirvez notification.');
+                    $message->from('support@sirvez.com','support team');
+                });
 
-            //sending gmail to user
-            $to_name = $user['first_name'];
-            $to_email = $user['email'];
-            $data = ['name'=>$user['first_name'], "pending_user" => $user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
-            Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
-                $message->to($to_email, $to_name)
-                        ->subject('sirvez support team invite you. please join our site.');
-                $message->from('support@sirvez.com','support team');
-            });
+            }
+            else{
+                $company_name = Company::whereId($project['company_id'])->first()->name;
+                $user = array();
+                $user['email'] = $project['sign_contact_email'];
+                $user['first_name'] = $project['sign_first_name'];
+                $user['user_type'] = 6;
+                $user['company_id'] = $project['company_id'];
+                $user['company_name'] = $company_name;
+                $invite_code = bcrypt($user['email'].$company_name);
+                $user['invite_code'] = str_replace('/', '___', $invite_code);
+                $user['status'] = '0';
+
+                $user = User::create($user);
+                $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
+
+                //sending gmail to user
+                $to_name = $user['first_name'];
+                $to_email = $user['email'];
+                $data = ['name'=>$user['first_name'], "pending_user" => $user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
+                Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
+                    $message->to($to_email, $to_name)
+                            ->subject('sirvez support team invite you. please join our site.');
+                    $message->from('support@sirvez.com','support team');
+                });
+            }
         }
         $res = array();
         $res['status'] = 'success';

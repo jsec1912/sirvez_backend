@@ -87,9 +87,27 @@ class RoomController extends Controller
                 $room['off_id'] = $request->id;
             $room = Room::create($room);
             $id = $room->id;
+            $room = Room::where('rooms.id',$id)
+                        ->leftJoin('projects','projects.id','=','rooms.project_id')
+                        ->leftJoin('users','users.id','=','projects.user_id')
+                        ->select('rooms.*','projects.project_name','users.first_name','users.last_name')
+                        ->first();
             $action = "created";
             if(!$request->room_site_id)
             Site_room::create(['company_id'=>$room['company_id'],'site_id'=>$room['site_id'],'room_number'=>$room['room_number']]);
+           
+            $insertnotificationdata = array(
+                'notice_type'		=> '5',
+                'notice_id'			=> $id,
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new location ['.$room['room_number'].']'.' in ['.$room['project_name'].' ] for ['.$room['first_name'].' '.$room['last_name'].'].',
+                'created_by'		=> $request->user->id,
+                'company_id'		=> $room['company_id'],
+                'project_id'        => $room['project_id'],
+                'created_date'		=> date("Y-m-d H:i:s"),
+                'is_read'	    	=> 0,
+            );
+            
+            Notification::create($insertnotificationdata);
         }
         else{
             $room_cnt = Room::where('project_id',$room['project_id'])
@@ -129,18 +147,7 @@ class RoomController extends Controller
         }
 
         //$notice_type ={1:pending_user,2:createcustomer 3:project 4:site 5:room}
-        $insertnotificationdata = array(
-            'notice_type'		=> '5',
-            'notice_id'			=> $id,
-            //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' have been '.$action.' location['.$room['room_number'].']',
-            'created_by'		=> $request->user->id,
-            'company_id'		=> $room['company_id'],
-            'project_id'        => $room['project_id'],
-            'created_date'		=> date("Y-m-d H:i:s"),
-            'is_read'	    	=> 0,
-        );
-        Notification::create($insertnotificationdata);
+        
         $res['status'] = 'success';
         $res['msg'] = 'Room Saved Successfully!';
         $res['room'] = $room;
@@ -236,7 +243,7 @@ class RoomController extends Controller
             $res['room_id'] = $room_id;
 
         }
-        if($request->has('project_id')||$request->has('project_name')){
+        if(($request->has('project_id') && $request->project_id != 'null')||$request->has('project_name')){
             if((!$request->has('project_id') || $request->project_id =='null') && $request->has('project_name'))
                 $project_id = Project::where('project_name',$request->project_name)->first()->id;
             else
@@ -376,7 +383,7 @@ class RoomController extends Controller
         $insertnotificationdata = array(
             'notice_type'		=> '5',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has been sent request to change location[".$room->room_number."]",
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has sent request to change location[".$room->room_number."]",
             'created_by'		=> $request->user->id,
             'company_id'		=> $room->company_id,
             'project_id'		=> $room->project_id,
