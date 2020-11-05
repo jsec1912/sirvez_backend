@@ -93,6 +93,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/room/changeRequest','RoomController@changeRequest');///
     Route::post('/room/setFavourite','RoomController@setFavourite');
     Route::post('/room/changeNotes','RoomController@changeNotes');
+    Route::post('/room/changeRoomNumber','RoomController@changeRoomNumber');
 
 
     Route::post('/task/updateTask','TaskController@updateTask');///

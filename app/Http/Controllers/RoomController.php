@@ -81,11 +81,20 @@ class RoomController extends Controller
                 $res['msg'] = 'The room number is already exist!';
                 return response()->json($res);
             }
+            if($request->duplicate > 0){
+                $room = Room::whereId($request->duplicate)->first()->toArray();
+                $room['room_number'] =$request->room_number;
+                unset($room["updated_at"]);
+                unset($room["created_at"]);
+                unset($room["id"]);
+            }
             $room['created_by']  = $request->user->id;
             $room['signed_off']  = $request->signed_off;
             if(strlen($request->id) > 10)
                 $room['off_id'] = $request->id;
+                 
             $room = Room::create($room);
+            
             $id = $room->id;
             $room = Room::where('rooms.id',$id)
                         ->leftJoin('projects','projects.id','=','rooms.project_id')
@@ -125,23 +134,33 @@ class RoomController extends Controller
         }
 
         //remove room_photh using room_array
-        $imgs = Room_photo::where('room_id',$id)->get();
-        $res_val = array();
-        foreach($imgs as $key => $row){
-            if(strpos($request->img_array,$row->img_name)===false)
-            Room_photo::whereId($row->id)->delete();
+        if($request->duplicate>0)
+        {
+            $imgs = Room_photo::where('room_id',$request->duplicate)->get();
+            foreach($imgs as $key => $row){
+                Room_photo::create(['room_id'=>$id,'user_id'=>$request->user->id,'img_name'=>$row->img_name]);
+            }
         }
+        else
+        {
+            $imgs = Room_photo::where('room_id',$id)->get();
+            $res_val = array();
+            foreach($imgs as $key => $row){
+                if(strpos($request->img_array,$row->img_name)===false)
+                Room_photo::whereId($row->id)->delete();
+            }
 
-        $images = $request->file('room_img');
-        $n = 0;
-        if(isset($images) && count($images) > 0 ){
-            foreach($images as $img_file) {
-                if (isset($img_file)) {
+            $images = $request->file('room_img');
+            $n = 0;
+            if(isset($images) && count($images) > 0 ){
+                foreach($images as $img_file) {
+                    if (isset($img_file)) {
 
-                    $n++;
-                    $fileName = $img_file->getClientOriginalName();
-                    $img_file->move(public_path('upload/img/'), $fileName);
-                    Room_photo::create(['room_id'=>$id,'user_id'=>$request->user->id,'img_name'=>$fileName]);
+                        $n++;
+                        $fileName = $img_file->getClientOriginalName();
+                        $img_file->move(public_path('upload/img/'), $fileName);
+                        Room_photo::create(['room_id'=>$id,'user_id'=>$request->user->id,'img_name'=>$fileName]);
+                    }
                 }
             }
         }
@@ -457,6 +476,16 @@ class RoomController extends Controller
         else
             $id = $request->id;
         Room::whereId($id)->update(['notes'=>$request->notes]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeRoomNumber(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::whereId($id)->update(['room_number'=>$request->room_number]);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
