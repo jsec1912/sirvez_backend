@@ -18,7 +18,7 @@ class CompanyController extends Controller
             'postcode' => 'required',
             'telephone' => 'required',
         ]);
-        
+
         if ($v->fails())
         {
             return response()->json([
@@ -29,22 +29,22 @@ class CompanyController extends Controller
         $company = array();
         $id = $request->user->company_id;
         if($request->hasFile('logo_img')){
-            $fileName = time().'logo.'.$request->logo_img->extension();  
+            $fileName = time().'logo.'.$request->logo_img->extension();
             $request->logo_img->move(public_path('upload/img/'), $fileName);
             $company['logo_img']  = $fileName;
         }
         if($request->hasFile('bg_image')){
-            $fileName = time().'bg.'.$request->bg_image->extension();  
+            $fileName = time().'bg.'.$request->bg_image->extension();
             $request->bg_image->move(public_path('upload/img/'), $fileName);
             $company['bg_image']  = $fileName;
         }
         if($request->hasFile('front_cover')){
-            $fileName = $request->post("name").'_front.'.$request->front_cover->extension();  
+            $fileName = $request->post("name").'_front.'.$request->front_cover->extension();
             $request->front_cover->move(public_path('upload/img/'), $fileName);
             $company['front_cover']  = $fileName;
         }
         if($request->hasFile('back_cover')){
-            $fileName = $request->post("name").'_back.'.$request->back_cover->extension();  
+            $fileName = $request->post("name").'_back.'.$request->back_cover->extension();
             $request->back_cover->move(public_path('upload/img/'), $fileName);
             $company['back_cover']  = $fileName;
         }
@@ -56,13 +56,13 @@ class CompanyController extends Controller
         $company['city']  = $request->post("city");
         $company['postcode']  = $request->post("postcode");
         $company['status']  = $request->post("status");
-        $company['telephone']  = $request->post("telephone"); 
+        $company['telephone']  = $request->post("telephone");
         $company['is_upload']  = $request->post("is_upload");
-        
+
         //return response()->json($company );
         $count = Company::where('id','<>',$id)->where('website',$request->website)->count() +
             Company::where('id','<>',$id)->where('company_email',$request->company_email)->count();
-        
+
         if($count>0)
         {
             $res = array();
@@ -72,9 +72,9 @@ class CompanyController extends Controller
         }
         company::whereId($id)->update($company);
         return response()->json(['status'=>'success','company'=>$company]);
-           
-            
-         
+
+
+
     }
     public function getCompanyInfo(request $request){
         $id = $request->user->company_id;
@@ -87,6 +87,14 @@ class CompanyController extends Controller
         $name = str_replace('-',' ',$request->company_name);
         $res = array();
         $res['company'] = Company::where('name',$name)->first();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeLogo(request $request){
+        $fileName = time().'logo.'.$request->logo_img->extension();
+        $request->logo_img->move(public_path('upload/img/'), $fileName);
+        $company['logo_img']  = $fileName;
+        Company::whereId($request->company_id)->update($company);
         $res['status'] = 'success';
         return response()->json($res);
     }

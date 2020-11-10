@@ -91,8 +91,9 @@ class CompanyCustomerController extends Controller
             // }
             if (strlen($request->id) > 10)
                 $company['off_id']  = $request->id;
-            $company = company::create($company);
+            $company = Company::create($company);
             $id = $company->id;
+            //User::whereId($company['manager'])->update(['company_id'=>$id,'user_type'=>3]);
             $flag = 1;
         }
         else{
@@ -101,7 +102,9 @@ class CompanyCustomerController extends Controller
                 $count += Company::where('id','<>',$id)->where('website',$request->website)->count();
             if($request->company_email)
                 $count += Company::where('id','<>',$id)->where('company_email',$request->company_email)->count();
-
+            $sel_company = Company::whereId($id)->first();
+            //User::whereId($sel_company['manager'])->update(['company_id'=>$request->user->company_id,'user_type'=>1]);
+            //User::whereId($company['manager'])->update(['company_id'=>$id,'user_type'=>3]);
             if($count>0)
             {
                 $res = array();
@@ -111,8 +114,6 @@ class CompanyCustomerController extends Controller
             }
 
             company::whereId($request->id)->update($company);
-
-
         }
 
         //insert company_customer
@@ -215,7 +216,7 @@ class CompanyCustomerController extends Controller
         $res = array();
         $res['status'] = 'success';
         $res['company'] = Company::whereId($company_id)->first();
-        $res['users'] = User::where('company_id',$company_id)->where('status',1)->get();
+        $res['users'] = User::where('company_id',$company_id)->whereIn('status',[1,3])->get();
         $projects = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
         if(!is_null($projects)){
             foreach($projects as $key=>$project){
@@ -257,7 +258,7 @@ class CompanyCustomerController extends Controller
             $res['company'] = Company::whereId($customer_id)->first();
         }
 
-        $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$request->user->company_id)->select('id','first_name','last_name')->get();
+        $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
 
         return response()->json($res);
     }
@@ -292,7 +293,10 @@ class CompanyCustomerController extends Controller
                 continue;
             }
             $success_key[$key] = 1;
-            $company_name = Company::whereId($pending_user['customer'])->first()->name;
+            if(Company::whereId($pending_user['customer'])->count()>0)
+                $company_name = Company::whereId($pending_user['customer'])->first()->name;
+            else
+                $company_name = '';
             //add usertable new user by pending
             $user = array();
             $user['email'] = $pending_user['email'];

@@ -11,6 +11,7 @@ use App\Project;
 use App\Room;
 use App\User;
 use App\Site;
+use App\Room_photo;
 use App\Project_user;
 use App\TaskComment;
 use Mail;
@@ -60,6 +61,7 @@ class TaskController extends Controller
             $fileName = time().'task.'.$request->task_img->extension();
             $request->task_img->move(public_path('upload/img/'), $fileName);
             $task['task_img']  = $fileName;
+
         }
         if(strlen($request->id) > 10)
             if(Task::where('off_id',$request->id)->count() > 0)
@@ -72,6 +74,9 @@ class TaskController extends Controller
             $task['off_id'] = $request->id;
             $task = Task::create($task);
             $id = $task->id;
+            if($request->hasFile('task_img')){
+                Room_photo::create(['room_id'=>$task['room_id'],'user_id'=>$request->user->id,'task_id'=>$id,'img_name'=>$task['task_img'] ]);
+            }
             $action = "created";
             if($request->has('assign_to'))
             {
@@ -104,6 +109,7 @@ class TaskController extends Controller
             }
         }
         //$notice_type ={1:pending_user,2:createcustomer 3:project 4:task}
+        $res['task'] = $task;
         if($action == "created"){
             $insertnotificationndata = array(
             'notice_type'		=> '4',
@@ -357,8 +363,11 @@ class TaskController extends Controller
             }
         }
         foreach($tasks as $key=>$row){
-            $room = Room::where('id',$row->room_id)->first();
-            $tasks[$key]['site_name'] = Site::where('id',$room->site_id)->first()->site_name;
+            $room = Room::where('id',$row->site_id)->first();
+            if(Site::where('id',$row->site_id)->count() > 0 )
+                $tasks[$key]['site_name'] = Site::where('id',$row->site_id)->first()->site_name;
+            else
+                $tasks[$key]['site_name'] = '';
             $assign_to= Project_user::where(['project_users.project_id'=>$row->id,'type'=>'2'])
             ->leftJoin('users','users.id','=','project_users.user_id')
             ->select('users.first_name as assign_name')->pluck('assign_name');
@@ -368,12 +377,15 @@ class TaskController extends Controller
             }
             $assign_str = implode(',',$assign);
             $tasks[$key]['assign_to'] = $assign_str;
+            $tasks[$key]['assign_users'] = Project_user::where(['project_users.project_id'=>$row->id,'type'=>'2'])
+            ->leftJoin('users','users.id','=','project_users.user_id')->get();
             $comment_number = TaskComment::where('task_id',$tasks[$key]['id'])->count();
             $tasks[$key]['comment_number'] = $comment_number;
             $task_comments = TaskComment::where('task_comments.task_id',$tasks[$key]['id'])
                 ->leftJoin('users','users.id','=','task_comments.created_by')
                 ->select('task_comments.*','users.first_name as created_user_f','users.last_name as created_user_l')
                 ->get();
+            $tasks[$key]['comments'] = $task_comments;
             for($i = 1;$i<=3;$i++){
                 $tasks[$key]['comment'.$i] = '';
                 $tasks[$key]['comment'.$i.'_date'] = '';
@@ -518,5 +530,25 @@ class TaskController extends Controller
             ->get();
         $res['status'] = 'success';
         return response()->json($res);
+    }
+    public function saveImage(request $request){
+        $res = array();
+        if(strlen($request->id)>10){
+            $id = Task::where('off_id',$request->id)->first()->id;
+        }else{
+            $id = $request->id;
+        }
+        $task = Task::whereId($id)->first();
+        if($request->hasFile('task_img')){
+            $fileName = time().'task.'.$request->task_img->extension();
+            $request->task_img->move(public_path('upload/img/'), $fileName);
+            Task::whereId($id)->update('task_img',$fileName);
+            Room_photo::where('room_id',$task['room_id'])->where('task_id',$id)->delete();
+            Room_photo::create(['room_id'=>$task['room_id'],'user_id'=>$request->user->id,'task_id'=>$id,'img_name'=>$fileName ]);
+        }
+        $res['status'] = 'success';
+        $res['id'] = $id;
+        return response()->json($res);
+
     }
 }

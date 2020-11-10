@@ -8,6 +8,8 @@ use App\Product;
 use App\Project;
 use App\Room;
 use App\Site;
+use App\Task;
+use App\Project_user;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Notification;
@@ -86,6 +88,32 @@ class ProductController extends Controller
                 'is_read'	    	=> 0,
             );
             Notification::create($insertnotificationdata);
+
+            if($request->is_createTask)
+            {
+                $room = Room::whereId($product->room_id)->first();
+                $task = array();
+                $task['task'] = $product['product_name'].'_task';
+                $task['company_id'] = $room->company_id;
+                $task['project_id']  = $room->project_id;
+                $task['room_id']  = $room->id;
+                $task['due_by_date']  = $request->due_by_date;
+                $task['created_by']  = $request->user->id;
+                $task['description'] = $request->notes;
+                $task['priority'] = $request->snagging;
+                
+                $task = Task::create($task);
+                $id = $task->id;
+                if($request->has('assign_to'))
+                {
+                    $array_res = array();
+                    $array_res =json_decode($request->assign_to,true);
+                    foreach($array_res as $row)
+                    {
+                        Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>'2']);
+                    }
+                }
+            }
             
         }
         else{

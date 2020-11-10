@@ -58,22 +58,42 @@ class UserController extends Controller
             $user->save();
             if($user->user_type ==1||$user->user_type ==3)
             {
-
-                $user->co_name = str_replace(' ','-',Company::where('id',$user->company_id)->first()->name);
-                $user->logo_img = Company::where('id',$user->company_id)->first()->logo_img;
-                $user->bg_image = Company::where('id',$user->company_id)->first()->bg_image;
-                $user->is_upload = Company::where('id',$user->company_id)->first()->is_upload;
-                $user->back_cover = Company::where('id',$user->company_id)->first()->back_cover;
-                $user->front_cover = Company::where('id',$user->company_id)->first()->front_cover;
+                if(Company::where('id',$user->company_id)->count()>0){
+                    $user->co_name = str_replace(' ','-',Company::where('id',$user->company_id)->first()->name);
+                    $user->logo_img = Company::where('id',$user->company_id)->first()->logo_img;
+                    $user->bg_image = Company::where('id',$user->company_id)->first()->bg_image;
+                    $user->is_upload = Company::where('id',$user->company_id)->first()->is_upload;
+                    $user->back_cover = Company::where('id',$user->company_id)->first()->back_cover;
+                    $user->front_cover = Company::where('id',$user->company_id)->first()->front_cover;
+                }
+                else
+                {
+                    $user->co_name = '';
+                    $user->logo_img = '';
+                    $user->bg_image = '';
+                    $user->is_upload = '';
+                    $user->back_cover = '';
+                    $user->front_cover = '';
+                }
             }
             else{
-                $company_id = Company_customer::where('customer_id',$user->company_id)->first()->company_id;
-                $user->co_name = str_replace(' ','-',Company::where('id',$company_id)->first()->name);
-                $user->logo_img = Company::where('id',$company_id)->first()->logo_img;
-                $user->bg_image = Company::where('id',$company_id)->first()->bg_image;
-                $user->is_upload = Company::where('id',$company_id)->first()->is_upload;
-                $user->back_cover = Company::where('id',$company_id)->first()->back_cover;
-                $user->front_cover = Company::where('id',$company_id)->first()->front_cover;
+                if(Company_customer::where('customer_id',$user->company_id)->count()>0){
+                    $company_id = Company_customer::where('customer_id',$user->company_id)->first()->company_id;
+                    $user->co_name = str_replace(' ','-',Company::where('id',$company_id)->first()->name);
+                    $user->logo_img = Company::where('id',$company_id)->first()->logo_img;
+                    $user->bg_image = Company::where('id',$company_id)->first()->bg_image;
+                    $user->is_upload = Company::where('id',$company_id)->first()->is_upload;
+                    $user->back_cover = Company::where('id',$company_id)->first()->back_cover;
+                    $user->front_cover = Company::where('id',$company_id)->first()->front_cover;
+                }else{
+                    $company_id = '';
+                    $user->co_name =  '';
+                    $user->logo_img =  '';
+                    $user->bg_image =  '';
+                    $user->is_upload =  '';
+                    $user->back_cover = '';
+                    $user->front_cover = '';
+                }
             }
             $response = ['status'=>'success', 'data'=>$user];           
         }
@@ -325,7 +345,17 @@ class UserController extends Controller
     public function totalUserlist(request $request){
         $res = array();
         $res['status'] = 'success';
-        $res['users'] = User::Where('company_id',$request->user->company_id)
+        if($request->user->user_type ==1)
+        {
+            $com_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+            $res['users'] = User::where(function($q) use($com_id,$request){
+                return $q->whereIn('company_id',$com_id)
+                    ->orwhere('company_id', $request->user->company_id);
+                })
+                ->where('id','<>',$request->user->id)->get();
+        }
+        else
+            $res['users'] = User::Where('company_id',$request->user->company_id)
                     ->where('id','<>',$request->user->id)->get();
         $res['company'] = Company::where('company_type','1')->get();
         return response()->json($res);

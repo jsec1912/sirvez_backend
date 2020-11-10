@@ -27,6 +27,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     //company modify
     Route::post('/company/saveCompany','CompanyController@saveCompany');
     Route::get('/company/getCompanyInfo','CompanyController@getCompanyInfo');
+    Route::post('/company/changeLogo','CompanyController@changeLogo');
     //customer
     Route::Post('/customers/company/customer-edit','CompanyCustomerController@addCompanyCustomer');///
     Route::Post('/customers/DeleteCompanyCustomer','CompanyCustomerController@DeleteCompanyCustomer');///
@@ -45,7 +46,11 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/project/deleteAssignUser','ProjectController@deleteAssignUser');
     Route::post('/project/signOff','ProjectController@signOff');
     Route::post('/project/addAssignUser','ProjectController@addAssignUser');
+    Route::post('/project/addCustomerUser','ProjectController@addCustomerUser');
+    Route::post('/project/deleteCustomerUser','ProjectController@deleteCustomerUser');
     Route::post('/project/changeSummary','ProjectController@changeSummary');
+    Route::post('/project/changeProjectName','ProjectController@changeProjectName');
+    Route::post('/project/changeContactNumber','ProjectController@changeContactNumber');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -94,6 +99,10 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/room/setFavourite','RoomController@setFavourite');
     Route::post('/room/changeNotes','RoomController@changeNotes');
     Route::post('/room/changeRoomNumber','RoomController@changeRoomNumber');
+    Route::post('/room/changeCeiling','RoomController@changeCeiling');
+    Route::post('/room/changeWall','RoomController@changeWall');
+    Route::post('/room/changeAsbestos','RoomController@changeAsbestos');
+    Route::post('/room/changeInstall','RoomController@changeInstall');
 
 
     Route::post('/task/updateTask','TaskController@updateTask');///
@@ -103,6 +112,8 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/task/setFavourite','TaskController@setFavourite');
     Route::post('/task/commentSubmit','TaskController@commentSubmit');
     Route::get('/task/getComments','TaskController@getComments');
+    Route::post('/task/saveImage','TaskController@saveImage');
+
 
     Route::post('/user/updateUser','UserController@CustomerUpdateUser');///
     Route::post('/user/deleteUser','UserController@DeleteUser');///

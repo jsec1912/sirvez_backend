@@ -30,8 +30,12 @@ class FloorController extends Controller
         $floor = array();
         $id = $request->id;
         $floor['site_id']  = $request->site_id;
-        if(strlen($request->building_id) > 10)
-            $floor['building_id'] = Building::where('off_id',$request->building_id)->first()->id;
+        if(strlen($request->building_id) > 10){
+            if(Building::where('off_id',$request->building_id)->count()>0)
+                $floor['building_id'] = Building::where('off_id',$request->building_id)->first()->id;
+            else
+                $floor['building_id'] = '';
+        }
         else
             $floor['building_id'] = $request->building_id;
         $floor['floor_name']  = $request->floor_name;

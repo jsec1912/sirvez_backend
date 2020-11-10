@@ -28,8 +28,13 @@ class BuildingController extends Controller
         }
         $building = array();
         $id = $request->id;
-        if(strlen($request->site_id) > 10)
-            $building['site_id'] = Site::where('off_id',$request->site_id)->first()->id;
+        if(strlen($request->site_id) > 10){
+            if(Site::where('off_id',$request->site_id)->count()>0){
+                $building['site_id'] = Site::where('off_id',$request->site_id)->first()->id;
+            }
+            else
+                $building['site_id'] = '';
+        }
         else
             $building['site_id'] = $request->site_id;
         $building['building_name']  = $request->building_name;

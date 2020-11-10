@@ -94,7 +94,7 @@ class StickerCategoryController extends Controller
     }
     public function categoryList(Request $request){
         $res = array();
-        $res['category'] = Sticker_category::withCount('stickers')->where('created_by',$request->user->id)->orderBy('id','desc')->get();
+        $res['category'] = Sticker_category::withCount('stickers')->orderBy('id','desc')->get();
         $res["status"] = "success";
         return response()->json($res);
     }

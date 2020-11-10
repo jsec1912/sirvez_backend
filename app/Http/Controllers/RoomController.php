@@ -260,6 +260,8 @@ class RoomController extends Controller
                                     ->orderBy('id','desc')
                                     ->first();
             $res['room_id'] = $room_id;
+            $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$room->company_id)->select('id','first_name','last_name')->get();
+            $res['task_assign_to'] = User::where('company_id',$room->company_id)->whereIn('user_type',[1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
 
         }
         if(($request->has('project_id') && $request->project_id != 'null')||$request->has('project_name')){
@@ -486,6 +488,54 @@ class RoomController extends Controller
         else
             $id = $request->id;
         Room::whereId($id)->update(['room_number'=>$request->room_number]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeInstall(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        $asbestos = $request->asbestos;
+
+        Room::whereId($id)->update(['estimate_day'=>$request->day,'estimate_time'=>$request->time]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeCeiling(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::whereId($id)->update(['ceiling_height'=>$request->ceiling_height]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeWall(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::whereId($id)->update(['wall'=>$request->wall]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeAsbestos(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        if($request->asbestos =='yes')
+            $asbestos = 1;
+        else if($request->asbestos =='no')
+            $asbestos = 0;
+        else
+            $asbestos = 2;
+        Room::whereId($id)->update(['asbestos'=>$asbestos]);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
