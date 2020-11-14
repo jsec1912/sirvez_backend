@@ -367,12 +367,13 @@ class CompanyCustomerController extends Controller
                                                 })->orderBy('id','desc')->take(10)
                                                 ->leftJoin('projects','projects.id','=','notifications.project_id')
                                                 ->leftJoin('users','users.id','=','projects.user_id')
-                                                ->select('notifications.*','projects.project_name','users.first_name','users.last_name')
+                                                ->select('notifications.*','projects.project_name','projects.id as project_id','users.first_name','users.last_name')
                                                 ->get();
         foreach($recent_messages as $key => $row){
             $recent_messages[$key]['user_img'] = '';
             $recent_messages[$key]['current_time'] = date("Y-m-d H:i:s");
             $recent_messages[$key]['room_number'] = '';
+            $recent_messages[$key]['room_id'] = '';
             if(User::where('id',$row['created_by'])->count()==0) continue;
             $user = User::where('id',$row['created_by'])->first();
             $recent_messages[$key]['user_img'] = $user['profile_pic'];
@@ -380,18 +381,21 @@ class CompanyCustomerController extends Controller
             {
                 if(Room::whereId($row['notice_id'])->count()==0) continue;
                 $recent_messages[$key]['room_number'] = Room::whereId($row['notice_id'])->first()->room_number;
+                $recent_messages[$key]['room_id'] = Room::whereId($row['notice_id'])->first()->id;
             }
             else if($row->notice_type==8){
                 if(Product::whereId($row['notice_id'])->count()==0) continue;
                 $roomId = Product::whereId($row['notice_id'])->first()->room_id;
                 if(Room::whereId($roomId)->count()==0) continue;
                 $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
+                $recent_messages[$key]['room_id']  = Room::whereId($roomId)->first()->id;
             }
             else if($row->notice_type==4){
                 if(Task::whereId($row['notice_id'])->count()==0) continue;
                 $roomId = Task::whereId($row['notice_id'])->first()->room_id;
                 if(Room::whereId($roomId)->count()==0) continue;
                 $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
+                $recent_messages[$key]['room_id']  = Room::whereId($roomId)->first()->room_id;
             }
         }
         $res['recent_messages'] = $recent_messages;

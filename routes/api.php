@@ -51,6 +51,8 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/project/changeSummary','ProjectController@changeSummary');
     Route::post('/project/changeProjectName','ProjectController@changeProjectName');
     Route::post('/project/changeContactNumber','ProjectController@changeContactNumber');
+    Route::post('/project/changeLocationForm','ProjectController@changeLocationForm');
+    Route::post('/project/changeSignoffForm','ProjectController@changeSignoffForm');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -138,44 +140,6 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/schedule/deleteSchedule','ScheduleController@deleteSchedule');///
     Route::post('/schedule/changeStart','ScheduleController@changeStart');///
 
-
-
-
-    // Route::get('/customer/list', 'CompanyController@Companylist');
-    // Route::get('/customer/info', 'CompanyController@Companyinfo');
-    // Route::post('/customer/UpdateCustomer', 'CompanyController@UpdateCustomer');
-    // Route::post('/customer/deleteCompany', 'CompanyController@deleteCompany');
-
-    // Route::get('/project/ProjectInfo','ProjectController@ProjectInfo');
-    // Route::post('/project/addProject','ProjectController@AddProject');
-    // Route::post('/project/updateProject','ProjectController@updateProject');
-    // Route::post('/project/deleteProject','ProjectController@DeleteProject');
-
-    // Route::get('/site/SiteInfo','SiteController@SiteInfo');
-    // Route::post('/site/addSite','SiteController@AddSite');
-    // Route::post('/site/updateSite','SiteController@updateSite');
-    // Route::post('/site/deleteSite','SiteController@DeleteSite');
-
-    // Route::get('/room/RoomInfo','RoomController@RoomInfo');
-    // Route::post('/room/addRoom','RoomController@AddRoom');
-    // Route::post('/room/updateRoom','RoomController@updateRoom');
-    // Route::post('/room/deleteRoom','RoomController@DeleteRoom');
-
-    // Route::post('/room/updateImg','RoomController@UpdateImg');
-    // Route::post('/room/DeleteImg','RoomController@DeleteImg');
-
-    // Route::post('/stiker/InsertStiker','StikerController@InsertStiker');
-    // Route::post('/stiker/DeleteStiker','StikerController@DeleteStiker');
-    // Route::post('/stiker/UpdateStiker','StikerController@UpdateStiker');
-
-    // Route::get('/product/ProductInfo','ProductController@ProductInfo');
-    // Route::post('/product/addProduct','ProductController@addProduct');
-    // Route::post('/product/updateProduct','ProductController@updateProduct');
-    // Route::post('/product/deleteProduct','ProductController@deleteProduct');
-
-    // Route::get('/task/TaskInfo','TaskController@TaskInfo');
-    // Route::post('/task/addTask','TaskController@addTask');
-    // Route::post('/task/updateTask','TaskController@updateTask');
-    // Route::post('/task/deleteTask','TaskController@deleteTask');
-
+    Route::post('/form/saveFrom','NewFormController@saveForm');///
+    Route::get('/form/infoForm', 'NewFormController@infoForm');///
 });

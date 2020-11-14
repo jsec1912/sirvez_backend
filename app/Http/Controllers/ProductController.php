@@ -13,6 +13,9 @@ use App\Project_user;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Notification;
+use App\Form_value;
+use App\New_form;
+use App\Form_field;
 
 class ProductController extends Controller
 {
@@ -44,6 +47,8 @@ class ProductController extends Controller
         $product['description']  = $request->description;
         $product['action']  = $request->action;
         $product['qty']  = $request->qty;
+        $product['test_form_id'] = $request->test_form_id;
+        $product['com_form_id'] = $request->com_form_id;
         if(strlen($request->to_room_id) > 10){
             $product['to_room_id'] = Room::where('off_id',$request->to_room_id)->first()->id;
         }
@@ -69,7 +74,7 @@ class ProductController extends Controller
                 $id = Product::where('off_id',$request->id)->first()->id;
             else $id = '';
         if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
-            
+
             $product['signed_off']  = $request->signed_off;
             $product['created_by']  = $request->user->id;
             if(strlen($request->id) > 10)
@@ -101,7 +106,7 @@ class ProductController extends Controller
                 $task['created_by']  = $request->user->id;
                 $task['description'] = $request->notes;
                 $task['priority'] = $request->snagging;
-                
+
                 $task = Task::create($task);
                 $id = $task->id;
                 if($request->has('assign_to'))
@@ -114,11 +119,64 @@ class ProductController extends Controller
                     }
                 }
             }
-            
+
         }
         else{
             $product['updated_by'] = $request->user->id;
             Product::whereId($id)->update($product);
+            $product = Product::whereId($id)->first();
+        }
+
+        if ($request->test_values && $request->test_form_id != "0") {
+            $values = array();
+            $values = json_decode($request->test_values);
+            $value = array();
+            foreach($values as $row){
+                $value['field_name'] = $row->field_name;
+                $value['field_type'] = $row->field_type;
+                $value['field_label'] = $row->field_label;
+                $value['new_form_id'] = $row->new_form_id;
+                $value['field_value'] = $row->field_value;
+                $value['is_checked'] = $row->is_checked;
+                $value['form_type'] = $row->form_type;
+                $value['parent_id'] = $product->id;
+                $cnt = Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$product->id)->count();
+                if($cnt>0)
+                    Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$product->id)
+                                ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+                else
+                    Form_value::create($value);
+            }
+        }
+
+        if ($request->com_values && $request->com_form_id != "0") {
+            $values = array();
+            $values = json_decode($request->com_values);
+            $value = array();
+            foreach($values as $row){
+                $value['field_name'] = $row->field_name;
+                $value['field_type'] = $row->field_type;
+                $value['field_label'] = $row->field_label;
+                $value['new_form_id'] = $row->new_form_id;
+                $value['field_value'] = $row->field_value;
+                $value['is_checked'] = $row->is_checked;
+                $value['form_type'] = $row->form_type;
+                $value['parent_id'] = $product->id;
+                $cnt = Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$product->id)->count();
+                if($cnt>0)
+                    Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$product->id)
+                                ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+                else
+                    Form_value::create($value);
+            }
         }
 
         $response = ['status'=>'success', 'msg'=>'Product Saved Successfully!'];
@@ -153,6 +211,8 @@ class ProductController extends Controller
         if ($request->has('id')) {
             $id = $request->id;
             $res['product'] = Product::whereId($id)->first();
+            $res['test_values'] = Form_value::where('parent_id',$id)->where('form_type',1)->get();
+            $res['com_values'] = Form_value::where('parent_id',$id)->where('form_type',2)->get();
         }
         if($request->has('project_id')){
             $company_id = Project::whereId($request->project_id)->pluck('company_id');
@@ -191,8 +251,12 @@ class ProductController extends Controller
                         $product['action'] = 2;
                     else
                         continue;
+                    if(strlen($request->project_id) > 10)
+                        $project_id = Project::where('off_id',$request->project_id)->first()->id;
+                    else
+                        $project_id = $request->project_id;
 
-                    $project_id = Project::where('project_name', $request->project_name)->first()->id;
+                    //$project_id = Project::where('project_name', $request->project_name)->first()->id;
                     $product_room = Room::where('project_id', $project_id)->where('room_number', $row[3])->get();
                     if ($product_room->count() != 1)
                         continue;

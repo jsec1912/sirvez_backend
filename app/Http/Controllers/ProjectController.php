@@ -20,6 +20,8 @@ use App\Project_user;
 use App\Schedule;
 use App\ScheduleProduct;
 use App\ScheduleEngineer;
+use App\New_form;
+use App\Form_field;
 use Mail;
 
 class ProjectController extends Controller
@@ -66,6 +68,7 @@ class ProjectController extends Controller
         $project['project_ref']  = $request->project_ref;
         $project['project_summary']  = $request->project_summary;
         $project['end_enable']  = $request->end_enable;
+        $project['new_form_id'] = $request->new_form_id;
         $action = "updated";
         if(strlen($request->id) > 10)
             if(Project::where('off_id',$request->id)->count() > 0)
@@ -74,6 +77,13 @@ class ProjectController extends Controller
         if(!isset($id) || $id=="" || $id=="null" || $id=="undefined"){
             if(strlen($request->id) > 10)
                 $project['off_id'] = $request->id;
+            // $project_cnt = Project::where('project_name',$project['project_name'])->count();
+            // if($project_cnt > 0)
+            // {
+            //     $res['status'] = 'error';
+            //     $res['msg'] = 'The project name is already exist!';
+            //     return response()->json($res);
+            // }
             $project = Project::create($project);
             $action = "created";
             $id = $project->id;
@@ -114,6 +124,13 @@ class ProjectController extends Controller
             }
         }
         else{
+            // $project_cnt = Project::where('project_name',$project['project_name'])->where('id','<>',$id)->count();
+            // if($project_cnt > 0)
+            // {
+            //     $res['status'] = 'error';
+            //     $res['msg'] = 'The project name is already exist!';
+            //     return response()->json($res);
+            // }
             Project::whereId($id)->update($project);
 
             if($request->has('customer_user'))
@@ -208,7 +225,7 @@ class ProjectController extends Controller
         $id = $request->id;
         if(strlen($request->id)>10)
             $id = Project::where('off_id',$request->id)->first()->id;
-        Project::whereId($id)->update(['archived'=>1,'archived_day'=>date('Y-m-d'),'archived_id',$request->user->id]);
+        Project::whereId($id)->update(['archived'=>1,'archived_day'=>date('Y-m-d'),'archived_id'=>$request->user->id]);
         $project = Project::whereId($id)->first();
         $insertnotificationndata = array(
             'notice_type'		=> '3',
@@ -264,7 +281,7 @@ class ProjectController extends Controller
             $project_array[$key]['site_count'] = Project_site::where('project_id',$row['id'])->count();
             $project_array[$key]['room_count'] = Room::where('project_id',$row['id'])->count();
             $project_array[$key]['messages'] = Notification::where('notice_type','3')->where('notice_id',$row['id'])->count();
-           
+
         }
         $res["projects"] = $project_array;
         $res['status'] = "success";
@@ -273,10 +290,10 @@ class ProjectController extends Controller
     public function projectDetail(Request $request){
         $res = array();
         $res['schedules'] = array();
-        if(!$request->has('id') || $request->id =='null')
-            $id = Project::where('project_name',$request->project_name)->first()->id;
+        if(strlen($request->project_id) > 10)
+            $id = Project::where('off_id',$request->project_id)->first()->id;
         else
-            $id = $request->id;
+            $id = $request->project_id;
         $project = Project::where('projects.id',$id)
             ->leftJoin('companies','projects.company_id','=','companies.id')
             ->leftJoin('users','users.id','=','projects.created_by')
@@ -348,14 +365,14 @@ class ProjectController extends Controller
                 $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
             else
             $products[$key]['room_name'] = '';
-            
+
             if($product['action'] ==0)
                 $products[$key]['product_action'] = "New Product";
             else if($product['action'] ==1)
                 $products[$key]['product_action'] = "Dispose";
             else
                 $products[$key]['product_action'] = "Move To Room";
-        
+
             //$products[$key]['to_room_name'] = Room::whereId($product->to_room_id)->first()->room_number;
             //$products[$key]['to_site_name'] = Site::whereId($product->to_site_id)->first()->site_name;
         }
@@ -389,7 +406,16 @@ class ProjectController extends Controller
         $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
         $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
         $res['status'] = "success";
+        $res['location_forms'] = New_form::where('form_type','0')->get();
+        $res['signoff_forms'] = New_form::where('form_type','3')->get();
+        $res['testing_forms'] = New_form::where('form_type','1')->get();
+        $res['commitioning_forms'] = New_form::where('form_type','2')->get();
+        $res['form_fields'] = Form_field::get();
         $res['project_id'] = $id;
+        $res['test_forms'] = New_form::where('created_by', $request->user->company_id)
+            ->where('form_type', 1)->get();
+        $res['com_forms'] = New_form::where('created_by', $request->user->company_id)
+            ->where('form_type', 2)->get();
         return response()->json($res);
     }
     public function getProjectInfo(Request $request){
@@ -432,6 +458,8 @@ class ProjectController extends Controller
             $com_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
         //$res['assign_to'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[1,5])->where('status',1)->get();
         //$res['customer_user'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[2,6])->where('status',1)->get();
+        $res['location_form_rows'] = New_form::where('form_type',0)->get();
+        $res['signoff_form_rows'] = New_form::where('form_type',3)->get();
         $res['sites'] = Site::orderBy('id','desc')->get();
         $res['rooms'] = Site_room::orderBy('id','desc')->get();
         $res['status'] = 'success';
@@ -715,4 +743,30 @@ class ProjectController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
+
+    public function changeLocationForm(request $request){
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+        Project::whereId($id)->update(['location_form_id'=>$request->location_form_id]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeSignoffForm(request $request){
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+        Project::whereId($id)->update(['signoff_form_id'=>$request->signoff_form_id]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+
 }

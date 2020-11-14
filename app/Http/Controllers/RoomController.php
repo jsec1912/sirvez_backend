@@ -24,6 +24,9 @@ use App\Sticker_category;
 use App\Schedule;
 use App\ScheduleProduct;
 use App\ScheduleEngineer;
+use App\Form_value;
+use App\New_form;
+use App\Form_field;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -92,10 +95,18 @@ class RoomController extends Controller
             $room['signed_off']  = $request->signed_off;
             if(strlen($request->id) > 10)
                 $room['off_id'] = $request->id;
-                 
             $room = Room::create($room);
-            
             $id = $room->id;
+            if($request->duplicate > 0){
+                $values = array();
+                $values = Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$request->duplicate)->get();
+                foreach($values as $value){
+                    $value['parent_id'] = $id;
+                    Form_value::create($value);
+                }
+            }
             $room = Room::where('rooms.id',$id)
                         ->leftJoin('projects','projects.id','=','rooms.project_id')
                         ->leftJoin('users','users.id','=','projects.user_id')
@@ -104,7 +115,7 @@ class RoomController extends Controller
             $action = "created";
             if(!$request->room_site_id)
             Site_room::create(['company_id'=>$room['company_id'],'site_id'=>$room['site_id'],'room_number'=>$room['room_number']]);
-           
+
             $insertnotificationdata = array(
                 'notice_type'		=> '5',
                 'notice_id'			=> $id,
@@ -115,22 +126,47 @@ class RoomController extends Controller
                 'created_date'		=> date("Y-m-d H:i:s"),
                 'is_read'	    	=> 0,
             );
-            
+
             Notification::create($insertnotificationdata);
         }
         else{
-            $room_cnt = Room::where('project_id',$room['project_id'])
-                            ->where('room_number',$room['room_number'])
-                            ->where('id','<>',$id)->count();
-            if($room_cnt > 0)
-            {
-                $res['status'] = 'error';
-                $res['msg'] = 'The room number is already exist!';
-                return response()->json($res);
-            }
+            // $room_cnt = Room::where('project_id',$room['project_id'])
+            //                 ->where('room_number',$room['room_number'])
+            //                 ->where('id','<>',$id)->count();
+            // if($room_cnt > 0)
+            // {
+            //     $res['status'] = 'error';
+            //     $res['msg'] = 'The room number is already exist!';
+            //     return response()->json($res);
+            // }
             $room['updated_by'] = $request->user->id;
             Room::whereId($id)->update($room);
             $room = Room::whereId($id)->first();
+        }
+        if($request->field_values){
+            $values = array();
+            $values = json_decode($request->field_values);
+            $value = array();
+            foreach($values as $row){
+                $value['field_name'] = $row->field_name;
+                $value['field_type'] = $row->field_type;
+                $value['field_label'] = $row->field_label;
+                $value['new_form_id'] = $row->new_form_id;
+                $value['field_value'] = $row->field_value;
+                $value['is_checked'] = $row->is_checked;
+                $value['form_type'] = $row->form_type;
+                $value['parent_id'] = $room->id;
+                $cnt = Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$room->id)->count();
+                if($cnt>0)
+                    Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$room->id)
+                                ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+                else
+                    Form_value::create($value);
+            }
         }
 
         //remove room_photh using room_array
@@ -166,7 +202,7 @@ class RoomController extends Controller
         }
 
         //$notice_type ={1:pending_user,2:createcustomer 3:project 4:site 5:room}
-        
+
         $res['status'] = 'success';
         $res['msg'] = 'Room Saved Successfully!';
         $res['room'] = $room;
@@ -191,27 +227,26 @@ class RoomController extends Controller
         $res = array();
         $res['schedules'] = array();
         if ($request->has('id')||$request->has('room_number')) {
-            if((!$request->has('id') || $request->id =='null') && $request->has('room_number')){
-                if($request->has('project_name')){
-                    $projectId = Project::where('project_name',$request->project_name)->first()->id;
-                    $room_id = Room::where('room_number',$request->room_number)->where('project_id',$projectId)->first()->id;
-                }
-                else
-                $room_id = Room::where('room_number',$request->room_number)->first()->id;
 
-            }
-            else
-                $room_id = $request->id;
+            $room_id = $request->id;
+            $projectId = $request->project_id;
 
             $room = Room::where('rooms.id',$room_id)
             ->leftJoin('departments','departments.id','=','rooms.department_id')
             ->leftJoin('projects','projects.id','=','rooms.project_id')
             ->leftJoin('companies','companies.id','=','rooms.company_id')
             ->leftJoin('sites','sites.id','=','rooms.site_id')
-            ->select('rooms.*','projects.project_name','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name')
+            ->select('rooms.*','projects.project_name','projects.location_form_id','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name')
             ->first();
 
             $room['img_files'] = Room_photo::where('room_id',$room_id)->get();
+            $room['form_value'] = Form_value::where('parent_id',$room_id)->where('form_type',0)->get();
+            $room['form_id'] = Project::whereId($projectId)->first()->location_form_id;
+            if($room['form_id']>0)
+                $room['form_style'] = json_decode(New_form::whereId($room['form_id'])->first()->form_data);
+            else
+                $room['form_style'] = [];
+            $res['form_fields'] = Form_field::get();
             $res["room"] = $room;
             $res['assign_to'] = Project_user::where(['project_users.project_id'=>$room->project_id,'project_users.type'=>'1'])
                                 ->leftjoin('users','users.id','=','project_users.user_id')
@@ -321,7 +356,12 @@ class RoomController extends Controller
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
+        $res['test_forms'] = New_form::where('created_by', $request->user->company_id)
+            ->where('form_type', 1)->get();
+        $res['com_forms'] = New_form::where('created_by', $request->user->company_id)
+            ->where('form_type', 2)->get();
         $res['status'] = "success";
+
         return response()->json($res);
     }
 

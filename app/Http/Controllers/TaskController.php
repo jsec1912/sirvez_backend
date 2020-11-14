@@ -91,7 +91,6 @@ class TaskController extends Controller
             }
         }
         else{
-
             $task['updated_by'] = $request->user->id;
             if($request->created_by) $task['created_by'] = $request->created_by;
             Task::whereId($id)->update($task);
@@ -108,6 +107,7 @@ class TaskController extends Controller
                 }
             }
         }
+        
         //$notice_type ={1:pending_user,2:createcustomer 3:project 4:task}
         $res['task'] = $task;
         if($action == "created"){
@@ -124,21 +124,23 @@ class TaskController extends Controller
             Notification::create($insertnotificationndata);
         }
         //sending gmail to user
-        $array_res =json_decode($request->assign_to,true);
-        $users = User::whereIn('id',$array_res)->get();
-        foreach($users as $pending_user){
-            $to_name = $pending_user['first_name'];
-            $to_email = $pending_user['email'];
-            $content = $request->user->first_name.' '.$request->user->last_name.' has assigned you a task.';
-           $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
-            $invitationURL = "https://app.sirvez.com/app/task-manager/my-task";
-            $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$task['task'],"description" =>$task['description'],"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view task'];
+        if($request->assign_to){
+            $array_res =json_decode($request->assign_to,true);
+            $users = User::whereIn('id',$array_res)->get();
+            foreach($users as $pending_user){
+                $to_name = $pending_user['first_name'];
+                $to_email = $pending_user['email'];
+                $content = $request->user->first_name.' '.$request->user->last_name.' has assigned you a task.';
+            $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
+                $invitationURL = "https://app.sirvez.com/app/task-manager/my-task";
+                $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$task['task'],"description" =>$task['description'],"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view task'];
 
-            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
-                $message->to($to_email, $to_name)
-                        ->subject('sirvez notification.');
-                $message->from('support@sirvez.com','sirvez support team');
-            });
+                Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                    $message->to($to_email, $to_name)
+                            ->subject('sirvez notification.');
+                    $message->from('support@sirvez.com','sirvez support team');
+                });
+            }
         }
 
         $response = ['status'=>'success', 'msg'=>'Task Saved Successfully!', 'req'=>$request->all()];
@@ -385,7 +387,6 @@ class TaskController extends Controller
                 ->leftJoin('users','users.id','=','task_comments.created_by')
                 ->select('task_comments.*','users.first_name as created_user_f','users.last_name as created_user_l')
                 ->get();
-            $tasks[$key]['comments'] = $task_comments;
             for($i = 1;$i<=3;$i++){
                 $tasks[$key]['comment'.$i] = '';
                 $tasks[$key]['comment'.$i.'_date'] = '';
@@ -397,6 +398,11 @@ class TaskController extends Controller
                 $tasks[$key]['comment'.$i.'_date'] = date('d-m-Y',strtotime($task_comments[$i-1]['created_at']));
                 $tasks[$key]['comment'.$i.'_user'] = $task_comments[$i-1]['created_user_f'].' '.$task_comments[$i-1]['created_user_l'];
             }
+            $task_comments = TaskComment::where('task_comments.task_id',$tasks[$key]['id'])
+                ->leftJoin('users','users.id','=','task_comments.created_by')
+                ->select('task_comments.*','users.first_name','users.last_name','users.profile_pic')
+                ->get();
+            $tasks[$key]['comments'] = $task_comments;
         }
         $res['tasks'] = $tasks;
         $res['status'] = "success";
