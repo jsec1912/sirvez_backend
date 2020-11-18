@@ -262,10 +262,10 @@ class ProductController extends Controller
                         $project_id = $request->project_id;
 
                     //$project_id = Project::where('project_name', $request->project_name)->first()->id;
-                    $product_room = Room::where('project_id', $project_id)->where('room_number', $row[3])->get();
-                    if ($product_room->count() != 1)
-                        continue;
-                    $product['room_id'] = $product_room->first()->id;
+                    // $product_room = Room::where('project_id', $project_id)->where('room_number', $row[3])->get();
+                    // if ($product_room->count() != 1)
+                    //     continue;
+                    // $product['room_id'] = $product_room->first()->id;
 
 
                     $product['qty'] = $row[4];
@@ -273,6 +273,10 @@ class ProductController extends Controller
                         $product['signed_off'] = 0;
                     else
                         $product['signed_off'] = 1;
+
+                    $product['room_id'] = $row[6];
+                    $product['test_form_id'] = $row[7];
+                    $product['com_form_id'] = $row[8];
 
                     $product['created_by']  = $request->user->id;
 
@@ -321,7 +325,7 @@ class ProductController extends Controller
     }
 
     public function saveTestingForm(request $request){
-        
+
         if(strlen($request->id) > 10)
             $id = Product::where('off_id',$request->id)->first()->id;
         else
