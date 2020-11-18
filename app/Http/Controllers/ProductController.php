@@ -211,15 +211,20 @@ class ProductController extends Controller
         if ($request->has('id')) {
             $id = $request->id;
             $res['product'] = Product::whereId($id)->first();
+            $room = Room::whereId($res['product']->room_id)->first();
+            $companyId = Project::whereId($room->project_id)->first()->company_id;
             $res['test_values'] = Form_value::where('parent_id',$id)->where('form_type',1)->get();
             $res['com_values'] = Form_value::where('parent_id',$id)->where('form_type',2)->get();
+            $res['test_forms'] = New_form::where('form_type', 1)->get();
+            $res['com_forms'] = New_form::where('form_type', 2)->get();
         }
         if($request->has('project_id')){
             $company_id = Project::whereId($request->project_id)->pluck('company_id');
             $res['sites'] = Site::where('company_id',$company_id)->get();
-            $res['rooms'] = Room::where('project_id',$request->project_id)->get();
+            $res['rooms'] = Room::where('rooms.project_id',$request->project_id)
+                                ->leftJoin('sites','rooms.site_id','=','sites.id')
+                                ->select('rooms.*','sites.site_name')->get();
         }
-
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -282,6 +287,219 @@ class ProductController extends Controller
             $res['status'] = "error";
             $res['msg'] = 'The excel format is not correct.';
         }
+        return response()->json($res);
+    }
+
+    public function signOff(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Product::whereId($id)->update(['signed_off'=>1,'signoff_date'=>date("Y-m-d H:i:s"),'signoff_by'=>$request->user->id]);
+        $res['status'] = "success";
+        return response()->json($res);
+    }
+
+    public function testSignOff(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Product::whereId($id)->update(['test_sign_off'=>1,'test_signoff_date'=>date("Y-m-d H:i:s"),'test_signoff_by'=>$request->user->id]);
+        $res['status'] = "success";
+        return response()->json($res);
+    }
+
+    public function comSignOff(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Product::whereId($id)->update(['com_sign_off'=>1,'com_signoff_date'=>date("Y-m-d H:i:s"),'com_signoff_by'=>$request->user->id]);
+        $res['status'] = "success";
+        return response()->json($res);
+    }
+
+    public function saveTestingForm(request $request){
+        
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        $values = array();
+        $values = json_decode($request->test_values);
+        $value = array();
+        foreach($values as $row){
+            $value['field_name'] = $row->field_name;
+            $value['field_type'] = $row->field_type;
+            $value['field_label'] = $row->field_label;
+            $value['new_form_id'] = $row->new_form_id;
+            $value['field_value'] = $row->field_value;
+            $value['is_checked'] = $row->is_checked;
+            $value['form_type'] = $row->form_type;
+            $value['parent_id'] = $id;
+            $cnt = Form_value::where('field_name',$row->field_name)
+                            ->where('new_form_id',$row->new_form_id)
+                            ->where('parent_id',$id)->count();
+            if($cnt>0)
+                Form_value::where('field_name',$row->field_name)
+                            ->where('new_form_id',$row->new_form_id)
+                            ->where('parent_id',$id)
+                            ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+            else
+                Form_value::create($value);
+        }
+        if($request->hasFile('testing_img')){
+            $fileName = time().'.'.$request->testing_img->extension();
+            $request->testing_img->move(public_path('upload/img/'), $fileName);
+            Product::whereId($id)->update(['testing_img'=>$fileName]);
+        }
+
+        if($request->hasFile('testing_video')){
+            $fileName = time().'.'.$request->testing_video->extension();
+            $request->testing_video->move(public_path('upload/img/'), $fileName);
+            Product::whereId($id)->update(['testing_video'=>$fileName]);
+        }
+
+        if($request->is_task)
+        {
+            $product = Product::whereId($id)->first();
+            $room = Room::whereId($product->room_id)->first();
+            $form_name = New_form::whereId($request->test_form_id)->first()->form_name;
+            $task = array();
+            $task['task'] = $product['product_name'].'['.$form_name.']_task';
+            $task['company_id'] = $room->company_id;
+            $task['project_id']  = $room->project_id;
+            $task['room_id']  = $room->id;
+            $task['due_by_date']  = $request->due_by_date;
+            $task['created_by']  = $request->user->id;
+            $task['description'] = $request->notes;
+            $task['priority'] = $request->snagging;
+
+            $task = Task::create($task);
+            $id = $task->id;
+            if($request->has('assign_to'))
+            {
+                $array_res = array();
+                $array_res =json_decode($request->assign_to,true);
+                foreach($array_res as $row)
+                {
+                    Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>'2']);
+                }
+            }
+        }
+
+        $res['status'] = "success";
+        return response()->json($res);
+
+    }
+
+    public function savecommissioningForm(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        $values = array();
+        $values = json_decode($request->com_values);
+        $value = array();
+        foreach($values as $row){
+            $value['field_name'] = $row->field_name;
+            $value['field_type'] = $row->field_type;
+            $value['field_label'] = $row->field_label;
+            $value['new_form_id'] = $row->new_form_id;
+            $value['field_value'] = $row->field_value;
+            $value['is_checked'] = $row->is_checked;
+            $value['form_type'] = $row->form_type;
+            $value['parent_id'] = $id;
+            $cnt = Form_value::where('field_name',$row->field_name)
+                            ->where('new_form_id',$row->new_form_id)
+                            ->where('parent_id',$id)->count();
+            if($cnt>0)
+                Form_value::where('field_name',$row->field_name)
+                            ->where('new_form_id',$row->new_form_id)
+                            ->where('parent_id',$id)
+                            ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+            else
+                Form_value::create($value);
+        }
+
+        if($request->is_task)
+        {
+            $product = Product::whereId($id)->first();
+            $room = Room::whereId($product->room_id)->first();
+            $form_name = New_form::whereId($request->com_form_id)->first()->form_name;
+            $task = array();
+            $task['task'] = $product['product_name'].'['.$form_name.']_task';
+            $task['company_id'] = $room->company_id;
+            $task['project_id']  = $room->project_id;
+            $task['room_id']  = $room->id;
+            $task['due_by_date']  = $request->due_by_date;
+            $task['created_by']  = $request->user->id;
+            $task['description'] = $request->notes;
+            $task['priority'] = $request->snagging;
+
+            $task = Task::create($task);
+            $id = $task->id;
+            if($request->has('assign_to'))
+            {
+                $array_res = array();
+                $array_res =json_decode($request->assign_to,true);
+                foreach($array_res as $row)
+                {
+                    Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>'2']);
+                }
+            }
+        }
+
+        $res['status'] = "success";
+        return response()->json($res);
+    }
+
+    public function changeProductName(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+            Product::whereId($id)->update(['product_name'=>$request->product_name]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeProductDescription(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+            Product::whereId($id)->update(['description'=>$request->product_description]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeTestingFormId(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+        Product::whereId($id)->update(['test_form_id'=>$request->test_form_id]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeCommissioningFormId(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+            Product::whereId($id)->update(['com_form_id'=>$request->com_form_id]);
+        $res = array();
+        $res['status'] = 'success';
         return response()->json($res);
     }
 }

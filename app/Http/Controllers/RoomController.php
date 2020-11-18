@@ -230,7 +230,6 @@ class RoomController extends Controller
 
             $room_id = $request->id;
             $projectId = $request->project_id;
-
             $room = Room::where('rooms.id',$room_id)
             ->leftJoin('departments','departments.id','=','rooms.department_id')
             ->leftJoin('projects','projects.id','=','rooms.project_id')
@@ -247,7 +246,10 @@ class RoomController extends Controller
             else
                 $room['form_style'] = [];
             $res['form_fields'] = Form_field::get();
+
             $res["room"] = $room;
+            $res['test_forms'] = New_form::where('form_type', 1)->get();
+            $res['com_forms'] = New_form::where('form_type', 2)->get();
             $res['assign_to'] = Project_user::where(['project_users.project_id'=>$room->project_id,'project_users.type'=>'1'])
                                 ->leftjoin('users','users.id','=','project_users.user_id')
                                 ->select('users.*')
@@ -297,6 +299,7 @@ class RoomController extends Controller
             $res['room_id'] = $room_id;
             $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$room->company_id)->select('id','first_name','last_name')->get();
             $res['task_assign_to'] = User::where('company_id',$room->company_id)->whereIn('user_type',[1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+            $res['signed_cnt'] = Product::where('room_id',$room_id)->where('signed_off','<>','2')->count()-Product::where('room_id',$room_id)->where('signed_off','1')->count();
 
         }
         if(($request->has('project_id') && $request->project_id != 'null')||$request->has('project_name')){
@@ -309,6 +312,9 @@ class RoomController extends Controller
             foreach($products as $key => $product)
             {
                 $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
+                $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
+                $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
                 if($product['action'] ==0)
                     $products[$key]['product_action'] = "New Product";
                 else if($product['action'] ==1)
@@ -356,10 +362,7 @@ class RoomController extends Controller
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
-        $res['test_forms'] = New_form::where('created_by', $request->user->company_id)
-            ->where('form_type', 1)->get();
-        $res['com_forms'] = New_form::where('created_by', $request->user->company_id)
-            ->where('form_type', 2)->get();
+        
         $res['status'] = "success";
 
         return response()->json($res);
@@ -401,10 +404,10 @@ class RoomController extends Controller
         $res['status'] = "success";
         Room::whereId($id)->update(['signed_off'=>1,'completed_date'=>date("d-m-Y H:i:s")]);
 
-        Product::where('room_id',$id)->update(['signed_off'=>1]);
+        //Product::where('room_id',$id)->update(['signed_off'=>1]);
         $room = Room::whereId($id)->first();
-        if(Room::where('project_id',$room->project_id)->where('signed_off','0')->count()==0)
-            Project::whereId($room->project_id)->update(['signed_off'=>2]);
+        // if(Room::where('project_id',$room->project_id)->where('signed_off','0')->count()==0)
+        //     Project::whereId($room->project_id)->update(['signed_off'=>2]);
         $insertnotificationdata = array(
             'notice_type'		=> '7',
             'notice_id'			=> $id,

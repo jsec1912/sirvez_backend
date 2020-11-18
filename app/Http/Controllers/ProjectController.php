@@ -22,6 +22,7 @@ use App\ScheduleProduct;
 use App\ScheduleEngineer;
 use App\New_form;
 use App\Form_field;
+use App\Form_value;
 use Mail;
 
 class ProjectController extends Controller
@@ -68,7 +69,8 @@ class ProjectController extends Controller
         $project['project_ref']  = $request->project_ref;
         $project['project_summary']  = $request->project_summary;
         $project['end_enable']  = $request->end_enable;
-        $project['new_form_id'] = $request->new_form_id;
+        $project['location_form_id'] = $request->location_form_id;
+        $project['signoff_form_id'] = $request->signoff_form_id;
         $action = "updated";
         if(strlen($request->id) > 10)
             if(Project::where('off_id',$request->id)->count() > 0)
@@ -365,6 +367,9 @@ class ProjectController extends Controller
                 $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
             else
             $products[$key]['room_name'] = '';
+            $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
+            $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
+            $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
 
             if($product['action'] ==0)
                 $products[$key]['product_action'] = "New Product";
@@ -406,16 +411,18 @@ class ProjectController extends Controller
         $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
         $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
         $res['status'] = "success";
-        $res['location_forms'] = New_form::where('form_type','0')->get();
-        $res['signoff_forms'] = New_form::where('form_type','3')->get();
-        $res['testing_forms'] = New_form::where('form_type','1')->get();
-        $res['commitioning_forms'] = New_form::where('form_type','2')->get();
+        $res['location_forms'] = New_form::where('created_by', $com_id)
+            ->where('form_type','0')->get();
+        $res['signoff_forms'] = New_form::where('created_by', $com_id)
+            ->where('form_type','3')->get();
+        //$res['testing_forms'] = New_form::where('form_type','1')->get();
+        //$res['commitioning_forms'] = New_form::where('form_type','2')->get();
         $res['form_fields'] = Form_field::get();
         $res['project_id'] = $id;
-        $res['test_forms'] = New_form::where('created_by', $request->user->company_id)
-            ->where('form_type', 1)->get();
-        $res['com_forms'] = New_form::where('created_by', $request->user->company_id)
-            ->where('form_type', 2)->get();
+        $res['test_forms'] = New_form::where('form_type', 1)->get();
+        $res['com_forms'] = New_form::where('form_type', 2)->get();
+        $res['off_form_values'] = Form_value::where('form_type', 2)
+            ->where('parent_id',$project['signoff_form_id'])->get();
         return response()->json($res);
     }
     public function getProjectInfo(Request $request){
@@ -572,7 +579,10 @@ class ProjectController extends Controller
     {
         $fileName = '';
         $project = array();
-        $project['signed_off'] = 1;
+        if ($request->user->user_type ==6)
+            $project['signed_off'] = 2;
+        else
+            $project['signed_off'] = 1;
         if($request->hasFile('sign_file')){
             $fileName = time().'.'.$request->sign_file->extension();
             $request->sign_file->move(public_path('upload/file/'), $fileName);
@@ -590,6 +600,33 @@ class ProjectController extends Controller
         if($request->sign_print_name) $project['sign_print_name'] = $request->sign_print_name;
 
         Project::whereId($request->id)->update($project);
+        
+        if($request->field_values){
+            $values = array();
+            $values = json_decode($request->field_values);
+            $value = array();
+            foreach($values as $row){
+                $value['field_name'] = $row->field_name;
+                $value['field_type'] = $row->field_type;
+                $value['field_label'] = $row->field_label;
+                $value['new_form_id'] = $row->new_form_id;
+                $value['field_value'] = $row->field_value;
+                $value['is_checked'] = $row->is_checked;
+                $value['form_type'] = $row->form_type;
+                $value['parent_id'] = $room->id;
+                $cnt = Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$room->id)->count();
+                if($cnt>0)
+                    Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$room->id)
+                                ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+                else
+                    Form_value::create($value);
+            }
+        }
+        
         $project=Project::where('projects.id',$request->id)
                 ->leftJoin('companies','companies.id','=','projects.company_id')
                 ->leftJoin('users','users.id','=','projects.created_by')

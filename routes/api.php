@@ -91,6 +91,15 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/product/productInfo','ProductController@productInfo');
     Route::get('/product/getProductInfo','ProductController@getProductInfo');
     Route::post('/product/import-product', 'ProductController@importProduct');
+    Route::post('/product/signOff', 'ProductController@signOff');
+    Route::post('/product/testSignOff', 'ProductController@testSignOff');
+    Route::post('/product/comSignOff', 'ProductController@comSignOff');
+    Route::post('/product/saveTestingForm', 'ProductController@saveTestingForm');
+    Route::post('/product/savecommissioningForm', 'ProductController@savecommissioningForm');
+    Route::post('/product/changeProductName', 'ProductController@changeProductName');
+    Route::post('/product/changeProductDescription', 'ProductController@changeProductDescription');
+    Route::post('/product/changeTestingFormId', 'ProductController@changeTestingFormId');
+    Route::post('/product/changeCommissioningFormId', 'ProductController@changeCommissioningFormId');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///
@@ -142,4 +151,5 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
 
     Route::post('/form/saveFrom','NewFormController@saveForm');///
     Route::get('/form/infoForm', 'NewFormController@infoForm');///
+    Route::post('/form/deleteForm', 'NewFormController@deleteForm');///
 });

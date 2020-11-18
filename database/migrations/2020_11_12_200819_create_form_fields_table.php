@@ -16,6 +16,10 @@ class CreateFormFieldsTable extends Migration
         Schema::create('form_fields', function (Blueprint $table) {
             $table->id();
             $table->timestamps();
+            $table->string('field_name');
+            $table->text('field_label');
+            $table->string('field_type');
+            $table->string('new_form_id');
         });
     }
 

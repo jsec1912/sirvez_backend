@@ -45,9 +45,7 @@ class NewFormController extends Controller
                 Form_field::create($field);
             }
         } else {
-            $form = New_form::whereId($request->form_id);
-            $form['form_data'] = $request->form_data;
-            $form->update();
+            New_form::whereId($request->form_id)->update(['form_data'=>$request->form_data]);
             $fields = array();
             $fields = json_decode($request->form_fields);
             $field = array();
@@ -56,17 +54,25 @@ class NewFormController extends Controller
                 $field['field_name'] = $row->field_name;
                 $field['field_type'] = $row->field_type;
                 $field['field_label'] = $row->field_label;
-                $field['new_form_id'] = $form->id;
-                $field['form_type'] = $form->form_type;
+                $field['new_form_id'] = $request->form_id;
+                $field['form_type'] = $request->form_type;
                 Form_field::create($field);
             }
         }
-        return response()->json(['status'=>'success','form'=>$form]);
+        return response()->json(['status'=>'success']);
     }
 
     public function infoForm(request $request) {
         $res = array();
         $res['forms'] = New_form::where('created_by', $request->user->company_id)->get();
+        $res['status'] = "success";
+        return response()->json($res);
+    }
+
+    public function deleteForm(request $request){
+        $res = array();
+        New_form::whereId($request->id)->delete();
+        Form_field::where('new_form_id',$request->id)->delete();
         $res['status'] = "success";
         return response()->json($res);
     }
