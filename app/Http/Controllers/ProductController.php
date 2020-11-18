@@ -502,4 +502,28 @@ class ProductController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
+
+    public function removeTestingImg(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+            Product::whereId($id)->update(['testing_img'=>'']);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function removeTestingVideo(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+            Product::whereId($id)->update(['testing_video'=>'']);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 }
