@@ -309,7 +309,10 @@ class ProductController extends Controller
             $id = Product::where('off_id',$request->id)->first()->id;
         else
             $id = $request->id;
-        Product::whereId($id)->update(['test_sign_off'=>1,'test_signoff_date'=>date("Y-m-d H:i:s"),'test_signoff_by'=>$request->user->id]);
+        if($request->test_sign_off=='1')
+            Product::whereId($id)->update(['test_sign_off'=>1,'test_signoff_date'=>date("Y-m-d H:i:s"),'test_signoff_by'=>$request->user->id]);
+        else
+        Product::whereId($id)->update(['test_sign_off'=>0,'test_signoff_date'=>null,'test_signoff_by'=>'']);
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -319,7 +322,10 @@ class ProductController extends Controller
             $id = Product::where('off_id',$request->id)->first()->id;
         else
             $id = $request->id;
-        Product::whereId($id)->update(['com_sign_off'=>1,'com_signoff_date'=>date("Y-m-d H:i:s"),'com_signoff_by'=>$request->user->id]);
+        if($request->com_sign_off=='1')
+            Product::whereId($id)->update(['com_sign_off'=>1,'com_signoff_date'=>date("Y-m-d H:i:s"),'com_signoff_by'=>$request->user->id]);
+        else
+            Product::whereId($id)->update(['com_sign_off'=>0,'com_signoff_date'=>null,'com_signoff_by'=>'']);
         $res['status'] = "success";
         return response()->json($res);
     }
