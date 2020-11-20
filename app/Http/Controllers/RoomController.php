@@ -27,6 +27,7 @@ use App\ScheduleEngineer;
 use App\Form_value;
 use App\New_form;
 use App\Form_field;
+use App\Room_comment;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -99,12 +100,17 @@ class RoomController extends Controller
             $id = $room->id;
             if($request->duplicate > 0){
                 $values = array();
-                $values = Form_value::where('field_name',$row->field_name)
-                                ->where('new_form_id',$row->new_form_id)
-                                ->where('parent_id',$request->duplicate)->get();
-                foreach($values as $value){
-                    $value['parent_id'] = $id;
-                    Form_value::create($value);
+                $cnt = Form_value::where('field_name',$room->field_name)
+                            ->where('new_form_id',$room->new_form_id)
+                            ->where('parent_id',$room->duplicate)->count();
+                if($cnt>0){
+                    $values = Form_value::where('field_name',$room->field_name)
+                                    ->where('new_form_id',$room->new_form_id)
+                                    ->where('parent_id',$room->duplicate)->get();
+                    foreach($values as $value){
+                        $value['parent_id'] = $id;
+                        Form_value::create($value);
+                    }
                 }
             }
             $room = Room::where('rooms.id',$id)
@@ -238,7 +244,14 @@ class RoomController extends Controller
             ->select('rooms.*','projects.project_name','projects.location_form_id','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name')
             ->first();
 
-            $room['img_files'] = Room_photo::where('room_id',$room_id)->get();
+            $images = Room_photo::where('room_id',$room_id)->get();
+            foreach($images as $key => $image){
+                $images[$key]['comments'] = Room_comment::where('photo_id',$image->id) 
+                    ->leftJoin('users','users.id','=','room_comments.created_by')
+                    ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
+                    ->get();
+            }
+            $room['img_files']  = $images;
             $room['form_value'] = Form_value::where('parent_id',$room_id)->where('form_type',0)->get();
             $room['form_id'] = Project::whereId($projectId)->first()->location_form_id;
             if($room['form_id']>0)
@@ -580,6 +593,62 @@ class RoomController extends Controller
             $asbestos = 2;
         Room::whereId($id)->update(['asbestos'=>$asbestos]);
         $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function commentSubmit(request $request)
+    {
+        $v = Validator::make($request->all(), [
+            'photo_id' =>'required',
+            'message' => 'required'
+        ]);
+        if ($v->fails())
+        {
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'You must input comments in the field!'
+            ]);
+        }
+        $comment = array();
+        if(strlen($request->photo_id)>10){
+            $comment['photo_id'] = Room_photo::where('off_id',$request->photo_id)->first()->id;
+        }else{
+            $comment['photo_id'] = $request->photo_id;
+        }
+
+        $comment['created_by'] = $request->user->id;
+        $comment['comment']  = $request->message;
+        
+        $comment = Room_comment::create($comment);
+        $res = array();
+        $res['comments'] = Room_comment::where('room_comments.photo_id',$comment['photo_id'])
+            ->leftJoin('users','users.id','=','room_comments.created_by')
+            ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
+            ->get();
+
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changePhotoOutput(request $request)
+    {
+        $v = Validator::make($request->all(), [
+            'photo_id' =>'required',
+            'output' => 'required'
+        ]);
+        if ($v->fails())
+        {
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'You must input comments in the field!'
+            ]);
+        }
+        if(strlen($request->photo_id)>10){
+            Room_photo::where('off_id',$request->photo_id)->update(['output'=>$request->output]);
+        }else{
+            Room_photo::where('id',$request->photo_id)->update(['output'=>$request->output]);
+        }
         $res['status'] = 'success';
         return response()->json($res);
     }

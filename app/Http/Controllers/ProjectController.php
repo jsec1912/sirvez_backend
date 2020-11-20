@@ -409,6 +409,8 @@ class ProjectController extends Controller
         $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
         $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
         $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
+        $res['unsigned_room'] = Room::where('project_id',$id)->where('signed_off','0')->get();
+        
         $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
         $res['status'] = "success";
         $res['location_forms'] = New_form::where('created_by', $com_id)

@@ -22,14 +22,14 @@ class SiteController extends Controller
             //company info
             'customer_id' => 'required',
             'site_name' => 'required',
-            'contact_number' => 'required',
-            'contact_name' => 'required',
+            //'contact_number' => 'required',
+            //'contact_name' => 'required',
             'address' => 'required',
             'city' => 'required',
             'postcode' => 'required',
-            'site_instructions' => 'required',
+            //'site_instructions' => 'required',
             //'parking_instructions' => 'required',
-            'access_hour' => 'required',
+            //'access_hour' => 'required',
             //'comment' => 'required',
             //'status' => 'required'
         ]);

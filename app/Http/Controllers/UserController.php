@@ -345,7 +345,7 @@ class UserController extends Controller
     public function totalUserlist(request $request){
         $res = array();
         $res['status'] = 'success';
-        if($request->user->user_type ==1)
+        if($request->user->user_type <6)
         {
             $com_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['users'] = User::where(function($q) use($com_id,$request){
@@ -353,11 +353,15 @@ class UserController extends Controller
                     ->orwhere('company_id', $request->user->company_id);
                 })
                 ->where('id','<>',$request->user->id)->get();
+            $res['customers'] = Company::whereIn('id',$com_id)
+                            ->orwhere('id', $request->user->company_id)->get();
         }
-        else
+        else{
             $res['users'] = User::Where('company_id',$request->user->company_id)
                     ->where('id','<>',$request->user->id)->get();
-        $res['company'] = Company::where('company_type','1')->get();
+            $res['customers'] = [];
+        }
+        
         return response()->json($res);
     }
     public function saveUser(request $request){

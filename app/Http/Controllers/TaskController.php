@@ -487,8 +487,7 @@ class TaskController extends Controller
             $request->file->move(public_path('upload/file/'), $fileName);
             $task['attach_file']  = $fileName;
         }
-        TaskComment::create($task);
-        $task = Task::whereId($task['task_id'])->first();
+        $task = TaskComment::create($task);
         $res = array();
         $res['comments'] = TaskComment::where('task_comments.task_id',$task['task_id'])
             ->leftJoin('users','users.id','=','task_comments.created_by')
@@ -497,7 +496,7 @@ class TaskController extends Controller
 
         $insertnotificationndata = array(
             'notice_type'		=> '4',
-            'notice_id'			=> $request->id,
+            'notice_id'			=> $task->id,
             //'notification'		=> 'New comment has been add in '.$task['task'].' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
             'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in task['.$task['task'].'].',
             'created_by'		=> $request->user->id,

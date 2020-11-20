@@ -76,4 +76,28 @@ class NewFormController extends Controller
         $res['status'] = "success";
         return response()->json($res);
     }
+    public function duplicateForm(request $request){
+        $form = array();
+        $sel_form = New_form::whereId($request->id)->first();
+        $form = array();
+        $form['created_by'] = $sel_form->created_by;
+        $form['form_type'] = $sel_form->form_type;
+        $form['form_name'] = $sel_form->form_name.'(1)';
+        $form['form_data']  = $sel_form->form_data;
+        $form = New_form::create($form);
+
+        $fields = Form_field::where('new_form_id',$form->id)->get();
+        foreach($fields as $row){
+            $field['field_name'] = $row->field_name;
+            $field['field_type'] = $row->field_type;
+            $field['field_label'] = $row->field_label;
+            $field['new_form_id'] = $form->id;
+            $field['form_type'] = $form->form_type;
+            Form_field::create($field);
+        }
+        $res = array();
+        $res['status'] = "success";
+        return response()->json($res);
+
+    }
 }

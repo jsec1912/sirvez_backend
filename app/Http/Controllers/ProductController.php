@@ -36,150 +36,158 @@ class ProductController extends Controller
             ]);
         }
         $product = array();
-        $id = $request->id;
-        if(strlen($request->room_id) > 10){
-            $product['room_id'] = Room::where('off_id',$request->room_id)->first()->id;
-        }
-        else
-            $product['room_id'] = $request->room_id;
-        //$product['room_id'] = $request->room_id;
-        $product['product_name']  = $request->product_name;
-        $product['description']  = $request->description;
-        $product['action']  = $request->action;
-        $product['qty']  = $request->qty;
-        $product['test_form_id'] = $request->test_form_id;
-        $product['com_form_id'] = $request->com_form_id;
-        if(strlen($request->to_room_id) > 10){
-            $product['to_room_id'] = Room::where('off_id',$request->to_room_id)->first()->id;
-        }
-        else
-            $product['to_room_id'] = $request->to_room_id;
+        for ($i=0;$i<intval($request->qty);$i++){
+            $product = [];
+            $id = $request->id;
+            if(strlen($request->room_id) > 10){
+                $product['room_id'] = Room::where('off_id',$request->room_id)->first()->id;
+            }
+            else
+                $product['room_id'] = $request->room_id;
+            $productName = $request->product_name;
+            if($i!=0)
+                $productName = $productName.'('.$i.')';
 
-        if(strlen($request->to_site_id) > 10){
-            $product['to_site_id'] = Site::where('off_id',$request->to_site_id)->first()->id;
-        }
-        else
-            $product['to_site_id'] = $request->to_site_id;
+            $product['product_name']  = $productName;
+            $product['description']  = $request->description;
+            $product['action']  = $request->action;
+            $product['qty']  = 1;
+            $product['test_form_id'] = $request->test_form_id;
+            $product['com_form_id'] = $request->com_form_id;
+            if(strlen($request->to_room_id) > 10){
+                $product['to_room_id'] = Room::where('off_id',$request->to_room_id)->first()->id;
+            }
+            else
+                $product['to_room_id'] = $request->to_room_id;
 
-        //$product['to_site_id']  = $request->to_site_id;
-        //$product['to_room_id']  = $request->to_room_id;
+            if(strlen($request->to_site_id) > 10){
+                $product['to_site_id'] = Site::where('off_id',$request->to_site_id)->first()->id;
+            }
+            else
+                $product['to_site_id'] = $request->to_site_id;
 
-        if($request->hasFile('upload_file')){
-            $fileName = time().'product.'.$request->upload_file->extension();
-            $request->upload_file->move(public_path('upload/file/'), $fileName);
-            $product['upload_file']  = $fileName;
-        }
-        if(strlen($request->id) > 10)
-            if(Product::where('off_id',$request->id)->count() > 0)
-                $id = Product::where('off_id',$request->id)->first()->id;
-            else $id = '';
-        if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+            //$product['to_site_id']  = $request->to_site_id;
+            //$product['to_room_id']  = $request->to_room_id;
 
-            $product['signed_off']  = $request->signed_off;
-            $product['created_by']  = $request->user->id;
+            if($request->hasFile('upload_file')){
+                $fileName = time().'product.'.$request->upload_file->extension();
+                $request->upload_file->move(public_path('upload/file/'), $fileName);
+                $product['upload_file']  = $fileName;
+            }
             if(strlen($request->id) > 10)
-                $product['off_id'] = $request->id;
-            $product = Product::create($product);
-            $room = Room::where('id',$product['room_id'])->first();
-            $insertnotificationdata = array(
-                'notice_type'		=> '8',
-                'notice_id'			=> $product->id,
-                //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new product in room['.$room['room_number'].']',
-                'created_by'		=> $request->user->id,
-                'company_id'		=> $room->company_id,
-                'project_id'        =>$room['project_id'],
-                'created_date'		=> date("Y-m-d H:i:s"),
-                'is_read'	    	=> 0,
-            );
-            Notification::create($insertnotificationdata);
+                if(Product::where('off_id',$request->id)->count() > 0)
+                    $id = Product::where('off_id',$request->id)->first()->id;
+                else $id = '';
+            if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
 
-            if($request->is_createTask)
-            {
-                $room = Room::whereId($product->room_id)->first();
-                $task = array();
-                $task['task'] = $product['product_name'].'_task';
-                $task['company_id'] = $room->company_id;
-                $task['project_id']  = $room->project_id;
-                $task['room_id']  = $room->id;
-                $task['due_by_date']  = $request->due_by_date;
-                $task['created_by']  = $request->user->id;
-                $task['description'] = $request->notes;
-                $task['priority'] = $request->snagging;
+                $product['signed_off']  = $request->signed_off;
+                $product['created_by']  = $request->user->id;
+                if(strlen($request->id) > 10)
+                    $product['off_id'] = $request->id;
+                $product = Product::create($product);
+                $room = Room::where('id',$product['room_id'])->first();
+                $insertnotificationdata = array(
+                    'notice_type'		=> '8',
+                    'notice_id'			=> $product->id,
+                    //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
+                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new product in room['.$room['room_number'].']',
+                    'created_by'		=> $request->user->id,
+                    'company_id'		=> $room->company_id,
+                    'project_id'        =>$room['project_id'],
+                    'created_date'		=> date("Y-m-d H:i:s"),
+                    'is_read'	    	=> 0,
+                );
+                Notification::create($insertnotificationdata);
 
-                $task = Task::create($task);
-                $id = $task->id;
-                if($request->has('assign_to'))
+                if($request->is_createTask)
                 {
-                    $array_res = array();
-                    $array_res =json_decode($request->assign_to,true);
-                    foreach($array_res as $row)
+                    $room = Room::whereId($product->room_id)->first();
+                    $task = array();
+                    $task['task'] = $productName.'_task';
+                    $task['company_id'] = $room->company_id;
+                    $task['project_id']  = $room->project_id;
+                    $task['room_id']  = $room->id;
+                    $task['due_by_date']  = $request->due_by_date;
+                    $task['created_by']  = $request->user->id;
+                    $task['description'] = $request->notes;
+                    $task['priority'] = $request->snagging;
+
+                    $task = Task::create($task);
+                    $id = $task->id;
+                    if($request->has('assign_to'))
                     {
-                        Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>'2']);
+                        $array_res = array();
+                        $array_res =json_decode($request->assign_to,true);
+                        foreach($array_res as $row)
+                        {
+                            Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>'2']);
+                        }
                     }
+                }
+
+            }
+            else{
+                $product['updated_by'] = $request->user->id;
+                Product::whereId($id)->update($product);
+                $product = Product::whereId($id)->first();
+            }
+
+            if ($request->test_values && $request->test_form_id != "0") {
+                $values = array();
+                $values = json_decode($request->test_values);
+                $value = array();
+                foreach($values as $row){
+                    $value['field_name'] = $row->field_name;
+                    $value['field_type'] = $row->field_type;
+                    $value['field_label'] = $row->field_label;
+                    $value['new_form_id'] = $row->new_form_id;
+                    $value['field_value'] = $row->field_value;
+                    $value['is_checked'] = $row->is_checked;
+                    $value['form_type'] = $row->form_type;
+                    $value['parent_id'] = $product->id;
+                    $cnt = Form_value::where('field_name',$row->field_name)
+                                    ->where('new_form_id',$row->new_form_id)
+                                    ->where('parent_id',$product->id)->count();
+                    if($cnt>0)
+                        Form_value::where('field_name',$row->field_name)
+                                    ->where('new_form_id',$row->new_form_id)
+                                    ->where('parent_id',$product->id)
+                                    ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+                    else
+                        Form_value::create($value);
                 }
             }
 
-        }
-        else{
-            $product['updated_by'] = $request->user->id;
-            Product::whereId($id)->update($product);
-            $product = Product::whereId($id)->first();
-        }
-
-        if ($request->test_values && $request->test_form_id != "0") {
-            $values = array();
-            $values = json_decode($request->test_values);
-            $value = array();
-            foreach($values as $row){
-                $value['field_name'] = $row->field_name;
-                $value['field_type'] = $row->field_type;
-                $value['field_label'] = $row->field_label;
-                $value['new_form_id'] = $row->new_form_id;
-                $value['field_value'] = $row->field_value;
-                $value['is_checked'] = $row->is_checked;
-                $value['form_type'] = $row->form_type;
-                $value['parent_id'] = $product->id;
-                $cnt = Form_value::where('field_name',$row->field_name)
-                                ->where('new_form_id',$row->new_form_id)
-                                ->where('parent_id',$product->id)->count();
-                if($cnt>0)
-                    Form_value::where('field_name',$row->field_name)
-                                ->where('new_form_id',$row->new_form_id)
-                                ->where('parent_id',$product->id)
-                                ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
-                else
-                    Form_value::create($value);
+            if ($request->com_values && $request->com_form_id != "0") {
+                $values = array();
+                $values = json_decode($request->com_values);
+                $value = array();
+                foreach($values as $row){
+                    $value['field_name'] = $row->field_name;
+                    $value['field_type'] = $row->field_type;
+                    $value['field_label'] = $row->field_label;
+                    $value['new_form_id'] = $row->new_form_id;
+                    $value['field_value'] = $row->field_value;
+                    $value['is_checked'] = $row->is_checked;
+                    $value['form_type'] = $row->form_type;
+                    $value['parent_id'] = $product->id;
+                    $cnt = Form_value::where('field_name',$row->field_name)
+                                    ->where('new_form_id',$row->new_form_id)
+                                    ->where('parent_id',$product->id)->count();
+                    if($cnt>0)
+                        Form_value::where('field_name',$row->field_name)
+                                    ->where('new_form_id',$row->new_form_id)
+                                    ->where('parent_id',$product->id)
+                                    ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+                    else
+                        Form_value::create($value);
+                }
             }
         }
+        //$product['room_id'] = $request->room_id;
 
-        if ($request->com_values && $request->com_form_id != "0") {
-            $values = array();
-            $values = json_decode($request->com_values);
-            $value = array();
-            foreach($values as $row){
-                $value['field_name'] = $row->field_name;
-                $value['field_type'] = $row->field_type;
-                $value['field_label'] = $row->field_label;
-                $value['new_form_id'] = $row->new_form_id;
-                $value['field_value'] = $row->field_value;
-                $value['is_checked'] = $row->is_checked;
-                $value['form_type'] = $row->form_type;
-                $value['parent_id'] = $product->id;
-                $cnt = Form_value::where('field_name',$row->field_name)
-                                ->where('new_form_id',$row->new_form_id)
-                                ->where('parent_id',$product->id)->count();
-                if($cnt>0)
-                    Form_value::where('field_name',$row->field_name)
-                                ->where('new_form_id',$row->new_form_id)
-                                ->where('parent_id',$product->id)
-                                ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
-                else
-                    Form_value::create($value);
-            }
-        }
 
-        $response = ['status'=>'success', 'msg'=>'Product Saved Successfully!'];
+        $response = ['status'=>'success', 'msg'=>'Product Saved Successfully!','product_name'=>$request->product_name];
         return response()->json($response);
     }
     public function deleteProduct(Request $request)
@@ -238,51 +246,76 @@ class ProductController extends Controller
             $idx = 0;
             $cnt = 0;
             $product = array();
+
+            $header = array(
+                'product'=>'product_name',
+                'product name'=>'product_name',
+                'location id'=>'room_id',
+                'room id'=>'room_id',
+                'qty'=>'qty',
+                'manufacturer'=>'manufacturer',
+                'model number'=>'model_number',
+                'model'=>'model_number',
+                'description'=>'description',
+                'testing id'=>'test_form_id',
+                'commissioning id'=>'com_form_id',
+                'commisioning id'=>'com_form_id',
+                'action'=>'action',
+                'product_action'=>'action'
+            );
+            $header_set = array('product_name', 'room_id', 'qty', 'manufacturer',
+                'model_number', 'description', 'test_form_id', 'com_form_id', 'action');
+            $value_id = array();
+
             foreach($excel_data[0] as $row) {
                 $idx ++;
-                if ($idx == 1) continue;
-                // $row->count()
-                if ($row->count() > 5) {
-                    if ($row[0] == '')
-                        continue;
-                    $product['product_name'] = $row[0];
-                    $product['description'] = $row[1];
-
-                    if ($row[2] == 'New Product')
-                        $product['action'] = 0;
-                    else if ($row[2] == 'Dispose')
-                        $product['action'] = 1;
-                    else if ($row[2] == 'Move To Room')
-                        $product['action'] = 2;
-                    else
-                        continue;
-                    if(strlen($request->project_id) > 10)
-                        $project_id = Project::where('off_id',$request->project_id)->first()->id;
-                    else
-                        $project_id = $request->project_id;
-
-                    //$project_id = Project::where('project_name', $request->project_name)->first()->id;
-                    // $product_room = Room::where('project_id', $project_id)->where('room_number', $row[3])->get();
-                    // if ($product_room->count() != 1)
-                    //     continue;
-                    // $product['room_id'] = $product_room->first()->id;
-
-
-                    $product['qty'] = $row[4];
-                    if ($row[5] == 'N/A')
-                        $product['signed_off'] = 0;
-                    else
-                        $product['signed_off'] = 1;
-
-                    $product['room_id'] = $row[6];
-                    $product['test_form_id'] = $row[7];
-                    $product['com_form_id'] = $row[8];
-
-                    $product['created_by']  = $request->user->id;
-
-                    Product::create($product);
-                    $cnt ++;
+                if ($idx == 1) {
+                    $sum = 0; $s = 0;
+                    for ($i = 0; $i < 9; $i++) {
+                        $srow = strtolower($row[$i]);
+                        if (array_key_exists($srow,$header)) {
+                            $frow = $header[$srow];
+                            $s = array_search($frow, $header_set);
+                            $sum |= 1<<$s;
+                            $value_id[$i] = $frow;
+                        } else {
+                            break;
+                        }
+                    }
+                    if ($i < 9 || $sum != 511) {
+                        $res['status'] = "error";
+                        $res['msg'] = 'The excel format is not correct.' . $i . ", " . $sum;
+                        return response()->json($res);
+                    }
+                    continue;
                 }
+                if ($row[0] == '')
+                    continue;
+                for ($i = 0; $i < 9; $i++) {
+                    $val = $row[$i];
+                    if ($value_id[$i] == 'test_form_id' || $value_id[$i] == 'com_form_id') {
+                        if (!is_numeric($val)) {
+                            $val = "0";
+                        }
+                    }
+                    if ($value_id[$i] == 'action') {
+                        $product['action'] = 0;
+                        if (strtolower($val) == 'new product') {
+                            $product['action'] = 0;
+                        } else if (strtolower($val) == 'dispose') {
+                            $product['action'] = 1;
+                        } else if (strtolower($val) == 'move to room') {
+                            $product['action'] = 2;
+                        }
+                    } else {
+                        $product[$value_id[$i]] = $val;
+                    }
+                }
+                $product['signed_off'] = 0;
+                $product['created_by']  = $request->user->id;
+
+                Product::create($product);
+                $cnt ++;
             }
             $res['total'] = $idx - 1;
             $res['cnt'] = $cnt;

@@ -116,6 +116,8 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/room/changeWall','RoomController@changeWall');
     Route::post('/room/changeAsbestos','RoomController@changeAsbestos');
     Route::post('/room/changeInstall','RoomController@changeInstall');
+    Route::post('/room/commentSubmit','RoomController@commentSubmit');
+    Route::post('/room/changePhotoOutput','RoomController@changePhotoOutput');
 
 
     Route::post('/task/updateTask','TaskController@updateTask');///
@@ -154,4 +156,5 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/form/saveFrom','NewFormController@saveForm');///
     Route::get('/form/infoForm', 'NewFormController@infoForm');///
     Route::post('/form/deleteForm', 'NewFormController@deleteForm');///
+    Route::post('/form/duplicateForm', 'NewFormController@duplicateForm');///
 });
