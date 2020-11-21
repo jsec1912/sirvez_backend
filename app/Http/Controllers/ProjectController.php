@@ -208,7 +208,7 @@ class ProjectController extends Controller
                 $to_name = $pending_user['first_name'];
                 $to_email = $pending_user['email'];
                 $content = $request->user->first_name.' has been '.$action.' project as '.$request->project_name;
-                $invitationURL = "https://app.sirvez.com/app/app/project/live/".$project['project_name'];
+                $invitationURL = "https://app.sirvez.com/app/app/project/live/".$id;
                 $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
                 Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)
@@ -248,7 +248,7 @@ class ProjectController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = 'Project('.$project->project_name.') was been archived by '.$request->user->first_name.' on ['.date("d-m-Y H:i:s")."].";
-            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$project['project_name'];
+            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$id;
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
             Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)

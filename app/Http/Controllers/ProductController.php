@@ -16,6 +16,7 @@ use App\Notification;
 use App\Form_value;
 use App\New_form;
 use App\Form_field;
+use App\Imports\ProductImport;
 
 class ProductController extends Controller
 {
@@ -237,15 +238,28 @@ class ProductController extends Controller
         return response()->json($res);
     }
     public function importProduct(Request $request) {
+        $res = array();
         if ($request->has('csv_file')) {
             $path = $request->file('csv_file')->getRealPath();
             $filename = $request->file('csv_file')->getClientOriginalName();
             $ext = $request->file('csv_file')->getClientOriginalExtension();
-            $excel_data = Excel::toCollection(null, $request->file('csv_file'));
+            $product_xls = new ProductImport($request->user->id);
+            Excel::import($product_xls, $request->file('csv_file'));
+            $res = $product_xls->get_value();
+        } else {
+            $res['status'] = "error";
+            $res['msg'] = 'The excel format is not correct.';
+        }
+        return response()->json($res);
+    }
 
-            $idx = 0;
-            $cnt = 0;
-            $product = array();
+    public function importList(Request $request) {
+        $res = array();
+        if ($request->has('product_list')) {
+            $product_list = array();
+            $product_list = json_decode($request->product_list);
+            $titles = array();
+            $titles = json_decode($request->titles);
 
             $header = array(
                 'product'=>'product_name',
@@ -265,64 +279,77 @@ class ProductController extends Controller
             );
             $header_set = array('product_name', 'room_id', 'qty', 'manufacturer',
                 'model_number', 'description', 'test_form_id', 'com_form_id', 'action');
+
+            $idx = 0;
+            $cnt = 0;
+            $product = array();
             $value_id = array();
 
-            foreach($excel_data[0] as $row) {
-                $idx ++;
-                if ($idx == 1) {
-                    $sum = 0; $s = 0;
-                    for ($i = 0; $i < 9; $i++) {
-                        $srow = strtolower($row[$i]);
-                        if (array_key_exists($srow,$header)) {
-                            $frow = $header[$srow];
-                            $s = array_search($frow, $header_set);
-                            $sum |= 1<<$s;
-                            $value_id[$i] = $frow;
-                        } else {
-                            break;
-                        }
-                    }
-                    if ($i < 9 || $sum != 511) {
-                        $res['status'] = "error";
-                        $res['msg'] = 'The excel format is not correct.' . $i . ", " . $sum;
-                        return response()->json($res);
-                    }
-                    continue;
+            $sum = 0; $s = 0; $i = 0;
+            foreach($titles as $row) {
+                $srow = strtolower($row);
+                if (array_key_exists($srow, $header)) {
+                    $frow = $header[$srow];
+                    $s = array_search($frow, $header_set);
+                    $sum |= 1<<$s;
+                    $value_id[$srow] = $frow;
+                } else {
+                    break;
                 }
-                if ($row[0] == '')
-                    continue;
-                for ($i = 0; $i < 9; $i++) {
-                    $val = $row[$i];
-                    if ($value_id[$i] == 'test_form_id' || $value_id[$i] == 'com_form_id') {
-                        if (!is_numeric($val)) {
-                            $val = "0";
+                $i ++;
+            }
+
+            if ($i < 9 || $sum != 511) {
+                $res['status'] = "error";
+                $res['msg'] = 'The excel format is not correct.' . $i . ", " . $sum;
+                return ;
+            }
+
+            $out = array();
+
+            foreach($product_list as $row) {
+                $ok = 1;
+                foreach ($row as $key => $val) {
+                    $out[$key] = $val;
+                    $top = strtolower($key);
+                    if (array_key_exists($top, $value_id)) {
+                        if ($value_id[$top] == 'test_form_id' || $value_id[$top] == 'com_form_id') {
+                            if (!is_numeric($val)) {
+                                $val = "0";
+                            }
                         }
-                    }
-                    if ($value_id[$i] == 'action') {
-                        $product['action'] = 0;
-                        if (strtolower($val) == 'new product') {
+                        if ($value_id[$top] == 'action') {
                             $product['action'] = 0;
-                        } else if (strtolower($val) == 'dispose') {
-                            $product['action'] = 1;
-                        } else if (strtolower($val) == 'move to room') {
-                            $product['action'] = 2;
+                            if (strtolower($val) == 'new product') {
+                                $product['action'] = 0;
+                            } else if (strtolower($val) == 'dispose') {
+                                $product['action'] = 1;
+                            } else if (strtolower($val) == 'move to room') {
+                                $product['action'] = 2;
+                            }
+                        } else {
+                            $product[$value_id[$top]] = $val;
                         }
                     } else {
-                        $product[$value_id[$i]] = $val;
+                        $ok = 0;
+                        break;
                     }
                 }
-                $product['signed_off'] = 0;
-                $product['created_by']  = $request->user->id;
+                if ($ok) {
+                    $product['signed_off'] = 0;
+                    $product['created_by']  = $request->user->id;
 
-                Product::create($product);
-                $cnt ++;
+                    Product::create($product);
+                    $cnt ++;
+                }
             }
-            $res['total'] = $idx - 1;
+
+            $res['total'] = count($product_list);
             $res['cnt'] = $cnt;
             $res['status'] = "success";
-        } else {
-            $res['status'] = "error";
-            $res['msg'] = 'The excel format is not correct.';
+            $res['out'] = $out;
+            $res['value_id'] = $value_id;
+
         }
         return response()->json($res);
     }
@@ -517,6 +544,34 @@ class ProductController extends Controller
             $id = $request->id;
 
             Product::whereId($id)->update(['description'=>$request->product_description]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeManufacturer(request $request) {
+        if (strlen($request->id) > 10) {
+            $id = Product::where('off_id', $request->id)->first()->id;
+        } else {
+            $id = $request->id;
+        }
+        if ($request->has('manufacturer')) {
+            Product::whereId($id)->update(['manufacturer'=>$request->manufacturer]);
+        }
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeModelNumber(request $request) {
+        if (strlen($request->id) > 10) {
+            $id = Product::where('off_id', $request->id)->first()->id;
+        } else {
+            $id = $request->id;
+        }
+        if ($request->has('model_number')) {
+            Product::whereId($id)->update(['model_number'=>$request->model_number]);
+        }
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);

@@ -395,7 +395,7 @@ class CompanyCustomerController extends Controller
                 $roomId = Task::whereId($row['notice_id'])->first()->room_id;
                 if(Room::whereId($roomId)->count()==0) continue;
                 $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
-                $recent_messages[$key]['room_id']  = Room::whereId($roomId)->first()->room_id;
+                $recent_messages[$key]['room_id']  = Room::whereId($roomId)->first()->id;
             }
         }
         $res['recent_messages'] = $recent_messages;

@@ -491,7 +491,7 @@ class RoomController extends Controller
         $to_name = $pending_user['first_name'];
         $to_email = $pending_user['email'];
         $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
-        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_name'].'/'.$room['room_number'];
+        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_id'].'/'.$room['id'];
         $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
         Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
             $message->to($to_email, $to_name)
@@ -505,7 +505,7 @@ class RoomController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
-            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_name'].'/'.$room['room_number'];
+            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_id'].'/'.$room['room_id'];
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
             Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
@@ -611,12 +611,8 @@ class RoomController extends Controller
             ]);
         }
         $comment = array();
-        if(strlen($request->photo_id)>10){
-            $comment['photo_id'] = Room_photo::where('off_id',$request->photo_id)->first()->id;
-        }else{
-            $comment['photo_id'] = $request->photo_id;
-        }
-
+       
+        $comment['photo_id'] = $request->photo_id;
         $comment['created_by'] = $request->user->id;
         $comment['comment']  = $request->message;
         
@@ -626,6 +622,34 @@ class RoomController extends Controller
             ->leftJoin('users','users.id','=','room_comments.created_by')
             ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
             ->get();
+
+        $roomId = Room_photo::whereId($request->photo_id)->first()->room_id;
+        $room = Room::whereId($roomId)->first();
+        $insertnotificationdata = array(
+            'notice_type'		=> '5',
+            'notice_id'			=> $roomId,
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in location['.$room['room_number'].'].',
+            'created_by'		=> $request->user->id,
+            'company_id'		=> $room['company_id'],
+            'project_id'        => $room['project_id'],
+            'created_date'		=> date("Y-m-d H:i:s"),
+            'is_read'	    	=> 0,
+        );
+        Notification::create($insertnotificationdata);
+
+        //sending gmail to user
+        $pending_user = User::where('id',$room->created_by)->first();
+        $to_name = $pending_user['first_name'];
+        $to_email = $pending_user['email'];
+        $content = $request->user->first_name.' '.$request->user->last_name. ' has added a new comment in location['.$room['room_number'].'].';
+        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_id'].'/'.$room['id'];
+        $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$request->message,"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
+        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+            $message->to($to_email, $to_name)
+                    ->subject('sirvez notification.');
+            $message->from('support@sirvez.com','sirvez support team');
+        });
+
 
         $res['status'] = 'success';
         return response()->json($res);

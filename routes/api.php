@@ -91,6 +91,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/product/productInfo','ProductController@productInfo');
     Route::get('/product/getProductInfo','ProductController@getProductInfo');
     Route::post('/product/import-product', 'ProductController@importProduct');
+    Route::post('/product/import-list', 'ProductController@importList');
     Route::post('/product/signOff', 'ProductController@signOff');
     Route::post('/product/testSignOff', 'ProductController@testSignOff');
     Route::post('/product/comSignOff', 'ProductController@comSignOff');
@@ -98,6 +99,8 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/product/savecommissioningForm', 'ProductController@savecommissioningForm');
     Route::post('/product/changeProductName', 'ProductController@changeProductName');
     Route::post('/product/changeProductDescription', 'ProductController@changeProductDescription');
+    Route::post('/product/changeModelNumber', 'ProductController@changeModelNumber');
+    Route::post('/product/changeManufacturer', 'ProductController@changeManufacturer');
     Route::post('/product/changeTestingFormId', 'ProductController@changeTestingFormId');
     Route::post('/product/changeCommissioningFormId', 'ProductController@changeCommissioningFormId');
     Route::post('/product/removeTestingImg', 'ProductController@removeTestingImg');

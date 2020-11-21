@@ -1,0 +1,2 @@
+(this["webpackJsonpjumbo-hooks"]=this["webpackJsonpjumbo-hooks"]||[]).push([[67],{1378:function(e,n,t){"use strict";t.r(n);var o=t(0),c=t.n(o),a=t(27),r=t(19);n.default=function(e){var n=e.match;return c.a.createElement(a.d,null,c.a.createElement(a.b,{exact:!0,from:"".concat(n.url,"/"),component:Object(r.a)((function(){return Promise.all([t.e(0),t.e(1),t.e(3),t.e(55)]).then(t.bind(null,1358))}))}),c.a.createElement(a.b,{component:Object(r.a)((function(){return t.e(2).then(t.bind(null,673))}))}))}}}]);
+//# sourceMappingURL=67.2a18b460.chunk.js.map

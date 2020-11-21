@@ -404,6 +404,7 @@ class TaskController extends Controller
                 ->get();
             $tasks[$key]['comments'] = $task_comments;
         }
+        $res['all_users'] = User::get();
         $res['tasks'] = $tasks;
         $res['status'] = "success";
         return response()->json($res);

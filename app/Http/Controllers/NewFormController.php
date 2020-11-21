@@ -45,7 +45,7 @@ class NewFormController extends Controller
                 Form_field::create($field);
             }
         } else {
-            New_form::whereId($request->form_id)->update(['form_data'=>$request->form_data]);
+            New_form::whereId($request->form_id)->update(['form_data'=>$request->form_data,'form_name'=>$request->form_name,'form_type'=>$request->form_type]);
             $fields = array();
             $fields = json_decode($request->form_fields);
             $field = array();
