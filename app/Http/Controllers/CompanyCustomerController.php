@@ -25,9 +25,6 @@ class CompanyCustomerController extends Controller
         $v = Validator::make($request->all(), [
             //company info
             'company_name' => 'required',
-            'address' => 'required',
-            'city' => 'required',
-            'postcode' => 'required',
             'manager' => 'required'
         ]);
 
@@ -49,6 +46,7 @@ class CompanyCustomerController extends Controller
         //$company['name'] = str_replace(' ','',$request->post("company_name"));
         $company['name'] = $request->post("company_name");
         $company['website']  = $request->post("website");
+        $company['parent_id']  = $request->post("parent_id");
         $company['company_email']  = $request->post("company_email");
         $company['address']  = $request->post("address");
         $company['city']  = $request->post("city");
@@ -66,14 +64,14 @@ class CompanyCustomerController extends Controller
             $count = 0;
             if($request->website)
                 $count += Company::where('website',$request->website)->count();
-            if($request->company_email)
-                $count+= Company::where('company_email',$request->company_email)->count();
+            // if($request->company_email)
+            //     $count+= Company::where('company_email',$request->company_email)->count();
 
             if($count>0)
             {
                 $res = array();
                 $res['status'] = "error";
-                $res['msg'] = 'The website or company email has already been taken!';
+                $res['msg'] = 'The website has already been taken!';
                 return response()->json($res);
             }
 
@@ -100,8 +98,8 @@ class CompanyCustomerController extends Controller
             $count = 0;
             if($request->website)
                 $count += Company::where('id','<>',$id)->where('website',$request->website)->count();
-            if($request->company_email)
-                $count += Company::where('id','<>',$id)->where('company_email',$request->company_email)->count();
+            // if($request->company_email)
+            //     $count += Company::where('id','<>',$id)->where('company_email',$request->company_email)->count();
             $sel_company = Company::whereId($id)->first();
             //User::whereId($sel_company['manager'])->update(['company_id'=>$request->user->company_id,'user_type'=>1]);
             //User::whereId($company['manager'])->update(['company_id'=>$id,'user_type'=>3]);
@@ -109,7 +107,7 @@ class CompanyCustomerController extends Controller
             {
                 $res = array();
                 $res['status'] = "error";
-                $res['msg'] = 'The website or company email has already been taken!';
+                $res['msg'] = 'The website has already been taken!';
                 return response()->json($res);
             }
 
@@ -193,21 +191,23 @@ class CompanyCustomerController extends Controller
         //     $query->with('company')->where('company_id', $userid);
         // }])->get();
         $res["customers"] = $customers;
+        $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->get();
+        $res['parent_customers'] = Company::get();
         $res['status'] = "success";
         return response()->json($res);
     }
     public function DeleteCompanyCustomer(Request $request){
         $company_id = $request->id;
         if(strlen($request->id)>10){
-            Company::where('off_id',$company_id)->delete();
+            $company_id = Company::where('off_id',$company_id)->first()->id;
         }
-        else{
-            Company::whereId($company_id)->delete();
-            Company_customer::where('company_id',$company_id)->delete();
-            Project::where('company_id',$company_id)->delete();
-            Site::where('company_id',$company_id)->delete();
-            Site_room::where('company_id',$company_id)->delete();
-        }
+        
+        Company::whereId($company_id)->delete();
+        Company_customer::where('company_id',$company_id)->delete();
+        Project::where('company_id',$company_id)->delete();
+        Site::where('company_id',$company_id)->delete();
+        Site_room::where('company_id',$company_id)->delete();
+        
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -247,19 +247,25 @@ class CompanyCustomerController extends Controller
             $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'project_users.type'=>'2'])->pluck('users.first_name');
         }
         $res['tasks'] = $tasks;
+        $res['childs'] = Company::where('companies.parent_id',$request->id)
+                        ->leftJoin('users','users.id','=','companies.manager')
+                        ->select('companies.*','users.first_name as manager_name')
+                        ->get();
         return response()->json($res);
     }
     public function getCustomerInfo(Request $request){
+        $res['customers'] = Company::get();
         if ($request->has('id')) {
             $customer_id = $request->id;
 
             $res = array();
             $res['status'] = 'success';
             $res['company'] = Company::whereId($customer_id)->first();
+            $res['customers'] = Company::where('id','<>',$customer_id)->get();
         }
 
         $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
-
+       
         return response()->json($res);
     }
     public function userList(Request $request){
@@ -419,9 +425,12 @@ class CompanyCustomerController extends Controller
 
         return response()->json($res);
     }
-
-
-
-
-
+    
+    public function setFavourite(request $request)
+    {
+        Company::whereId($request->id)->update(['favourite'=>$request->favourite]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 }

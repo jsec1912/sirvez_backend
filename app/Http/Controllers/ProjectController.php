@@ -23,6 +23,7 @@ use App\ScheduleEngineer;
 use App\New_form;
 use App\Form_field;
 use App\Form_value;
+use App\Room_comment;
 use Mail;
 
 class ProjectController extends Controller
@@ -208,7 +209,7 @@ class ProjectController extends Controller
                 $to_name = $pending_user['first_name'];
                 $to_email = $pending_user['email'];
                 $content = $request->user->first_name.' has been '.$action.' project as '.$request->project_name;
-                $invitationURL = "https://app.sirvez.com/app/app/project/live/".$id;
+                $invitationURL = "https://app.sirvez.com/app/project/live/".$id;
                 $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
                 Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)
@@ -248,7 +249,7 @@ class ProjectController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = 'Project('.$project->project_name.') was been archived by '.$request->user->first_name.' on ['.date("d-m-Y H:i:s")."].";
-            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$id;
+            $invitationURL = "https://app.sirvez.com/app/project/live/".$id;
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$project['project_name'],"description" =>$project['project_summary'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view project'];
             Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
@@ -281,6 +282,8 @@ class ProjectController extends Controller
         foreach($project_array as $key => $row){
             $project_array[$key]['survey_start_date'] = date('d-m-Y', strtotime($row['survey_start_date']));
             $project_array[$key]['site_count'] = Project_site::where('project_id',$row['id'])->count();
+            $room_idx = Room::where('project_id',$row['id'])->pluck('id');
+            $project_array[$key]['product_count'] = Product::whereIn('room_id',$room_idx)->count();
             $project_array[$key]['room_count'] = Room::where('project_id',$row['id'])->count();
             $project_array[$key]['messages'] = Notification::where('notice_type','3')->where('notice_id',$row['id'])->count();
 
@@ -333,7 +336,14 @@ class ProjectController extends Controller
             $rooms[$key]['products'] = Product::where('room_id',$room->id)->count();
             $rooms[$key]['total_tasks'] = Task::where('room_id',$room->id)->count();
             $rooms[$key]['complete_tasks'] =Task::where('room_id',$room->id)->where('archived',1)->count();
-            $rooms[$key]['img_files'] = Room_photo::where('room_id',$room->id)->get();
+            $images = Room_photo::where('room_id',$room->id)->get();
+            foreach($images as $k => $image){
+                $images[$k]['comments'] = Room_comment::where('photo_id',$image->id) 
+                    ->leftJoin('users','users.id','=','room_comments.created_by')
+                    ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
+                    ->get();
+            }
+            $rooms[$key]['img_files'] = $images;
         }
         $res['rooms'] = $rooms;
         $room_ids = Room::where('project_id',$project['id'])->pluck('id');
@@ -423,8 +433,9 @@ class ProjectController extends Controller
         $res['project_id'] = $id;
         $res['test_forms'] = New_form::where('form_type', 1)->get();
         $res['com_forms'] = New_form::where('form_type', 2)->get();
-        $res['off_form_values'] = Form_value::where('form_type', 2)
+        $res['off_form_values'] = Form_value::where('form_type', 3)
             ->where('parent_id',$project['signoff_form_id'])->get();
+        $res['product_form_values'] = Form_value::whereIn('form_type',[1,2])->get();
         return response()->json($res);
     }
     public function getProjectInfo(Request $request){

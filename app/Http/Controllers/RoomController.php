@@ -261,6 +261,7 @@ class RoomController extends Controller
             $res['form_fields'] = Form_field::get();
 
             $res["room"] = $room;
+            $res['product_form_values'] = Form_value::whereIn('form_type',[1,2])->get();
             $res['test_forms'] = New_form::where('form_type', 1)->get();
             $res['com_forms'] = New_form::where('form_type', 2)->get();
             $res['assign_to'] = Project_user::where(['project_users.project_id'=>$room->project_id,'project_users.type'=>'1'])
@@ -491,7 +492,7 @@ class RoomController extends Controller
         $to_name = $pending_user['first_name'];
         $to_email = $pending_user['email'];
         $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
-        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_id'].'/'.$room['id'];
+        $invitationURL = "https://app.sirvez.com/app/project/live/".$room['project_id'].'/'.$room['id'];
         $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
         Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
             $message->to($to_email, $to_name)
@@ -505,7 +506,7 @@ class RoomController extends Controller
             $to_name = $pending_user['first_name'];
             $to_email = $pending_user['email'];
             $content = $request->user->first_name.' '.$request->user->last_name. ' has been sent request to change location['.$room->room_number.']';
-            $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_id'].'/'.$room['room_id'];
+            $invitationURL = "https://app.sirvez.com/app/project/live/".$room['project_id'].'/'.$room['room_id'];
             $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$room['notes'],"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
             Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)
@@ -623,11 +624,11 @@ class RoomController extends Controller
             ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
             ->get();
 
-        $roomId = Room_photo::whereId($request->photo_id)->first()->room_id;
-        $room = Room::whereId($roomId)->first();
+        $room_photo = Room_photo::whereId($request->photo_id)->first();
+        $room = Room::whereId($room_photo->room_id)->first();
         $insertnotificationdata = array(
             'notice_type'		=> '5',
-            'notice_id'			=> $roomId,
+            'notice_id'			=> $room_photo->room_id,
             'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in location['.$room['room_number'].'].',
             'created_by'		=> $request->user->id,
             'company_id'		=> $room['company_id'],
@@ -642,7 +643,8 @@ class RoomController extends Controller
         $to_name = $pending_user['first_name'];
         $to_email = $pending_user['email'];
         $content = $request->user->first_name.' '.$request->user->last_name. ' has added a new comment in location['.$room['room_number'].'].';
-        $invitationURL = "https://app.sirvez.com/app/app/project/live/".$room['project_id'].'/'.$room['id'];
+        $invitationURL = "https://app.sirvez.com/app/project/live/".$room['project_id'].'/'.$room['id'];
+        $room_img = 'https://app.sirvez.com/upload/img/'.$room_photo['image_name'];
         $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$room['room_number'],"description" =>$request->message,"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view location'];
         Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
             $message->to($to_email, $to_name)
@@ -657,22 +659,14 @@ class RoomController extends Controller
 
     public function changePhotoOutput(request $request)
     {
-        $v = Validator::make($request->all(), [
-            'photo_id' =>'required',
-            'output' => 'required'
-        ]);
-        if ($v->fails())
-        {
-            return response()->json([
-                'status' => 'error',
-                'msg' => 'You must input comments in the field!'
-            ]);
-        }
-        if(strlen($request->photo_id)>10){
-            Room_photo::where('off_id',$request->photo_id)->update(['output'=>$request->output]);
-        }else{
-            Room_photo::where('id',$request->photo_id)->update(['output'=>$request->output]);
-        }
+        Room_photo::where('id',$request->photo_id)->update(['output'=>$request->output]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changePhotoPortrait(request $request)
+    {
+        Room_photo::where('id',$request->photo_id)->update(['portrait'=>$request->portrait]);
         $res['status'] = 'success';
         return response()->json($res);
     }

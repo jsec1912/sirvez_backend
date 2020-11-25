@@ -36,6 +36,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/customers/company/customer-edit','CompanyCustomerController@getCustomerInfo');///
     Route::get('/customers/userList','CompanyCustomerController@userList');///
     Route::Post('/customers/pendingUser','CompanyCustomerController@pendingUser');
+    Route::Post('/customers/setFavourite','CompanyCustomerController@setFavourite');
 
     Route::post('/project/updateProject','ProjectController@updateProject');///
     Route::post('/project/deleteProject','ProjectController@deleteProject');///
@@ -121,6 +122,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/room/changeInstall','RoomController@changeInstall');
     Route::post('/room/commentSubmit','RoomController@commentSubmit');
     Route::post('/room/changePhotoOutput','RoomController@changePhotoOutput');
+    Route::post('/room/changePhotoPortrait','RoomController@changePhotoPortrait');
 
 
     Route::post('/task/updateTask','TaskController@updateTask');///

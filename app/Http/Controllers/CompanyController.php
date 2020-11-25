@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Company;
+use App\User;
 use Illuminate\Support\Facades\Validator;
 
 class CompanyController extends Controller
@@ -13,10 +14,10 @@ class CompanyController extends Controller
         $v = Validator::make($request->all(), [
             //company info
             'name' => 'required',
-            'address' => 'required',
-            'city' => 'required',
-            'postcode' => 'required',
-            'telephone' => 'required',
+            // 'address' => 'required',
+            // 'city' => 'required',
+            // 'postcode' => 'required',
+            // 'telephone' => 'required',
         ]);
 
         if ($v->fails())
@@ -50,24 +51,25 @@ class CompanyController extends Controller
         }
         $company['name'] = $request->post("name");
         $company['website']  = $request->post("website");
-        $company['company_email']  = $request->post("company_email");
-        $company['address']  = $request->post("address");
-        $company['address2']  = $request->post("address2");
-        $company['city']  = $request->post("city");
-        $company['postcode']  = $request->post("postcode");
+        $company['parent_id']  = $request->post("parent_id");
+        $company['manager']  = $request->post("manager");
+        // $company['company_email']  = $request->post("company_email");
+        // $company['address']  = $request->post("address");
+        // $company['address2']  = $request->post("address2");
+        // $company['city']  = $request->post("city");
+        // $company['postcode']  = $request->post("postcode");
         $company['status']  = $request->post("status");
         $company['telephone']  = $request->post("telephone");
         $company['is_upload']  = $request->post("is_upload");
 
         //return response()->json($company );
-        $count = Company::where('id','<>',$id)->where('website',$request->website)->count() +
-            Company::where('id','<>',$id)->where('company_email',$request->company_email)->count();
+        $count = Company::where('id','<>',$id)->where('website',$request->website)->count();
 
         if($count>0)
         {
             $res = array();
             $res['status'] = "error";
-            $res['msg'] = 'The website or company email has already been taken!';
+            $res['msg'] = 'The website has already been taken!';
             return response()->json($res);
         }
         company::whereId($id)->update($company);
@@ -81,6 +83,8 @@ class CompanyController extends Controller
         $res = array();
         $res['status'] = 'success';
         $res['company'] = Company::whereId($id)->first();
+        $res['customers'] = Company::where('id','<>',$id)->get();
+        $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$id)->get();
         return response()->json($res);
     }
     public function getCompanyImg(request $request){
