@@ -16,6 +16,7 @@ use App\Notification;
 use App\Form_value;
 use App\New_form;
 use App\Form_field;
+use App\Qr_option;
 use App\Imports\ProductImport;
 
 class ProductController extends Controller
@@ -622,6 +623,27 @@ class ProductController extends Controller
             Product::whereId($id)->update(['testing_video'=>'']);
         $res = array();
         $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function getQrOption(request $request){
+        $res = array();
+        $res['status'] = 'success';
+        $res['option'] = Qr_option::first();
+        return response()->json($res);
+    }
+    public function updateQrOption(request $request){
+        $res = array();
+        $res['option'] = Qr_option::truncate();
+        $option = array();
+        $option['company_logo'] = $request->company_logo;
+        $option['sirvez_logo'] = $request->sirvez_logo;
+        $option['client_name'] = $request->client_name;
+        $option['install_date'] = $request->install_date;
+        $option['website'] = $request->website;
+        $option['phone_number'] = $request->phone_number;
+        Qr_option::create($option);
+        $res['status'] = 'success';
+        
         return response()->json($res);
     }
 }

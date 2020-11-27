@@ -106,6 +106,8 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/product/changeCommissioningFormId', 'ProductController@changeCommissioningFormId');
     Route::post('/product/removeTestingImg', 'ProductController@removeTestingImg');
     Route::post('/product/removeTestingVideo', 'ProductController@removeTestingVideo');
+    Route::get('/product/getQrOption', 'ProductController@getQrOption');
+    Route::post('/product/updateQrOption', 'ProductController@updateQrOption');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///
