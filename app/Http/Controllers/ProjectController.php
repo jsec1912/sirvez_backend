@@ -24,6 +24,7 @@ use App\New_form;
 use App\Form_field;
 use App\Form_value;
 use App\Room_comment;
+use App\Qr_option;
 use Mail;
 
 class ProjectController extends Controller
@@ -370,28 +371,7 @@ class ProjectController extends Controller
         }
 
         $res['schedules'] = $schedules;
-        $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
-        foreach($products as $key => $product)
-        {
-            if(Room::whereId($product->room_id)->count()>0)
-                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
-            else
-            $products[$key]['room_name'] = '';
-            $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
-            $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
-            $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
-
-            if($product['action'] ==0)
-                $products[$key]['product_action'] = "New Product";
-            else if($product['action'] ==1)
-                $products[$key]['product_action'] = "Dispose";
-            else
-                $products[$key]['product_action'] = "Move To Room";
-
-            //$products[$key]['to_room_name'] = Room::whereId($product->to_room_id)->first()->room_number;
-            //$products[$key]['to_site_name'] = Site::whereId($product->to_site_id)->first()->site_name;
-        }
-        $res['products'] = $products;
+        
         $tasks = Task::where('project_id',$project['id'])->orderBy('id','desc')->get();
         foreach($tasks as $key=>$row){
             $tasks[$key]['assign_to'] = Project_user::leftjoin('users','users.id','=','project_users.user_id')
@@ -436,6 +416,35 @@ class ProjectController extends Controller
         $res['off_form_values'] = Form_value::where('form_type', 3)
             ->where('parent_id',$project['signoff_form_id'])->get();
         $res['product_form_values'] = Form_value::whereIn('form_type',[1,2])->get();
+        $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
+        foreach($products as $key => $product)
+        {
+            if(Room::whereId($product->room_id)->count()>0){
+                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
+            }
+            else
+                $products[$key]['room_name'] = '';
+            $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
+            $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
+            $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
+            $products[$key]['company_logo'] = Company::whereId($project->company_id)->first()->logo_img;
+            $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
+            $products[$key]['client_name'] = $res['customer_users'];
+            $products[$key]['install_date'] = date('d-m-Y',strtotime($project['survey_start_date']));
+
+            if($product['action'] ==0)
+                $products[$key]['product_action'] = "New Product";
+            else if($product['action'] ==1)
+                $products[$key]['product_action'] = "Dispose";
+            else
+                $products[$key]['product_action'] = "Move To Room";
+
+            //$products[$key]['to_room_name'] = Room::whereId($product->to_room_id)->first()->room_number;
+            //$products[$key]['to_site_name'] = Site::whereId($product->to_site_id)->first()->site_name;
+        }
+        $res['products'] = $products;
+        $res['qr_option'] = Qr_option::first();
         return response()->json($res);
     }
     public function getProjectInfo(Request $request){

@@ -131,7 +131,7 @@ class TaskController extends Controller
                 $to_name = $pending_user['first_name'];
                 $to_email = $pending_user['email'];
                 $content = $request->user->first_name.' '.$request->user->last_name.' has assigned you a task.';
-            $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
+                $task_img = 'https://app.sirvez.com/upload/img/'.$task['task_img'];
                 $invitationURL = "https://app.sirvez.com/app/task-manager/my-task";
                 $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>$task['task'],"description" =>$task['description'],"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view task'];
 

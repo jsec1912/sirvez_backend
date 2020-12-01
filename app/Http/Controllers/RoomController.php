@@ -16,6 +16,7 @@ use App\Project;
 use App\Project_user;
 use App\Room_photo;
 use App\Notification;
+use App\Company;
 use App\Company_customer;
 use App\Department;
 use App\Building;
@@ -28,6 +29,7 @@ use App\Form_value;
 use App\New_form;
 use App\Form_field;
 use App\Room_comment;
+use App\Qr_option;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -323,12 +325,21 @@ class RoomController extends Controller
                 $project_id = $request->project_id;
             $room_ids = Room::where('project_id',$project_id)->pluck('id');
             $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
+            $project = Project::whereId($project_id)->first();
             foreach($products as $key => $product)
             {
                 $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
                 $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
                 $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
                 $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
+                $products[$key]['company_logo'] = Company::whereId($project->company_id)->first()->logo_img;
+                $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
+                $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$project_id,'project_users.type'=>'3'])
+                                                            ->leftjoin('users','users.id','=','project_users.user_id')
+                                                            ->select('users.*')
+                                                            ->get();
+                $products[$key]['install_date'] = date('d-m-Y',strtotime(Project::whereId($project_id)->first()->survey_start_date));
                 if($product['action'] ==0)
                     $products[$key]['product_action'] = "New Product";
                 else if($product['action'] ==1)
@@ -376,7 +387,7 @@ class RoomController extends Controller
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
-        
+        $res['qr_option'] = Qr_option::first();
         $res['status'] = "success";
 
         return response()->json($res);
