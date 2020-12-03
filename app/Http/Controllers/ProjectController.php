@@ -25,6 +25,7 @@ use App\Form_field;
 use App\Form_value;
 use App\Room_comment;
 use App\Qr_option;
+use App\Product_sign;
 use Mail;
 
 class ProjectController extends Controller
@@ -416,7 +417,7 @@ class ProjectController extends Controller
         $res['off_form_values'] = Form_value::where('form_type', 3)
             ->where('parent_id',$project['signoff_form_id'])->get();
         $res['product_form_values'] = Form_value::whereIn('form_type',[1,2])->get();
-        $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
+        $products = Product::whereIn('room_id',$room_ids)->orWhereNull('room_id')->orderBy('id','desc')->get();
         foreach($products as $key => $product)
         {
             if(Room::whereId($product->room_id)->count()>0){
@@ -430,6 +431,10 @@ class ProjectController extends Controller
             $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
             $products[$key]['company_logo'] = Company::whereId($project->company_id)->first()->logo_img;
             $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
+            $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
+                                                    ->leftJoin('users','users.id','=','product_signs.user_id')
+                                                    ->select('product_signs.*','users.first_name')
+                                                    ->get();
             $products[$key]['client_name'] = $res['customer_users'];
             $products[$key]['install_date'] = date('d-m-Y',strtotime($project['survey_start_date']));
 

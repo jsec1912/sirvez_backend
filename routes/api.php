@@ -24,6 +24,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
 
     //dashboard
     Route::get('/dashboard','CompanyCustomerController@getDashboard');////
+    Route::get('/barcodeCheck','ProductController@barcodeCheck');////
     //company modify
     Route::post('/company/saveCompany','CompanyController@saveCompany');
     Route::get('/company/getCompanyInfo','CompanyController@getCompanyInfo');
@@ -108,6 +109,12 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/product/removeTestingVideo', 'ProductController@removeTestingVideo');
     Route::get('/product/getQrOption', 'ProductController@getQrOption');
     Route::post('/product/updateQrOption', 'ProductController@updateQrOption');
+    Route::get('/product/getBarcodeApi', 'ProductController@getBarcodeApi');
+    Route::post('/product/updateBarcodeApi', 'ProductController@updateBarcodeApi');
+    Route::get('/product/insertBarcode', 'ProductController@insertBarcode');
+    Route::get('/product/AssignProduct', 'ProductController@AssignProduct');
+    Route::get('/product/getBarcodeInfo', 'ProductController@getBarcodeInfo');
+    Route::post('/product/newBarcode', 'ProductController@newBarcode');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///

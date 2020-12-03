@@ -17,7 +17,14 @@ use App\Form_value;
 use App\New_form;
 use App\Form_field;
 use App\Qr_option;
+use App\Company_customer;
+use App\Company;
 use App\Imports\ProductImport;
+use App\Barcode_api;
+use App\Barcode;
+use App\Product_sign;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Response;
 
 class ProductController extends Controller
 {
@@ -221,8 +228,6 @@ class ProductController extends Controller
         if ($request->has('id')) {
             $id = $request->id;
             $res['product'] = Product::whereId($id)->first();
-            $room = Room::whereId($res['product']->room_id)->first();
-            $companyId = Project::whereId($room->project_id)->first()->company_id;
             $res['test_values'] = Form_value::where('parent_id',$id)->where('form_type',1)->get();
             $res['com_values'] = Form_value::where('parent_id',$id)->where('form_type',2)->get();
             $res['test_forms'] = New_form::where('form_type', 1)->get();
@@ -633,7 +638,7 @@ class ProductController extends Controller
     }
     public function updateQrOption(request $request){
         $res = array();
-        $res['option'] = Qr_option::truncate();
+        Qr_option::truncate();
         $option = array();
         $option['company_logo'] = $request->company_logo;
         $option['sirvez_logo'] = $request->sirvez_logo;
@@ -643,7 +648,151 @@ class ProductController extends Controller
         $option['phone_number'] = $request->phone_number;
         Qr_option::create($option);
         $res['status'] = 'success';
-        
+
+        return response()->json($res);
+    }
+    public function barcodeCheck(request $request){
+        $res = array();
+        if($request->user->user_type!=6)
+        $comId = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+        $res['customers'] = Company::whereIn('id',$comId)->orWhere('id',$request->user->company_id)->get();
+        $res['projects'] = Project::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
+        $res['sites'] = Site::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
+        $res['locations'] = Room::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
+        $roomIdx = Room::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->pluck('id');
+        $res['products'] = Product::whereIn('room_id',$roomIdx)->get();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function getBarcodeApi(request $request){
+        $res = array();
+        $res['api'] = Barcode_api::first();
+        $response = Http::get('https://api.barcodelookup.com/v2/rate-limits',
+                        ['formatted'=>'y','key'=>$res['api']->api]);
+        $res_data =  json_decode($response->body());
+        if ($res_data) {
+            $res['total'] = $res_data->allowed_calls_per_month;
+            $res['remain'] = $res_data->remaining_calls_per_month;
+            $res['allow_per_m'] = $res_data->allowed_calls_per_minute;
+            $res['remain_per_m'] = $res_data->remaining_calls_per_minute;
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function updateBarcodeApi(request $request){
+        $res = array();
+        Barcode_api::truncate();
+        Barcode_api::create(['api'=>$request->api]);
+
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function newBarcode(request $request) {
+        $res = array();
+        $cnt = Barcode::where('barcode', $request->barcode)->count();
+        if ($cnt > 0) {
+            $res['status'] = 'error';
+            $res['msg'] = 'Barcode number ' . $request->barcode . ' already exists in the data base.';
+        } else {
+            if ($request->hasFile('product_img')) {
+                $fileName = time().'barcode.'.$request->product_img->extension();
+                $request->product_img->move(public_path('upload/img/'), $fileName);
+                $product = json_decode($request->product);
+                $product->products[0]->images = array($fileName);
+                $product->products[0]->localdb = 1;
+                Barcode::create(['barcode'=>$request->barcode,'data'=>json_encode($product)]);
+                $res['status'] = 'success';
+            } else {
+                $res['status'] = 'error';
+                $res['msg'] = 'Product image must be attached.';
+            }
+        }
+        return response()->json($res);
+    }
+
+    public function getBarcodeInfo(request $request) {
+        $res = array();
+        $cnt = Barcode::where('barcode',$request->barcode)->count();
+        if($cnt)
+        {
+            $data = Barcode::where('barcode',$request->barcode)->first();
+            $res['status'] = 'success';
+            $res['product'] = json_decode($data->data)->products[0];
+        }
+        else
+        {
+            $api_key = Barcode_api::first()->api;
+            $response = Http::get('https://api.barcodelookup.com/v2/products',
+                        ['barcode' =>$request->barcode,'formatted'=>'y','key'=>$api_key]);
+            $res_data =  json_decode($response->body());
+            if ($res_data) {
+                $res['status'] = 'success';
+                $res['product'] = $res_data->products[0];
+                Barcode::create(['barcode'=>$request->barcode,'data'=>$response->body()]);
+            } else {
+                $res['status'] = 'error';
+                $res['msg'] = 'The barcode does not exist in database';
+            }
+        }
+        return response()->json($res);
+    }
+    public function insertBarcode(request $request){
+        $res = array();
+        $cnt = Barcode::where('barcode',$request->barcode)->count();
+        $product = null;
+        if($cnt)
+        {
+            $data = Barcode::where('barcode',$request->barcode)->first();
+            $res['status'] = 'success';
+            $product = json_decode($data->data)->products[0];
+        }
+        else
+        {
+            $api_key = Barcode_api::first()->api;
+            $response = Http::get('https://api.barcodelookup.com/v2/products',
+                        ['barcode' =>$request->barcode,'formatted'=>'y','key'=>$api_key]);
+            $res_data =  json_decode($response->body());
+            if($res_data){
+                Barcode::create(['barcode'=>$request->barcode,'data'=>$response->body()]);
+                $product = $res_data->products[0];
+                $res['status'] = 'success';
+            }
+            else{
+                $res['status'] = 'error';
+                $res['msg'] = 'The barcode does not exist in database';
+            }
+        }
+        if($product){
+            $data = array();
+                $data['product_name'] = $product->product_name;
+                $data['b_product_name'] = $product->product_name;
+                $data['b_barcode'] = $product->barcode_number;
+                $data['b_manufacturer'] = $product->manufacturer;
+                $data['b_description'] = $product->description;
+                $data['b_image'] = $product->images[0];
+                $data['action'] = 3;
+                $data['qty'] = 1;
+                $data['project_id'] = $request->project_id;
+                $data['created_by'] = $request->user->id;
+                $data['project_id'] = $request->project_id;
+                Product::create($data);
+        }
+        $res['product'] = $product;
+        return response()->json($res);
+    }
+    public function AssignProduct(request $request){
+        $res = array();
+        $product = Product::whereId($request->product_id)->first();
+        $assign_product = Product::whereId($request->assign_id)->first();
+        $assign_product->b_barcode = $product->b_barcode;
+        $assign_product->b_product_name = $product->b_product_name;
+        $assign_product->b_manufacturer = $product->b_manufacturer;
+        $assign_product->b_description = $product->b_description;
+        $assign_product->b_image = $product->b_image;
+        $assign_product->save();
+        Product_sign::Create(['product_id'=>$request->assign_id,'user_id'=>$product->created_by,'sign_date'=>$product->created_at]);
+        Product::whereId($request->product_id)->delete();
+        $res['status'] = 'success';
         return response()->json($res);
     }
 }

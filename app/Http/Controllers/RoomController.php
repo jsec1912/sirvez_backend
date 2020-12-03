@@ -30,6 +30,7 @@ use App\New_form;
 use App\Form_field;
 use App\Room_comment;
 use App\Qr_option;
+use App\Product_sign;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -324,7 +325,7 @@ class RoomController extends Controller
             else
                 $project_id = $request->project_id;
             $room_ids = Room::where('project_id',$project_id)->pluck('id');
-            $products = Product::whereIn('room_id',$room_ids)->orderBy('id','desc')->get();
+            $products = Product::whereIn('room_id',$room_ids)->orWhereNull('room_id')->orderBy('id','desc')->get();
             $project = Project::whereId($project_id)->first();
             foreach($products as $key => $product)
             {
@@ -335,6 +336,10 @@ class RoomController extends Controller
                 $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
                 $products[$key]['company_logo'] = Company::whereId($project->company_id)->first()->logo_img;
                 $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
+                $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
+                                                    ->leftJoin('users','users.id','=','product_signs.user_id')
+                                                    ->select('product_signs.*','users.first_name')
+                                                    ->get();
                 $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$project_id,'project_users.type'=>'3'])
                                                             ->leftjoin('users','users.id','=','project_users.user_id')
                                                             ->select('users.*')
