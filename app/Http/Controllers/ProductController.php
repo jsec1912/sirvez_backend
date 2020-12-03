@@ -770,6 +770,11 @@ class ProductController extends Controller
                 $data['b_manufacturer'] = $product->manufacturer;
                 $data['b_description'] = $product->description;
                 $data['b_image'] = $product->images[0];
+                $data['b_type'] = $product->barcode_type;
+                $data['b_model'] = $product->model;
+                $data['b_height'] = $product->height;
+                $data['b_length'] = $product->length;
+                $data['b_mpn'] = $product->mpn;
                 $data['action'] = 3;
                 $data['qty'] = 1;
                 $data['project_id'] = $request->project_id;
@@ -789,6 +794,11 @@ class ProductController extends Controller
         $assign_product->b_manufacturer = $product->b_manufacturer;
         $assign_product->b_description = $product->b_description;
         $assign_product->b_image = $product->b_image;
+        $assign_product->b_type = $product->b_type;
+        $assign_product->b_model = $product->b_model;
+        $assign_product->b_height = $product->height;
+        $assign_product->b_length = $product->length;
+        $assign_product->b_mpn = $product->b_mpn;
         $assign_product->save();
         Product_sign::Create(['product_id'=>$request->assign_id,'user_id'=>$product->created_by,'sign_date'=>$product->created_at]);
         Product::whereId($request->product_id)->delete();
