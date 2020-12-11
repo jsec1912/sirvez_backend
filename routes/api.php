@@ -11,6 +11,9 @@ Route::group(['middleware' => ['api-header', 'cors']], function () {
 
     Route::get('user/login', 'UserController@login');
     Route::post('user/register', 'UserController@register');
+    Route::post('user/forgot', 'UserController@forgot');
+    Route::get('user/checkToken', 'UserController@checkToken');
+    Route::post('user/changePassword', 'UserController@changePassword');
     Route::post('/room/saveimage','RoomController@saveimage');
     Route::post('user/checkValidate', 'UserController@checkValidate');
     Route::post('companyuser/register', 'UserController@companyUserRegister');
@@ -29,6 +32,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/company/saveCompany','CompanyController@saveCompany');
     Route::get('/company/getCompanyInfo','CompanyController@getCompanyInfo');
     Route::post('/company/changeLogo','CompanyController@changeLogo');
+    Route::get('/company/customerList','CompanyController@customerList');
     //customer
     Route::Post('/customers/company/customer-edit','CompanyCustomerController@addCompanyCustomer');///
     Route::Post('/customers/DeleteCompanyCustomer','CompanyCustomerController@DeleteCompanyCustomer');///
@@ -111,10 +115,18 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/product/updateQrOption', 'ProductController@updateQrOption');
     Route::get('/product/getBarcodeApi', 'ProductController@getBarcodeApi');
     Route::post('/product/updateBarcodeApi', 'ProductController@updateBarcodeApi');
-    Route::get('/product/insertBarcode', 'ProductController@insertBarcode');
-    Route::get('/product/AssignProduct', 'ProductController@AssignProduct');
+    Route::post('/product/insertBarcode', 'ProductController@insertBarcode');
+    Route::post('/product/AssignProduct', 'ProductController@AssignProduct');
     Route::get('/product/getBarcodeInfo', 'ProductController@getBarcodeInfo');
     Route::post('/product/newBarcode', 'ProductController@newBarcode');
+    Route::post('/product/qrScan', 'ProductController@qrScan');
+    Route::post('/product/addLabel', 'ProductController@addLabel');
+    Route::post('/product/deleteLabel', 'ProductController@deleteLabel');
+    Route::post('/product/setProductLabel', 'ProductController@setProductLabel');
+    Route::post('/product/uploadTechPdf', 'ProductController@uploadTechPdf');
+    Route::post('/product/uploadBrochuresPdf', 'ProductController@uploadBrochuresPdf');
+    Route::get('/product/unassignedProducts','ProductController@unassignedProducts');
+    Route::post('/product/updateScanProduct','ProductController@updateScanProduct');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///
@@ -132,6 +144,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/room/commentSubmit','RoomController@commentSubmit');
     Route::post('/room/changePhotoOutput','RoomController@changePhotoOutput');
     Route::post('/room/changePhotoPortrait','RoomController@changePhotoPortrait');
+    Route::post('/room/removeComment','RoomController@removeComment');
 
 
     Route::post('/task/updateTask','TaskController@updateTask');///
@@ -142,6 +155,9 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/task/commentSubmit','TaskController@commentSubmit');
     Route::get('/task/getComments','TaskController@getComments');
     Route::post('/task/saveImage','TaskController@saveImage');
+    Route::post('/task/addLabel', 'TaskController@addLabel');
+    Route::post('/task/deleteLabel', 'TaskController@deleteLabel');
+    Route::post('/task/setTaskLabel', 'TaskController@setTaskLabel');
 
 
     Route::post('/user/updateUser','UserController@CustomerUpdateUser');///
@@ -171,4 +187,13 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/form/infoForm', 'NewFormController@infoForm');///
     Route::post('/form/deleteForm', 'NewFormController@deleteForm');///
     Route::post('/form/duplicateForm', 'NewFormController@duplicateForm');///
+
+    Route::post('/version/updateVersion','VersionControlController@updateVersion');///
+    Route::post('/version/deleteVersion','VersionControlController@deleteVersion');///
+    Route::post('/version/changeVersionName', 'VersionControlController@changeVersionName');
+    Route::post('/version/changeVersionNumber', 'VersionControlController@changeVersionNumber');
+    Route::post('/version/changeVersionTag', 'VersionControlController@changeVersionTag');
+    Route::post('/version/changeVersionRoom', 'VersionControlController@changeVersionRoom');
+    Route::post('/version/changeVersionDescription', 'VersionControlController@changeVersionDescription');
+
 });

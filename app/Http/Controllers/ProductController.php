@@ -23,6 +23,8 @@ use App\Imports\ProductImport;
 use App\Barcode_api;
 use App\Barcode;
 use App\Product_sign;
+use App\Product_label;
+use App\Product_label_value;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Response;
 
@@ -642,10 +644,11 @@ class ProductController extends Controller
         $option = array();
         $option['company_logo'] = $request->company_logo;
         $option['sirvez_logo'] = $request->sirvez_logo;
-        $option['client_name'] = $request->client_name;
-        $option['install_date'] = $request->install_date;
-        $option['website'] = $request->website;
-        $option['phone_number'] = $request->phone_number;
+        $option['company_name'] = $request->company_name;
+        $option['contact'] = $request->contact;
+        $option['warranty_date'] = $request->warranty_date;
+        $option['product_name'] = $request->product_name;
+        $option['product_code'] = $request->product_code;
         Qr_option::create($option);
         $res['status'] = 'success';
 
@@ -764,6 +767,8 @@ class ProductController extends Controller
         }
         if($product){
             $data = array();
+                $data['b_where'] = $request->b_where;
+                $data['room_id'] = $request->b_location;
                 $data['product_name'] = $product->product_name;
                 $data['b_product_name'] = $product->product_name;
                 $data['b_barcode'] = $product->barcode_number;
@@ -780,9 +785,10 @@ class ProductController extends Controller
                 $data['project_id'] = $request->project_id;
                 $data['created_by'] = $request->user->id;
                 $data['project_id'] = $request->project_id;
-                Product::create($data);
+                $data = Product::create($data);
+                Product_sign::Create(['product_id'=>$data->id,'user_id'=>$data->created_by,'sign_date'=>$data->created_at,'sign_type'=>0]);
+                $res['product'] = $data;
         }
-        $res['product'] = $product;
         return response()->json($res);
     }
     public function AssignProduct(request $request){
@@ -799,9 +805,121 @@ class ProductController extends Controller
         $assign_product->b_height = $product->height;
         $assign_product->b_length = $product->length;
         $assign_product->b_mpn = $product->b_mpn;
+        $assign_product->b_where = $product->b_where;
         $assign_product->save();
-        Product_sign::Create(['product_id'=>$request->assign_id,'user_id'=>$product->created_by,'sign_date'=>$product->created_at]);
+        Product_sign::Create(['product_id'=>$request->assign_id,'user_id'=>$product->created_by,'sign_date'=>$product->created_at,'sign_type'=>1]);
+        $product_sign = Product_sign::where('product_id',$product->id)->first();
+        if($product_sign){
+            $product_sign->product_id = $request->assign_id;
+            $product_sign->save();
+        }
         Product::whereId($request->product_id)->delete();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function qrScan(request $request){
+        $res = array();
+        Product_sign::Create(['product_id'=>$request->product_id,'user_id'=>$request->user->id,'sign_date'=>date("Y-m-d H:i:s"),'sign_type'=>2]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addLabel(request $request){
+        $res = array();
+        Product_label::Create(['label'=>$request->label,'created_by'=>$request->user->id]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function deleteLabel(request $request){
+        $res = array();
+        Product_label::whereId($request->id)->delete();
+        Product_label_value::where('label_id',$request->id)->delete();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setProductLabel(request $request){
+        $id = $request->id;
+        if(strlen($request->id) > 10){
+            $id = Product::where('off_id',$request->id)->first()->id;
+        }
+        else
+            $id = $request->id;
+        Product_label_value::where('product_id',$id)->delete();
+        $array_res = array();
+        $array_res =json_decode($request->label_value,true);
+        if($array_res){
+            foreach($array_res as $row)
+            {
+                Product_label_value::create(['product_id'=>$id,'label_id'=>$row]);
+            }
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function uploadTechPdf(request $request){
+        $id = $request->id;
+        if(strlen($request->id) > 10){
+            $id = Product::where('off_id',$request->id)->first()->id;
+        }
+        else
+            $id = $request->id;
+        $product = Product::whereId($id)->first();
+        $fileName = '';
+        if($request->hasFile('upload_file')){
+            $fileName = time().'_technique.'.$request->upload_file->extension();
+            $request->upload_file->move(public_path('upload/file/'), $fileName);
+            $product['technical_pdf'] = $fileName;
+            $product->save();
+        }
+        $res['file_name'] = $fileName;
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function uploadBrochuresPdf(request $request){
+        $id = $request->id;
+        if(strlen($request->id) > 10){
+            $id = Product::where('off_id',$request->id)->first()->id;
+        }
+        else
+            $id = $request->id;
+        $product = Product::whereId($id)->first();
+        $fileName = '';
+        if($request->hasFile('upload_file')){
+            $fileName = time().'_brochures.'.$request->upload_file->extension();
+            $request->upload_file->move(public_path('upload/file/'), $fileName);
+            $product['brochures_pdf'] = $fileName;
+            $product->save();
+        }
+        $res['file_name'] = $fileName;
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function unassignedProducts(request $request){
+        $products = Product::where('action',3)->get();
+        $res = array();
+        $res['products'] = $products;
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function updateScanProduct(request $request){
+        $id = $request->id;
+        if(strlen($request->id) > 10){
+            $id = Product::where('off_id',$request->id)->first()->id;
+        }
+        else
+            $id = $request->id;
+        $product = Product::where('id',$id)->first();
+        $product->product_name = $request->b_product_name;
+        $product->b_product_name = $request->b_product_name;
+        $product->b_product_name = $request->b_product_name;
+        $product->b_type = $request->b_type;
+        $product->b_model = $request->b_model;
+        $product->b_manufacturer = $request->b_manufacturer;
+        $product->b_mpn = $request->b_mpn;
+        $product->b_height = $request->b_height;
+        $product->b_length = $request->b_length;
+        $product->b_description = $request->b_description;
+        $product->save();
         $res['status'] = 'success';
         return response()->json($res);
     }

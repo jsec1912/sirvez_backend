@@ -61,7 +61,7 @@ class DepartmentController extends Controller
     }
     public function departmentList(Request $request){
         $res = array();
-        if($request->user->user_type ==1){
+        if($request->user->user_type <=1){
             $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $departments= Department::whereIn('company_id',$customer_id)->orderBy('id','desc')->get();
         }
@@ -88,7 +88,7 @@ class DepartmentController extends Controller
             ->select('departments.*','companies.name')->first(); 
             $res["department"] = $department;
         }
-        if($request->user->user_type ==1){
+        if($request->user->user_type <=1){
             $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['customers'] = Company::whereIn('id',$customer_id)->get();
             $res['sites'] = Site::whereIn('id',$customer_id)->get();

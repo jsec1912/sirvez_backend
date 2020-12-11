@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\New_form;
 use App\Form_field;
 use App\Form_value;
+use App\Company_customer;
 use Illuminate\Support\Facades\Validator;
 
 class NewFormController extends Controller
@@ -28,6 +29,7 @@ class NewFormController extends Controller
         if ($request->has('form_id') && $request->form_id == '0') {
             $form = array();
             $form['created_by'] = $request->user->company_id;
+            $form['user_id'] = $request->user->id;
             $form['form_type'] = $request->form_type;
             $form['form_name'] = $request->form_name;
             $form['form_data']  = $request->form_data;
@@ -64,7 +66,14 @@ class NewFormController extends Controller
 
     public function infoForm(request $request) {
         $res = array();
-        $res['forms'] = New_form::where('created_by', $request->user->company_id)->get();
+        $comId = array();
+        if($request->user->user_type < 6)
+            $comId = Company_customer::where('company_id',$request->company_id)->pluck('customer_id');
+        $res['forms'] = New_form::whereIn('new_forms.created_by',$comId)
+                                ->orWhere('new_forms.created_by', $request->user->company_id)
+                                ->leftJoin('users','users.id','=','new_forms.user_id')
+                                ->select('new_forms.*','users.profile_pic','users.first_name')
+                                ->get();
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -81,6 +90,7 @@ class NewFormController extends Controller
         $sel_form = New_form::whereId($request->id)->first();
         $form = array();
         $form['created_by'] = $sel_form->created_by;
+        $form['user_id'] = $request->user->id;
         $form['form_type'] = $sel_form->form_type;
         $form['form_name'] = $sel_form->form_name.'(1)';
         $form['form_data']  = $sel_form->form_data;

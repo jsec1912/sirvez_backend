@@ -56,7 +56,7 @@ class UserController extends Controller
             $user->auth_token = $token;
             $user->rate ='0';
             $user->save();
-            if($user->user_type ==1||$user->user_type ==3)
+            if($user->user_type <=3)
             {
                 if(Company::where('id',$user->company_id)->count()>0){
                     $user->co_name = str_replace(' ','-',Company::where('id',$user->company_id)->first()->name);
@@ -98,7 +98,7 @@ class UserController extends Controller
             $response = ['status'=>'success', 'data'=>$user];           
         }
         else 
-          $response = ['status'=>'error', 'msg'=>'Record doesnt exists'];
+          $response = ['status'=>'error', 'msg'=>'Password is incorrect!'];
         
 
         return response()->json($response, 201);
@@ -349,16 +349,22 @@ class UserController extends Controller
         {
             $com_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['users'] = User::where(function($q) use($com_id,$request){
-                return $q->whereIn('company_id',$com_id)
-                    ->orwhere('company_id', $request->user->company_id);
-                })
-                ->where('id','<>',$request->user->id)->get();
+                                    return $q->whereIn('users.company_id',$com_id)
+                                        ->orwhere('users.company_id', $request->user->company_id);
+                                    })
+                                ->where('users.id','<>',$request->user->id)
+                                ->leftJoin('companies','users.company_id','=','companies.id')
+                                ->select('users.*','companies.company_type')
+                                ->get();
             $res['customers'] = Company::whereIn('id',$com_id)
                             ->orwhere('id', $request->user->company_id)->get();
         }
         else{
-            $res['users'] = User::Where('company_id',$request->user->company_id)
-                    ->where('id','<>',$request->user->id)->get();
+            $res['users'] = User::Where('users.company_id',$request->user->company_id)
+                                ->where('users.id','<>',$request->user->id)
+                                ->leftJoin('companies','users.company_id','=','companies.id')
+                                ->select('users.*','companies.company_type')
+                                ->get();
             $res['customers'] = [];
         }
         
@@ -473,6 +479,50 @@ class UserController extends Controller
         User::where('email',$request->email)->update($user_info);
         $res = array();
         $res['status'] = "success";
+        return response()->json($res);
+    }
+    public function forgot(request $request)
+    {
+        $res = array();
+        $pending_user = User::where('email',$request->email)->first();
+       
+        if($pending_user){
+            $token = $pending_user->auth_token;
+
+            $to_name = $request->name;
+            $to_email = $pending_user['email'];
+            $content = 'Did you Forgot password? Please click button if you want to change your password!';
+            $invitationURL = "https://app.sirvez.com/register/".$token;
+            $data = ['name'=>$to_name, "content" => 'Forgot password',"title" =>'Forgot password',"description" =>$content,"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to change password'];
+            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                $message->to($to_email, $to_name)
+                        ->subject('sirvez notification.');
+                $message->from('support@sirvez.com','sirvez support team');
+            });
+            $res['status'] = "success";
+        }
+        else{
+            $res['status'] = "error";
+        }
+        return response()->json($res);
+    }
+    public function checkToken(request $request){
+        $res = array();
+        $user = User::where('auth_token',$request->token)->first();
+        if($user){
+            $res['status'] = 'success';
+            $res['user'] = $user;
+        }
+        else
+            $res['status'] = 'error';
+        return response()->json($res);
+    }
+    public function changePassword(request $request){
+        $res = array();
+        User::where('email',$request->email)->update(['password'=>bcrypt($request->password)]);
+        $user = User::where('email',$request->email)->first();
+        $res['data'] = $user;
+        $res['status'] = 'success';
         return response()->json($res);
     }
 }

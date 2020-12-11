@@ -43,11 +43,13 @@
                                         <tr>
                                             <td colspan="2">- {{$description}}</td>
                                         </tr>
+                                        <?php if (isset($img)) {?>
                                         <tr>
                                             <td colspan="2" align="center">
                                             <span><img src="{{$img}}" style="width:125px"></span>
                                             </td>
                                         </tr>
+                                        <?php }?>
         
                                         <tr>
                                         <td colspan="2">&nbsp;</td>

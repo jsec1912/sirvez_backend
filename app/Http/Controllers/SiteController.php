@@ -110,7 +110,7 @@ class SiteController extends Controller
         if($request->has('company_id'))
             $sites = Site::where('company_id',$request->company_id)->orderBy('id','desc')->get();
         else{
-            if($request->user->user_type==1)
+            if($request->user->user_type<=1)
             {
                 $company_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
                 $sites = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
@@ -148,7 +148,7 @@ class SiteController extends Controller
         if ($request->has('id')) {
             $res['site'] = Site::where('id',$request->id)->first();   
         }    
-        if($request->user->user_type ==1){
+        if($request->user->user_type <=1){
             $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['customers'] = Company::whereIn('id',$customer_id)->orderBy('id','desc')->get();
         }

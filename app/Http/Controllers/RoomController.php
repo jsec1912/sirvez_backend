@@ -29,8 +29,11 @@ use App\Form_value;
 use App\New_form;
 use App\Form_field;
 use App\Room_comment;
+use App\Version_control;
 use App\Qr_option;
 use App\Product_sign;
+use App\Product_label;
+use App\Product_label_value;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -314,8 +317,8 @@ class RoomController extends Controller
                                     ->orderBy('id','desc')
                                     ->first();
             $res['room_id'] = $room_id;
-            $res['customer_userlist'] = User::whereIn('user_type',[2,6])->where('status',1)->where('company_id',$room->company_id)->select('id','first_name','last_name')->get();
-            $res['task_assign_to'] = User::where('company_id',$room->company_id)->whereIn('user_type',[1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+            $res['customer_userlist'] = User::whereIn('user_type',[4,6])->where('status',1)->where('company_id',$room->company_id)->select('id','first_name','last_name')->get();
+            $res['task_assign_to'] = User::where('company_id',$room->company_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
             $res['signed_cnt'] = Product::where('room_id',$room_id)->where('signed_off','<>','2')->count()-Product::where('room_id',$room_id)->where('signed_off','1')->count();
 
         }
@@ -325,21 +328,51 @@ class RoomController extends Controller
             else
                 $project_id = $request->project_id;
             $room_ids = Room::where('project_id',$project_id)->pluck('id');
-            $products = Product::whereIn('room_id',$room_ids)->orWhereNull('room_id')->orderBy('id','desc')->get();
+            
+            $versions = Version_control::whereIn('version_controls.room_id',$room_ids)
+                                    ->leftJoin('rooms','rooms.id','=','version_controls.room_id')
+                                    ->leftJoin('users','users.id','=','version_controls.created_by')
+                                    ->select('version_controls.*','rooms.room_number','users.profile_pic','users.first_name','users.last_name')
+                                    ->orderBy('version_controls.group_id','asc')
+                                    ->get();
+            foreach($versions as $key => $version)
+            {
+                if($version['tag'] ==0)
+                    $versions[$key]['version_tag'] = "Drawing";
+                else if($version['tag'] ==1)
+                    $versions[$key]['version_tag'] = "Document";
+                else
+                    $versions[$key]['version_tag'] = "SpreadSheet";
+            }
+            $res['versions'] = $versions;
+            $products = Product::whereIn('room_id',$room_ids)
+                                ->orWhere(function($q) use($project_id){
+                                    return $q->where('project_id',$project_id)
+                                        ->where('action',3);
+                                })
+                                ->orderBy('id','desc')
+                                ->get();
             $project = Project::whereId($project_id)->first();
             foreach($products as $key => $product)
             {
-                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
-                $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
+                if($product->room_id){
+                    $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                    $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
+                }
+                else{
+                    $products[$key]['room_name'] = '';
+                    $products[$key]['project_id'] = '';
+                }
                 $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
                 $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
                 $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
-                $products[$key]['company_logo'] = Company::whereId($project->company_id)->first()->logo_img;
+                $products[$key]['company_info'] = Company::whereId($project->company_id)->first();
                 $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
                 $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
                                                     ->leftJoin('users','users.id','=','product_signs.user_id')
-                                                    ->select('product_signs.*','users.first_name')
+                                                    ->select('product_signs.*','users.first_name','users.profile_pic')
                                                     ->get();
+                $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
                 $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$project_id,'project_users.type'=>'3'])
                                                             ->leftjoin('users','users.id','=','project_users.user_id')
                                                             ->select('users.*')
@@ -377,7 +410,7 @@ class RoomController extends Controller
             $res['rooms'] = Site_room::where('company_id',$request->customer_id)/* ->whereNull('project_id') */->get();
         }
         else{
-            if($request->user->user_type ==1||$request->user->user_type ==3){
+            if($request->user->user_type <=3){
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
                 $res['sites'] = Site::whereIn('id',$customer_id)->orderBy('id','desc')->get();
                 $res['projects'] = Project::whereIn('company_id',$customer_id)->orderBy('id','desc')->get();
@@ -392,6 +425,7 @@ class RoomController extends Controller
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
+        $res['product_labels'] = Product_label::get();
         $res['qr_option'] = Qr_option::first();
         $res['status'] = "success";
 
@@ -683,6 +717,11 @@ class RoomController extends Controller
     public function changePhotoPortrait(request $request)
     {
         Room_photo::where('id',$request->photo_id)->update(['portrait'=>$request->portrait]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function removeComment(request $request){
+        Room_comment::where('id',$request->id)->delete();
         $res['status'] = 'success';
         return response()->json($res);
     }

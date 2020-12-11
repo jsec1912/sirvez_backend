@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Company;
+use App\Company_customer;
+use App\Site;
+use App\Project;
+use App\Room;
 use App\User;
 use Illuminate\Support\Facades\Validator;
 
@@ -53,12 +57,13 @@ class CompanyController extends Controller
         $company['website']  = $request->post("website");
         $company['parent_id']  = $request->post("parent_id");
         $company['manager']  = $request->post("manager");
-        // $company['company_email']  = $request->post("company_email");
-        // $company['address']  = $request->post("address");
-        // $company['address2']  = $request->post("address2");
-        // $company['city']  = $request->post("city");
-        // $company['postcode']  = $request->post("postcode");
-        $company['status']  = $request->post("status");
+        $company['company_email']  = $request->post("company_email");
+        $company['address']  = $request->post("address");
+        $company['address2']  = $request->post("address2");
+        $company['city']  = $request->post("city");
+        $company['postcode']  = $request->post("postcode");
+        $company['country']  = $request->post("country");
+        //$company['status']  = $request->post("status");
         $company['telephone']  = $request->post("telephone");
         $company['is_upload']  = $request->post("is_upload");
 
@@ -84,7 +89,7 @@ class CompanyController extends Controller
         $res['status'] = 'success';
         $res['company'] = Company::whereId($id)->first();
         $res['customers'] = Company::where('id','<>',$id)->get();
-        $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$id)->get();
+        $res['account_manager'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$id)->get();
         return response()->json($res);
     }
     public function getCompanyImg(request $request){
@@ -99,6 +104,25 @@ class CompanyController extends Controller
         $request->logo_img->move(public_path('upload/img/'), $fileName);
         $company['logo_img']  = $fileName;
         Company::whereId($request->company_id)->update($company);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function customerList(request $request){
+        $res = array();
+        $customers= Company::where('company_type',1)->get();
+        foreach($customers as $key=>$customer){
+            $customerIds = Company_customer::where('company_id',$customer->id)->pluck('id');
+            $customers[$key]['customers'] = User::where('company_id',$customer->id)->count();
+            $customers[$key]['users'] = Company_customer::where('company_id',$customer->id)->count();
+            $customers[$key]['customer_users'] = User::whereIn('company_id',$customerIds)->count();
+            $customers[$key]['projects'] = Project::whereIn('company_id',$customerIds)
+                                        ->orWhere('company_id',$customer->id)->count();
+            $customers[$key]['rooms'] = Room::whereIn('company_id',$customerIds)
+                                        ->orWhere('company_id',$customer->id)->count();
+            $customers[$key]['sites'] = Site::whereIn('company_id',$customerIds)
+                                        ->orWhere('company_id',$customer->id)->count();
+        }
+        $res['customers'] = $customers;
         $res['status'] = 'success';
         return response()->json($res);
     }

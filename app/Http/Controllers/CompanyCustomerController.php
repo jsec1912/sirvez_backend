@@ -12,6 +12,11 @@ use App\Site_room;
 use App\Project;
 use App\Product;
 use App\Room;
+use App\Product_label;
+use App\Product_sign;
+use App\Product_label_value;
+use App\Qr_option;
+use App\New_form;
 use App\Project_user;
 use App\Notification;
 //use Illuminate\Support\Facades\Mail;
@@ -191,7 +196,7 @@ class CompanyCustomerController extends Controller
         //     $query->with('company')->where('company_id', $userid);
         // }])->get();
         $res["customers"] = $customers;
-        $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->get();
+        $res['account_manager'] = User::whereIn('user_type',[0,1,3])->where('status',1)->get();
         $res['parent_customers'] = Company::get();
         $res['status'] = "success";
         return response()->json($res);
@@ -242,6 +247,41 @@ class CompanyCustomerController extends Controller
         $res['sites'] =$sites;
         $res['rooms'] = Site_room::where('site_rooms.company_id',$company_id)
             ->leftJoin('sites','site_rooms.site_id','=','sites.id')->select('site_rooms.*','sites.site_name')->orderBy('id','desc')->get();
+        $roomIdx = Room::where('company_id',$company_id)->pluck('id');
+        $products = Product::whereIn('products.room_id',$roomIdx)->where('action','<','3')->get();
+        foreach($products as $key => $product)
+        {
+            if(Room::whereId($product->room_id)->count()>0){
+                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
+            }
+            else
+                $products[$key]['room_name'] = '';
+            $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
+            $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
+            $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
+            $products[$key]['company_info'] = Company::whereId($company_id)->first();
+            $products[$key]['website'] = Company::whereId($company_id)->first()->website;
+            $products[$key]['company_name'] = Company::whereId($company_id)->first()->name;
+            $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
+                                                    ->leftJoin('users','users.id','=','product_signs.user_id')
+                                                    ->select('product_signs.*','users.first_name','users.profile_pic')
+                                                    ->get();
+            $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
+            $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$products[$key]['project_id'],'project_users.type'=>'3'])
+                                    ->leftjoin('users','users.id','=','project_users.user_id')
+                                    ->select('users.*')
+                                    ->get();
+            $products[$key]['install_date'] = date('d-m-Y',strtotime($project['survey_start_date']));
+
+            if($product['action'] ==0)
+                $products[$key]['product_action'] = "New Product";
+            else if($product['action'] ==1)
+                $products[$key]['product_action'] = "Dispose";
+            else
+                $products[$key]['product_action'] = "Move To Room";
+        }
+        $res['products'] = $products;
         $tasks = Task::where('company_id',$company_id)->orderBy('id','desc')->get();
         foreach($tasks as $key=>$row){
             $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'project_users.type'=>'2'])->pluck('users.first_name');
@@ -251,6 +291,11 @@ class CompanyCustomerController extends Controller
                         ->leftJoin('users','users.id','=','companies.manager')
                         ->select('companies.*','users.first_name as manager_name')
                         ->get();
+        $res['product_labels'] = Product_label::get();
+        $res['task_assign_to'] = User::where('company_id',$company_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+        $res['test_forms'] = New_form::where('form_type', 1)->get();
+        $res['com_forms'] = New_form::where('form_type', 2)->get();
+        $res['qr_option'] = Qr_option::first();
         return response()->json($res);
     }
     public function getCustomerInfo(Request $request){
@@ -264,7 +309,7 @@ class CompanyCustomerController extends Controller
             $res['customers'] = Company::where('id','<>',$customer_id)->get();
         }
 
-        $res['account_manager'] = User::whereIn('user_type',[1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
+        $res['account_manager'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
        
         return response()->json($res);
     }
@@ -350,7 +395,7 @@ class CompanyCustomerController extends Controller
         $res = array();
         $res['status'] = "success";
         $id = $request->user->company_id;
-        if($request->user->user_type ==1||$request->user->user_type ==3){}
+        if($request->user->user_type <=3){}
         $customerId = Company_customer::where('company_id',$id)->pluck('customer_id');
         $projects = Project::whereNull('projects.signed_off')
                                 ->where(function($q) use($customerId,$id){
