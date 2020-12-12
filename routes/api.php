@@ -165,6 +165,10 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/user/userInfo','UserController@userInfo');///
     Route::post('/user/saveUser','UserController@saveUser');///
     Route::get('/user/totalUserlist','UserController@totalUserlist');///
+    Route::post('/user/sendFeedback','UserController@sendFeedback');///
+    Route::post('/user/deleteFeedback','UserController@deleteFeedback');///
+    Route::get('/user/getFeedbackList','UserController@getFeedbackList');///
+    Route::post('/user/setFeedback','UserController@setFeedback');///
 
     Route::post('/category/updateCategory','StickerCategoryController@updateCategory');///
     Route::post('/category/deleteCategory','StickerCategoryController@deleteCategory');///

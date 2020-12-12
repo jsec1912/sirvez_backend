@@ -7,6 +7,7 @@ use App\User;
 use App\Company;
 use App\Company_customer;
 use App\Notification;
+use App\User_feedback;
 use JWTAuth;
 use JWTAuthException;
 use Illuminate\Support\Facades\Validator;
@@ -522,6 +523,40 @@ class UserController extends Controller
         User::where('email',$request->email)->update(['password'=>bcrypt($request->password)]);
         $user = User::where('email',$request->email)->first();
         $res['data'] = $user;
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function sendFeedback(request $request){
+        $feedback = array();
+        $feedback['feedback_email'] = $request->user->email;
+        $feedback['feedback_type'] = $request->feedback_type;
+        $feedback['feedback_msg'] = $request->feedback_msg;
+        $feedback['user_id'] = $request->user->id;
+        $feedback['is_read'] = 0;
+        User_feedback::create($feedback);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function deleteFeedback(request $request){
+        $id = $request->id;
+        if(strlen($request->id) > 10){
+            $id = User_feedback::where('off_id',$request->id)->first()->id;
+        }
+        else
+            $id = $request->id;
+        User_feedback::whereId($id)->delete();
+    }
+    public function getFeedbackList(request $request){
+        $res = array();
+        $res['feedbacks'] = User_feedback::orderBy('user_feedbacks.id','desc')
+                        ->leftJoin('users','user_feedbacks.user_id','=','users.id')
+                        ->select('user_feedbacks.*','users.profile_pic','users.first_name','users.last_name')
+                        ->get();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setFeedback(request $request){
+        User::where('id',$request->id)->update(['is_feedback'=>$request->is_feedback]);
         $res['status'] = 'success';
         return response()->json($res);
     }

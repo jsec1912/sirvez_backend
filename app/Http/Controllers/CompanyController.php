@@ -56,7 +56,7 @@ class CompanyController extends Controller
         $company['name'] = $request->post("name");
         $company['website']  = $request->post("website");
         $company['parent_id']  = $request->post("parent_id");
-        $company['manager']  = $request->post("manager");
+        //$company['manager']  = $request->post("manager");
         $company['company_email']  = $request->post("company_email");
         $company['address']  = $request->post("address");
         $company['address2']  = $request->post("address2");
@@ -77,6 +77,7 @@ class CompanyController extends Controller
             $res['msg'] = 'The website has already been taken!';
             return response()->json($res);
         }
+        
         company::whereId($id)->update($company);
         return response()->json(['status'=>'success','company'=>$company]);
 

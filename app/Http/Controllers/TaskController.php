@@ -174,6 +174,7 @@ class TaskController extends Controller
                                     return $q->whereIn('tasks.id',$taskIdx)
                                     ->orwhere('tasks.created_by',$request->user->id);
                                 })
+                    ->where('tasks.room_id',$request->room_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -185,7 +186,6 @@ class TaskController extends Controller
                     ->leftJoin('floors','floors.id','=','rooms.floor_id')
                     ->leftJoin('companies','companies.id','=','tasks.company_id')
                     ->leftjoin('users','users.id','=','tasks.created_by')
-                    ->where('tasks.room_id',$request->room_id)
                     ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','floors.floor_name','buildings.building_name','users.first_name AS account_manager','users.profile_pic')
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
@@ -198,12 +198,11 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-                $tasks = Task::whereIn('tasks.company_id',$customer_id)
+                $tasks = Task::where('tasks.room_id',$request->room_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
                     })
-                    ->where('tasks.room_id',$request->room_id)
                     ->leftJoin('projects','projects.id','=','tasks.project_id')
                     ->leftJoin('sites','sites.id','=','tasks.site_id')
                     ->leftJoin('rooms','rooms.id','=','tasks.room_id')
@@ -216,7 +215,7 @@ class TaskController extends Controller
                     ->orderBy('tasks.id','desc')
                     ->get();
 
-                $res['users'] = User::/* whereIn('company_id',$customer_id)->or */Where('company_id',$request->user->company_id)->get();
+                $res['users'] = User::/* whereIn('company_id',$customer_id)->or */where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 // $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['projects'] = array();
@@ -236,6 +235,7 @@ class TaskController extends Controller
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
                     })
+                    ->where('tasks.company_id',$request->customer_id)
                     ->leftJoin('projects','projects.id','=','tasks.project_id')
                     ->leftJoin('sites','sites.id','=','tasks.site_id')
                     ->leftJoin('rooms','rooms.id','=','tasks.room_id')
@@ -243,7 +243,6 @@ class TaskController extends Controller
                     ->leftJoin('floors','floors.id','=','rooms.floor_id')
                     ->leftJoin('companies','companies.id','=','tasks.company_id')
                     ->leftjoin('users','users.id','=','tasks.created_by')
-                    ->where('tasks.company_id',$request->customer_id)
                     ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','floors.floor_name','buildings.building_name','users.first_name AS account_manager','users.profile_pic')
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
@@ -268,12 +267,11 @@ class TaskController extends Controller
                     ->leftJoin('floors','floors.id','=','rooms.floor_id')
                     ->leftJoin('companies','companies.id','=','tasks.company_id')
                     ->leftjoin('users','users.id','=','tasks.created_by')
-                    ->where('tasks.company_id',$request->customer_id)
                     ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','floors.floor_name','buildings.building_name','users.first_name AS account_manager','users.profile_pic')
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::where('company_id',$request->customer_id)->orWhere('company_id',$request->user->company_id)->get();
+                $res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->customer_id)->get();
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
                 $res['customerId'] = $request->customer_id;
@@ -281,7 +279,7 @@ class TaskController extends Controller
         }
         else if($request->has('project_id') && $request->project_id != 'undefined' && $request->project_id){
             $res['project_id'] = $request->project_id;
-             if($request->user->user_type >1){
+            if($request->user->user_type >1){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $tasks = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
@@ -291,6 +289,7 @@ class TaskController extends Controller
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
                     })
+                    ->where('tasks.project_id',$request->project_id)
                     ->leftJoin('projects','projects.id','=','tasks.project_id')
                     ->leftJoin('sites','sites.id','=','tasks.site_id')
                     ->leftJoin('rooms','rooms.id','=','tasks.room_id')
@@ -298,7 +297,6 @@ class TaskController extends Controller
                     ->leftJoin('floors','floors.id','=','rooms.floor_id')
                     ->leftJoin('companies','companies.id','=','tasks.company_id')
                     ->leftjoin('users','users.id','=','tasks.created_by')
-                    ->where('tasks.project_id',$request->project_id)
                     ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','floors.floor_name','buildings.building_name','users.first_name AS account_manager','users.profile_pic')
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
@@ -311,7 +309,7 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-                $tasks = Task::whereIn('tasks.company_id',$customer_id)
+                $tasks = Task::where('tasks.project_id',$request->project_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
                         ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
@@ -323,12 +321,11 @@ class TaskController extends Controller
                     ->leftJoin('floors','floors.id','=','rooms.floor_id')
                     ->leftJoin('companies','companies.id','=','tasks.company_id')
                     ->leftjoin('users','users.id','=','tasks.created_by')
-                    ->where('tasks.project_id',$request->project_id)
                     ->select('tasks.*','projects.project_name','companies.name as company_name','sites.site_name','rooms.room_number','floors.floor_name','buildings.building_name','users.first_name AS account_manager','users.profile_pic')
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::whereIn('company_id',$customer_id)->orWhere('company_id',$request->user->company_id)->get();
+                $res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
@@ -380,7 +377,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::whereIn('company_id',$customer_id)->orWhere('company_id',$request->user->company_id)->get();
+                $res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 $res['projects'] = Project::whereIn('company_id',$customer_id)->get();
             }

@@ -102,20 +102,24 @@ class RoomController extends Controller
             $room['signed_off']  = $request->signed_off;
             if(strlen($request->id) > 10)
                 $room['off_id'] = $request->id;
+            
             $room = Room::create($room);
             $id = $room->id;
+           
             if($request->duplicate > 0){
+
                 $values = array();
-                $cnt = Form_value::where('field_name',$room->field_name)
-                            ->where('new_form_id',$room->new_form_id)
-                            ->where('parent_id',$room->duplicate)->count();
+                $cnt = Form_value::where('form_type',0)
+                                ->where('parent_id',$request->duplicate)->count();
+                
                 if($cnt>0){
-                    $values = Form_value::where('field_name',$room->field_name)
-                                    ->where('new_form_id',$room->new_form_id)
-                                    ->where('parent_id',$room->duplicate)->get();
+                    $values = Form_value::where('form_type',0)
+                                    ->where('parent_id',$request->duplicate)->get();
                     foreach($values as $value){
-                        $value['parent_id'] = $id;
-                        Form_value::create($value);
+                        $temp_value = $value->toArray();
+                        unset($temp_value["id"]);
+                        $temp_value['parent_id'] = $id;
+                        Form_value::create($temp_value);
                     }
                 }
             }
