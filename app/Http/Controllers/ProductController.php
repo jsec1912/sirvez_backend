@@ -27,6 +27,7 @@ use App\Product_label;
 use App\Product_label_value;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Response;
+use DateTime;
 
 class ProductController extends Controller
 {
@@ -101,7 +102,7 @@ class ProductController extends Controller
                     'notice_type'		=> '8',
                     'notice_id'			=> $product->id,
                     //'notification'		=> $room['room_number'].' have been '.$action.' by  '.$request->user->first_name.').',
-                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new product in room['.$room['room_number'].']',
+                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new product in location: '.$room['room_number'].'',
                     'created_by'		=> $request->user->id,
                     'company_id'		=> $room->company_id,
                     'project_id'        =>$room['project_id'],
@@ -213,7 +214,38 @@ class ProductController extends Controller
     }
     public function productList(Request $request){
         $res = array();
-        $products = product::where('project_id',$request->project_id)->orderBy('id','desc')->get();
+        if($request->user->user_type<4)
+            $company_id = $request->user->company_id;
+        else
+            $company_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
+        $comIds = Company_customer::where('company_id',$company_id)->pluck('customer_id');
+        $roomIds = Room::whereIn('company_id',$comIds)->pluck('id');
+        $res['barcodes'] = product::whereIn('room_id',$roomIds)->whereNotNull('b_barcode')->orderBy('id','desc')->get()->groupBy('b_barcode');
+        $products =  product::whereIn('room_id',$roomIds)
+                            ->whereNotNull('b_barcode')
+                            ->orderBy('id','desc')
+                            ->get();
+        foreach($products as $key=>$product){
+            $room = Room::whereId($product->room_id)->first();
+            $products[$key]['customer_name'] ='';
+            $products[$key]['project_name'] = '';
+            $products[$key]['site_name'] = '';
+            $products[$key]['room_number'] = '';
+            $now_date = new DateTime();
+            $checkin_date = new DateTime($product['checkin_date']);
+            $warranty_time = floor(($now_date->diff($checkin_date)->format('%a'))/365);
+            if($warranty_time > 0) $products[$key]['in_warranty'] = $warranty_time;
+            else $products[$key]['in_warranty'] = 0;
+
+            if($room){
+                $products[$key]['customer_name'] = Company::whereId($room->company_id)->first()->name;
+                $products[$key]['project_name'] = Project::whereId($room->project_id)->first()->project_name;
+                $products[$key]['site_name'] = Site::whereId($room->site_id)->first()->site_name;
+                $products[$key]['room_number'] = $room->room_number;
+                $products[$key]['project_id'] = $room->project_id;
+                $products[$key]['room_id'] = $room->id;
+            }
+        }
         $res["products"] = $products;
         $res['status'] = "success";
         return response()->json($res);
@@ -282,6 +314,9 @@ class ProductController extends Controller
                 'testing id'=>'test_form_id',
                 'commissioning id'=>'com_form_id',
                 'commisioning id'=>'com_form_id',
+                'warranty'=>'warranty_time',
+                'warranty(year)'=>'warranty_time',
+                'warranty time'=>'warranty_time',
                 'action'=>'action',
                 'product_action'=>'action'
             );
@@ -656,14 +691,17 @@ class ProductController extends Controller
     }
     public function barcodeCheck(request $request){
         $res = array();
-        if($request->user->user_type!=6)
-        $comId = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-        $res['customers'] = Company::whereIn('id',$comId)->orWhere('id',$request->user->company_id)->get();
-        $res['projects'] = Project::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
-        $res['sites'] = Site::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
-        $res['locations'] = Room::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
-        $roomIdx = Room::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->pluck('id');
-        $res['products'] = Product::whereIn('room_id',$roomIdx)->get();
+        
+        if($request->user->user_type < 4){
+            $comId = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+            $res['sites'] = Site::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
+            $res['locations'] = Room::whereIn('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
+        }
+        else{
+            $comId = Company_customer::where('customer_id',$request->user->company_id)->company_id;
+            $res['sites'] = Site::where('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
+            $res['locations'] = Room::where('company_id',$comId)->orWhere('company_id',$request->user->company_id)->get();
+        }
         $res['status'] = 'success';
         return response()->json($res);
     }
@@ -785,6 +823,7 @@ class ProductController extends Controller
                 $data['project_id'] = $request->project_id;
                 $data['created_by'] = $request->user->id;
                 $data['project_id'] = $request->project_id;
+                $data['checkin_date'] = date("Y-m-d H:i:s");
                 $data = Product::create($data);
                 Product_sign::Create(['product_id'=>$data->id,'user_id'=>$data->created_by,'sign_date'=>$data->created_at,'sign_type'=>0]);
                 $res['product'] = $data;
@@ -793,8 +832,19 @@ class ProductController extends Controller
     }
     public function AssignProduct(request $request){
         $res = array();
-        $product = Product::whereId($request->product_id)->first();
-        $assign_product = Product::whereId($request->assign_id)->first();
+
+        $productId = $request->product_id;
+        if(strlen($request->product_id) > 10)
+            if(Product::where('off_id',$product_id)->count() > 0)
+                $productId = Product::where('off_id',$product_id)->first()->id;
+        $product = Product::whereId($productId)->first();
+
+        $assignId = $request->assign_id;
+        if(strlen($request->assign_id) > 10)
+        if(Product::where('off_id',$assignId)->count() > 0)
+            $assignId = Product::where('off_id',$assignId)->first()->id;
+
+        $assign_product = Product::whereId($assignId)->first();
         $assign_product->b_barcode = $product->b_barcode;
         $assign_product->b_product_name = $product->b_product_name;
         $assign_product->b_manufacturer = $product->b_manufacturer;
@@ -806,20 +856,27 @@ class ProductController extends Controller
         $assign_product->b_length = $product->length;
         $assign_product->b_mpn = $product->b_mpn;
         $assign_product->b_where = $product->b_where;
+        $assign_product->checkin_date = $product->checkin_date;
+        $assign_product->warranty_time = $product->warranty_time;
         $assign_product->save();
-        Product_sign::Create(['product_id'=>$request->assign_id,'user_id'=>$product->created_by,'sign_date'=>$product->created_at,'sign_type'=>1]);
+        Product_sign::Create(['product_id'=>$assign_product->id,'user_id'=>$product->created_by,'sign_date'=>$product->created_at,'sign_type'=>1]);
         $product_sign = Product_sign::where('product_id',$product->id)->first();
         if($product_sign){
-            $product_sign->product_id = $request->assign_id;
+            $product_sign->product_id = $assign_product->id;
             $product_sign->save();
         }
-        Product::whereId($request->product_id)->delete();
+        Product::whereId($product->id)->delete();
         $res['status'] = 'success';
         return response()->json($res);
     }
     public function qrScan(request $request){
         $res = array();
-        Product_sign::Create(['product_id'=>$request->product_id,'user_id'=>$request->user->id,'sign_date'=>date("Y-m-d H:i:s"),'sign_type'=>2]);
+        $productId = $request->product_id;
+        if(strlen($request->product_id) > 10)
+            if(Product::where('off_id',$product_id)->count() > 0)
+                $productId = Product::where('off_id',$product_id)->first()->id;
+                
+        Product_sign::Create(['product_id'=>$productId,'user_id'=>$request->user->id,'sign_date'=>date("Y-m-d H:i:s"),'sign_type'=>2]);
         $res['status'] = 'success';
         return response()->json($res);
     }
@@ -894,13 +951,6 @@ class ProductController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
-    public function unassignedProducts(request $request){
-        $products = Product::where('action',3)->get();
-        $res = array();
-        $res['products'] = $products;
-        $res['status'] = 'success';
-        return response()->json($res);
-    }
     public function updateScanProduct(request $request){
         $id = $request->id;
         if(strlen($request->id) > 10){
@@ -922,5 +972,25 @@ class ProductController extends Controller
         $product->save();
         $res['status'] = 'success';
         return response()->json($res);
+    }
+    public function labelList(request $request){
+        $res = array();
+        $res['labels'] = Product_label::leftJoin('users','users.id','=','product_labels.created_by')
+                                        ->select('product_labels.*','users.profile_pic','users.first_name','users.last_name')
+                                        ->get();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeWarrantyTime(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+        Product::whereId($id)->update(['warranty_time'=>$request->warranty_time]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+
     }
 }

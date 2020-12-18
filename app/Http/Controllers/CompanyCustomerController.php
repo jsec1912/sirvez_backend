@@ -143,7 +143,7 @@ class CompanyCustomerController extends Controller
             'notice_type'		=> '2',
             'notice_id'			=> $companyCustomer->id,
             //'notification'		=> $company['name'].' have been '.$action.' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new company['.$company['name'].'].',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new company: '.$company['name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $id,
             'created_date'		=> date("Y-m-d H:i:s"),
@@ -221,23 +221,21 @@ class CompanyCustomerController extends Controller
         $res = array();
         $res['status'] = 'success';
         $res['company'] = Company::whereId($company_id)->first();
-        $res['users'] = User::where('company_id',$company_id)->whereIn('status',[1,3])->get();
-        $projects = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
+        $comIds = Company_customer::where('company_id',$company_id)->pluck('customer_id');
+        
+        $res['users'] = User::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->whereIn('status',[1,3])->get();
+        $projects = Project::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->orderBy('id','desc')->get();
         if(!is_null($projects)){
             foreach($projects as $key=>$project){
-                if(User::whereId($project->created_by)->count() > 0)
-                    $projects[$key]['user_name'] = User::whereId($project->created_by)->first()->first_name;
-                else
-                    $projects[$key]['user_name'] = '';
                 if(User::whereId($project->manager_id)->count() > 0)
-                    $projects[$key]['manager_name'] = User::whereId($project->manager_id)->first()->first_name;
+                    $projects[$key]['account_manager'] = User::whereId($project->manager_id)->first()->first_name;
                 else
-                    $projects[$key]['manager_name'] = '';
+                    $projects[$key]['account_manager'] = '';
                 $projects[$key]['rooms'] = Room::where('project_id',$project->id)->count();
             }
         }
         $res['projects'] = $projects;
-        $sites = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
+        $sites = Site::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->orderBy('id','desc')->get();
         foreach($sites as $key=>$site){
 
             $sites[$key]['rooms'] = Site_room::where('site_id',$site->id)->count();
@@ -245,10 +243,11 @@ class CompanyCustomerController extends Controller
         }
 
         $res['sites'] =$sites;
-        $res['rooms'] = Site_room::where('site_rooms.company_id',$company_id)
+        $res['rooms'] = Site_room::whereIn('site_rooms.company_id',$comIds)->orWhere('site_rooms.company_id',$company_id)
             ->leftJoin('sites','site_rooms.site_id','=','sites.id')->select('site_rooms.*','sites.site_name')->orderBy('id','desc')->get();
-        $roomIdx = Room::where('company_id',$company_id)->pluck('id');
+        $roomIdx = Room::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->pluck('id');
         $products = Product::whereIn('products.room_id',$roomIdx)->where('action','<','3')->get();
+        $productIds = Product::whereIn('products.room_id',$roomIdx)->where('action','<','3')->pluck('id');
         foreach($products as $key => $product)
         {
             if(Room::whereId($product->room_id)->count()>0){
@@ -282,7 +281,7 @@ class CompanyCustomerController extends Controller
                 $products[$key]['product_action'] = "Move To Room";
         }
         $res['products'] = $products;
-        $tasks = Task::where('company_id',$company_id)->orderBy('id','desc')->get();
+        $tasks = Task::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->orderBy('id','desc')->get();
         foreach($tasks as $key=>$row){
             $tasks[$key]['assign_to'] = Project_user::leftJoin('users','users.id','=','project_users.user_id')->where(['project_users.project_id'=>$row->id,'project_users.type'=>'2'])->pluck('users.first_name');
         }
@@ -291,6 +290,8 @@ class CompanyCustomerController extends Controller
                         ->leftJoin('users','users.id','=','companies.manager')
                         ->select('companies.*','users.first_name as manager_name')
                         ->get();
+        $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
+        $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
         $res['product_labels'] = Product_label::get();
         $res['task_assign_to'] = User::where('company_id',$company_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
         $res['test_forms'] = New_form::where('form_type', 1)->get();
@@ -347,7 +348,7 @@ class CompanyCustomerController extends Controller
             if(Company::whereId($pending_user['customer'])->count()>0)
                 $company_name = Company::whereId($pending_user['customer'])->first()->name;
             else
-                $company_name = '';
+                $company_name = Company::whereId($request->user->company_id)->first()->name;
             //add usertable new user by pending
             $user = array();
             $user['email'] = $pending_user['email'];
@@ -361,12 +362,12 @@ class CompanyCustomerController extends Controller
             $res['status'] = "success";
 
             $user = User::create($user);
-            $user_role = ['1'=>'Super Admin','2'=> 'admin','3'=>'Account Admin','6'=>'nomal'];
+            $user_role = ['1'=>'super admin','2'=> 'engineer','3'=>'account admin','4'=>'admin','6'=>'nomal'];
 
             $insertnotificationndata = array(
                 'notice_type'		=> '1',
                 'notice_id'			=> $user->id,
-                'notification'		=> $user['first_name'].' '.$user['last_name'].' has added you as '.$user_role[$pending_user['user_role']].' by  '.$request->user->first_name.' ('.$company_name.').',
+                'notification'		=> $user['first_name'].' '.$user['last_name'].' has added '.$pending_user['first_name'].' as '.$user_role[$pending_user['user_role']].' by  '.$request->user->first_name.' '.$request->user->last_name.' in company: '.$company_name.'.',
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $user['company_id'],
                 'created_date'		=> date("Y-m-d H:i:s"),

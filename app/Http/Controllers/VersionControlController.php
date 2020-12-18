@@ -55,7 +55,7 @@ class VersionControlController extends Controller
             $insertnotificationdata = array(
                 'notice_type'		=> '8',
                 'notice_id'			=> $version->id,
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new version control('.$version['version_name'].') in room['.$room['room_number'].']',
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new version control '.$version['version_name'].' in room: '.$room['room_number'].'.',
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $room->company_id,
                 'project_id'        => $room['project_id'],

@@ -117,7 +117,7 @@ class TaskController extends Controller
             $insertnotificationndata = array(
             'notice_type'		=> '4',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new task : ['.$task['task'].']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new task : '.$task['task'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $request->company_id,
             'project_id'		=> $request->project_id,
@@ -170,6 +170,16 @@ class TaskController extends Controller
             $res['room_id'] = $request->room_id;
             if($request->user->user_type >1){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
+                $taskIds = Task::where(function($q) use($taskIdx,$request){
+                                return $q->whereIn('tasks.id',$taskIdx)
+                                ->orwhere('tasks.created_by',$request->user->id);
+                            })
+                            ->where('tasks.room_id',$request->room_id)
+                            ->where(function($q){
+                                return $q->where('tasks.archived',0)
+                                ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                            })
+                            ->pluck('id');
                 $tasks = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
                                     ->orwhere('tasks.created_by',$request->user->id);
@@ -198,6 +208,12 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+                $taskIds = Task::where('tasks.room_id',$request->room_id)
+                            ->where(function($q){
+                                return $q->where('tasks.archived',0)
+                                ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                            })
+                            ->pluck('id');
                 $tasks = Task::where('tasks.room_id',$request->room_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
@@ -227,6 +243,16 @@ class TaskController extends Controller
             $res['project_id'] = '';
             if($request->user->user_type >1){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
+                $taskIds = Task::where(function($q) use($taskIdx,$request){
+                                    return $q->whereIn('tasks.id',$taskIdx)
+                                    ->orwhere('tasks.created_by',$request->user->id);
+                                })
+                                ->where(function($q){
+                                    return $q->where('tasks.archived',0)
+                                    ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                                })
+                                ->where('tasks.company_id',$request->customer_id)
+                                ->pluck('id');
                 $tasks = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
                                     ->orwhere('tasks.created_by',$request->user->id);
@@ -254,7 +280,12 @@ class TaskController extends Controller
                 $res['customerId'] = $request->customer_id;
             }
             else{
-
+                $taskIds = Task::where('tasks.company_id',$request->customer_id)
+                        ->where(function($q){
+                            return $q->where('tasks.archived',0)
+                            ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                        })
+                        ->pluck('id');
                 $tasks = Task::where('tasks.company_id',$request->customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
@@ -281,6 +312,16 @@ class TaskController extends Controller
             $res['project_id'] = $request->project_id;
             if($request->user->user_type >1){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
+                $taskIds = Task::where(function($q) use($taskIdx,$request){
+                                return $q->whereIn('tasks.id',$taskIdx)
+                                ->orwhere('tasks.created_by',$request->user->id);
+                                })
+                                ->where(function($q){
+                                    return $q->where('tasks.archived',0)
+                                    ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                                })
+                                ->where('tasks.project_id',$request->project_id)
+                                ->pluck('id');
                 $tasks = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
                                     ->orwhere('tasks.created_by',$request->user->id);
@@ -309,6 +350,12 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+                $taskIds = Task::where('tasks.project_id',$request->project_id)
+                        ->where(function($q){
+                            return $q->where('tasks.archived',0)
+                            ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                        })
+                        ->pluck('id');
                 $tasks = Task::where('tasks.project_id',$request->project_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
@@ -335,6 +382,15 @@ class TaskController extends Controller
         else{
             if($request->user->user_type >1){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
+                $taskIds = Task::where(function($q)use($taskIdx,$request){
+                            return $q->whereIn('tasks.id',$taskIdx)
+                            ->orwhere('tasks.created_by',$request->user->id);
+                        })
+                        ->where(function($q){
+                            return $q->where('tasks.archived',0)
+                            ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                        })
+                        ->pluck('id');
                 $tasks = Task::where(function($q)use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
                                     ->orwhere('tasks.created_by',$request->user->id);
@@ -361,6 +417,12 @@ class TaskController extends Controller
             }
             else{
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+                $taskIds = Task::whereIn('tasks.company_id',$customer_id)
+                                ->where(function($q){
+                                    return $q->where('tasks.archived',0)
+                                    ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                                })
+                                ->pluck('id');
                 $tasks = Task::whereIn('tasks.company_id',$customer_id)
                     ->where(function($q){
                         return $q->where('tasks.archived',0)
@@ -423,6 +485,8 @@ class TaskController extends Controller
             $tasks[$key]['comments'] = $task_comments;
             $tasks[$key]['label_value'] = Task_label_value::where('task_id',$row->id)->pluck('label_id');
         }
+        $labelIds = Task_label_value::whereIn('task_id',$taskIds)->pluck('label_id');
+        $res['task_used_labels'] = Task_label::whereIn('id',$labelIds)->get();
         $res['task_labels'] = Task_label::get();
         $res['all_users'] = User::get();
         $res['tasks'] = $tasks;
@@ -444,7 +508,7 @@ class TaskController extends Controller
             $res['customer'] = Company::where('id',$company_id)->orderBy('id','desc')->get();
             $res['project'] = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['customer_site'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
-            $res['room'] = Room::where('company_id',$company_id)->get();$company_id = Company_customer::where('company_id',$request->user->company_id)->orderBy('id','desc')->pluck('customer_id');
+            $res['room'] = Room::where('company_id',$company_id)->get();
         }
         if($request->has('room_id')){
             $room = Room::whereId($request->room_id)->first();
@@ -518,7 +582,7 @@ class TaskController extends Controller
             'notice_type'		=> '4',
             'notice_id'			=> $task->id,
             //'notification'		=> 'New comment has been add in '.$task['task'].' by  '.$request->user->first_name.' ('.$request->user->company_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in task['.$task['task'].'].',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in task: '.$task['task'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $task->company_id,
             'project_id'		=> $task->project_id,
@@ -608,5 +672,13 @@ class TaskController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
 
+    }
+    public function labelList(request $request){
+        $res = array();
+        $res['labels'] = Task_label::leftJoin('users','users.id','=','task_labels.created_by')
+                                        ->select('task_labels.*','users.profile_pic','users.first_name','users.last_name')
+                                        ->get();
+        $res['status'] = 'success';
+        return response()->json($res);
     }
 }

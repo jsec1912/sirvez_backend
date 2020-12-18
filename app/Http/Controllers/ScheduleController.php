@@ -19,6 +19,7 @@ use DateTime;
 class ScheduleController extends Controller
 {
     public function UpdateSchedule(Request $request){
+      
         $res = array();
         $product_name = '';
         $v = Validator::make($request->all(), [
@@ -102,8 +103,8 @@ class ScheduleController extends Controller
                     ]);
                 }
             }
-            if($request->is_createTask)
-            {
+            if($request->is_createTask=='true')
+            {   
                 $room = Room::whereId($schedule->room_id)->first();
                 $task = array();
                 $task['task'] = $schedule['schedule_name'].'_task';

@@ -19,6 +19,7 @@ class CreateNewFormsTable extends Migration
             $table->string('form_name');
             $table->text('form_data');
             $table->string('created_by');
+            $table->string('off_id');
         });
     }
 

@@ -329,8 +329,10 @@ class UserController extends Controller
     public function userList(request $request){
         $res = array();
         $res['status'] = 'success';
+      
         $company_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
         $res['users'] = User::whereIn('company_id',$company_id)->orwhere('company_id',$request->user->company_id)->where('id','<>',$request->user->id)->get();
+       
         return response()->json($res);
     }
     public function userInfo(request $request){
@@ -346,7 +348,14 @@ class UserController extends Controller
     public function totalUserlist(request $request){
         $res = array();
         $res['status'] = 'success';
-        if($request->user->user_type <6)
+        if($request->user->user_type == 0){
+            $res['users'] = User::where('users.id','<>',$request->user->id)
+                            ->leftJoin('companies','users.company_id','=','companies.id')
+                            ->select('users.*','companies.company_type')
+                            ->get();
+            $res['customers'] = Company::get();
+        }
+        else if($request->user->user_type <6)
         {
             $com_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['users'] = User::where(function($q) use($com_id,$request){
@@ -534,6 +543,19 @@ class UserController extends Controller
         $feedback['user_id'] = $request->user->id;
         $feedback['is_read'] = 0;
         User_feedback::create($feedback);
+
+        $pending_user = User::where('id',1)->first();
+        $to_name = $pending_user['first_name'];
+        $to_email = $pending_user['email'];
+        $content = $request->user->first_name.' '.$request->user->last_name. ' remains feedback.';
+        $invitationURL = "https://app.sirvez.com/app/feedbacks";
+        $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>'Feedback',"description" =>$request->feedback_msg,"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view feedback'];
+        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+            $message->to($to_email, $to_name)
+                    ->subject('sirvez notification.');
+            $message->from('support@sirvez.com','sirvez support team');
+        });
+
         $res['status'] = 'success';
         return response()->json($res);
     }

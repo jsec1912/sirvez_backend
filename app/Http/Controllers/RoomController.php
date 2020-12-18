@@ -135,7 +135,7 @@ class RoomController extends Controller
             $insertnotificationdata = array(
                 'notice_type'		=> '5',
                 'notice_id'			=> $id,
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new location ['.$room['room_number'].']'.' in ['.$room['project_name'].' ] for ['.$room['first_name'].' '.$room['last_name'].'].',
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new location '.$room['room_number'].' in project: '.$room['project_name'].'.',
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $room['company_id'],
                 'project_id'        => $room['project_id'],
@@ -264,20 +264,12 @@ class RoomController extends Controller
             $room['img_files']  = $images;
             $room['form_value'] = Form_value::where('parent_id',$room_id)->where('form_type',0)->get();
             $room['form_id'] = Project::whereId($projectId)->first()->location_form_id;
-            if($room['form_id']>0)
-                $room['form_style'] = json_decode(New_form::whereId($room['form_id'])->first()->form_data);
-            else
-                $room['form_style'] = [];
             $res['form_fields'] = Form_field::get();
 
             $res["room"] = $room;
             $res['product_form_values'] = Form_value::whereIn('form_type',[1,2])->get();
             $res['test_forms'] = New_form::where('form_type', 1)->get();
             $res['com_forms'] = New_form::where('form_type', 2)->get();
-            $res['assign_to'] = Project_user::where(['project_users.project_id'=>$room->project_id,'project_users.type'=>'1'])
-                                ->leftjoin('users','users.id','=','project_users.user_id')
-                                ->select('users.*')
-                                ->get();
             // $products= Product::where('room_id',$room_id)->orderBy('id','desc')->get();
             // foreach($products as $key => $product)
             // {
@@ -321,8 +313,8 @@ class RoomController extends Controller
                                     ->orderBy('id','desc')
                                     ->first();
             $res['room_id'] = $room_id;
-            $res['customer_userlist'] = User::whereIn('user_type',[4,6])->where('status',1)->where('company_id',$room->company_id)->select('id','first_name','last_name')->get();
-            $res['task_assign_to'] = User::where('company_id',$room->company_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+            $com_id = Company_customer::where('customer_id',$room->company_id)->first()->company_id;
+            $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
             $res['signed_cnt'] = Product::where('room_id',$room_id)->where('signed_off','<>','2')->count()-Product::where('room_id',$room_id)->where('signed_off','1')->count();
 
         }
@@ -356,6 +348,12 @@ class RoomController extends Controller
                                 })
                                 ->orderBy('id','desc')
                                 ->get();
+            $productIds = Product::whereIn('room_id',$room_ids)
+                                ->orWhere(function($q) use($project_id){
+                                    return $q->where('project_id',$project_id)
+                                        ->where('action',3);
+                                })
+                                ->pluck('id');
             $project = Project::whereId($project_id)->first();
             foreach($products as $key => $product)
             {
@@ -393,19 +391,20 @@ class RoomController extends Controller
             $company_id = Project::whereId($project_id)->first()->company_id;
             $com_id = Company_customer::where('customer_id',$company_id)->first()->company_id;
             $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
-            $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
-            $res['projects'] = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
+            if(Company_customer::where('customer_id',$company_id)->count()>0)
+                $companyId = Company_customer::where('customer_id',$company_id)->first()->company_id;
+            else
+                $companyId = '';
+            $res['sites'] = Site::where('company_id',$company_id)->orWhere('company_id',$companyId)->orderBy('id','desc')->get();
             $site_id = Site::where('company_id',$company_id)->pluck('id');
             $res['departments'] = Department::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['buildings'] = Building::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
-            $res['project_rooms'] = Room::where('project_id',$project_id)->get();
             $res['rooms'] = Site_room::where('company_id',$company_id)/* ->whereNull('project_id') */->get();
             $res['floors'] = Floor::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
             $res['project_id'] = $project_id;
             $res['project_signoff'] = Project::whereId($project_id)->first()->signed_off;
         }
         else if(isset($request->customer_id)&& $request->customer_id>0){
-            $res['projects'] = Project::where('company_id',$request->customer_id)->orderBy('id','desc')->get();
             $res['sites'] = Site::where('company_id',$request->customer_id)->orderBy('id','desc')->get();
             $site_id = Site::where('company_id',$request->customer_id)->pluck('id');
             $res['departments'] = Department::where('company_id',$request->customer_id)->orderBy('id','desc')->get();
@@ -417,18 +416,18 @@ class RoomController extends Controller
             if($request->user->user_type <=3){
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
                 $res['sites'] = Site::whereIn('id',$customer_id)->orderBy('id','desc')->get();
-                $res['projects'] = Project::whereIn('company_id',$customer_id)->orderBy('id','desc')->get();
                 $res['departments'] = Department::whereIn('company_id',$customer_id)->orderBy('id','desc')->get();
             }
             else{
                 $res['sites'] = Site::where('id',$request->user->company_id)->orderBy('id','desc')->get();
-                $res['projects'] = Project::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
                 $res['departments'] = Department::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
             }
 
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
+        $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
+        $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
         $res['product_labels'] = Product_label::get();
         $res['qr_option'] = Qr_option::first();
         $res['status'] = "success";
@@ -470,7 +469,11 @@ class RoomController extends Controller
             $id = $request->id;
         $res = array();
         $res['status'] = "success";
-        Room::whereId($id)->update(['signed_off'=>1,'completed_date'=>date("d-m-Y H:i:s")]);
+        Room::whereId($id)->update([
+            'signed_off'=>1,
+            'completed_date'=>date("d-m-Y H:i:s"),
+            'completed_by'=>$request->user->id
+        ]);
 
         //Product::where('room_id',$id)->update(['signed_off'=>1]);
         $room = Room::whereId($id)->first();
@@ -480,7 +483,7 @@ class RoomController extends Controller
             'notice_type'		=> '7',
             'notice_id'			=> $id,
             //'notification'		=> "The room(".$room->room_number.") was signed off by ".$request->user->first_name."  on date ".date("d-m-Y H:i:s"),
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has signed off location[".$room->room_number."] on [".date("d-m-Y H:i:s").']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has signed off location: ".$room->room_number." on ".date("d-m-Y H:i:s").'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $room->company_id,
             'project_id'		=> $room->project_id,
@@ -515,7 +518,7 @@ class RoomController extends Controller
         $insertnotificationdata = array(
             'notice_type'		=> '5',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has sent request to change location[".$room->room_number."]",
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has sent request to change location: ".$room->room_number.".",
             'created_by'		=> $request->user->id,
             'company_id'		=> $room->company_id,
             'project_id'		=> $room->project_id,
@@ -683,7 +686,7 @@ class RoomController extends Controller
         $insertnotificationdata = array(
             'notice_type'		=> '5',
             'notice_id'			=> $room_photo->room_id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in location['.$room['room_number'].'].',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added a new comment in location: '.$room['room_number'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $room['company_id'],
             'project_id'        => $room['project_id'],

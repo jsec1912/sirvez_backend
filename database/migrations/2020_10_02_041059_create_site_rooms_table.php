@@ -22,6 +22,7 @@ class CreateSiteRoomsTable extends Migration
             $table->string('building_id');
             $table->string('floor_id');
             $table->string('room_number');
+            $table->string('off_id');
         });
     }
 

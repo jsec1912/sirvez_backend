@@ -26,6 +26,7 @@ class CreateVersionControlsTable extends Migration
             $table->string('pdf_link');
             $table->string('created_by');
             $table->string('parent_id');
+            $table->string('off_id');
         });
     }
 

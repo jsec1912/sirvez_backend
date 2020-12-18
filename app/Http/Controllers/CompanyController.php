@@ -8,6 +8,7 @@ use App\Company_customer;
 use App\Site;
 use App\Project;
 use App\Room;
+use App\Site_room;
 use App\User;
 use Illuminate\Support\Facades\Validator;
 
@@ -91,6 +92,17 @@ class CompanyController extends Controller
         $res['company'] = Company::whereId($id)->first();
         $res['customers'] = Company::where('id','<>',$id)->get();
         $res['account_manager'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$id)->get();
+
+        $sites = Site::where('company_id',$id)->orderBy('id','desc')->get();
+        foreach($sites as $key=>$site){
+
+            $sites[$key]['rooms'] = Site_room::where('site_id',$site->id)->count();
+            $sites[$key]['projects'] = Project::where('company_id',$id)->count();
+        }
+
+        $res['sites'] =$sites;
+        $res['rooms'] = Site_room::where('site_rooms.company_id',$id)
+            ->leftJoin('sites','site_rooms.site_id','=','sites.id')->select('site_rooms.*','sites.site_name')->orderBy('id','desc')->get();
         return response()->json($res);
     }
     public function getCompanyImg(request $request){
@@ -112,7 +124,7 @@ class CompanyController extends Controller
         $res = array();
         $customers= Company::where('company_type',1)->get();
         foreach($customers as $key=>$customer){
-            $customerIds = Company_customer::where('company_id',$customer->id)->pluck('id');
+            $customerIds = Company_customer::where('company_id',$customer->id)->pluck('customer_id');
             $customers[$key]['customers'] = User::where('company_id',$customer->id)->count();
             $customers[$key]['users'] = Company_customer::where('company_id',$customer->id)->count();
             $customers[$key]['customer_users'] = User::whereIn('company_id',$customerIds)->count();

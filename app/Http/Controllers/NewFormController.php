@@ -26,8 +26,15 @@ class NewFormController extends Controller
                 'msg' => 'You must input data form name!'
             ]);
         }
-        if ($request->has('form_id') && $request->form_id == '0') {
+        $id = $request->form_id;
+        if(strlen($request->form_id) > 10)
+            if(New_form::where('off_id',$id)->count() > 0)
+                $id = New_form::where('off_id',$id)->first()->id;
+            else $id = '';
+        if ($id == '0'||$id =='') {
             $form = array();
+            if(strlen($id) > 10)
+                $form['off_id'] = $id;
             $form['created_by'] = $request->user->company_id;
             $form['user_id'] = $request->user->id;
             $form['form_type'] = $request->form_type;
@@ -47,16 +54,16 @@ class NewFormController extends Controller
                 Form_field::create($field);
             }
         } else {
-            New_form::whereId($request->form_id)->update(['form_data'=>$request->form_data,'form_name'=>$request->form_name,'form_type'=>$request->form_type]);
+            New_form::whereId($id)->update(['form_data'=>$request->form_data,'form_name'=>$request->form_name,'form_type'=>$request->form_type]);
             $fields = array();
             $fields = json_decode($request->form_fields);
             $field = array();
-            Form_field::where('new_form_id', $request->form_id)->delete();
+            Form_field::where('new_form_id', $id)->delete();
             foreach($fields as $row) {
                 $field['field_name'] = $row->field_name;
                 $field['field_type'] = $row->field_type;
                 $field['field_label'] = $row->field_label;
-                $field['new_form_id'] = $request->form_id;
+                $field['new_form_id'] = $id;
                 $field['form_type'] = $request->form_type;
                 Form_field::create($field);
             }
@@ -80,14 +87,22 @@ class NewFormController extends Controller
 
     public function deleteForm(request $request){
         $res = array();
-        New_form::whereId($request->id)->delete();
-        Form_field::where('new_form_id',$request->id)->delete();
+        if(strlen($request->id) > 10)
+            $id = New_form::where(['off_id'=>$request->id])->first()->id;
+        else
+            $id = $request->id;
+        New_form::whereId($id)->delete();
+        Form_field::where('new_form_id',$id)->delete();
         $res['status'] = "success";
         return response()->json($res);
     }
     public function duplicateForm(request $request){
         $form = array();
-        $sel_form = New_form::whereId($request->id)->first();
+        if(strlen($request->id) > 10)
+            $id = New_form::where(['off_id'=>$request->id])->first()->id;
+        else
+            $id = $request->id;
+        $sel_form = New_form::whereId($id)->first();
         $form = array();
         $form['created_by'] = $sel_form->created_by;
         $form['user_id'] = $request->user->id;

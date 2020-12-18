@@ -16,6 +16,8 @@ class CreateRoomCommentsTable extends Migration
         Schema::create('room_comments', function (Blueprint $table) {
             $table->id();
             $table->timestamps();
+            $table->string('comment');
+            $table->string('created_by');
         });
     }
 

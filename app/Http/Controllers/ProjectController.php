@@ -75,8 +75,16 @@ class ProjectController extends Controller
         $project['project_ref']  = $request->project_ref;
         $project['project_summary']  = $request->project_summary;
         $project['end_enable']  = $request->end_enable;
-        $project['location_form_id'] = $request->location_form_id;
-        $project['signoff_form_id'] = $request->signoff_form_id;
+        if ($request->has('location_form_id') && $request->location_form_id) {
+            $project['location_form_id'] = $request->location_form_id;
+        } else {
+            $project['location_form_id'] = 0;
+        }
+        if ($request->has('signoff_form_id') && $request->signoff_form_id) {
+            $project['signoff_form_id'] = $request->signoff_form_id;
+        } else {
+            $project['signoff_form_id'] = 0;
+        }
         $action = "updated";
         if(strlen($request->id) > 10)
             if(Project::where('off_id',$request->id)->count() > 0)
@@ -120,7 +128,7 @@ class ProjectController extends Controller
                     $insertnotificationndata = array(
                         'notice_type'		=> '3',
                         'notice_id'			=> $id,
-                        'notification'		=> $request->user->first_name.' '.$request->user->last_name.'has added you as a team member for a new project.['.$client.']',
+                        'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$client.' as a team member for a new project: '.$request->project_name.'.',
                         'created_by'		=> $request->user->id,
                         'company_id'		=> $project['company_id'],
                         'project_id'		=> $id,
@@ -166,41 +174,68 @@ class ProjectController extends Controller
 
         //$notice_type ={1:pending_user,2:createcustomer 3:project}
         if($request->cusotmer_user){
-            $customerUsers= User::whereIn('id',$request->cusotmer_user)->pluck('first_Name');
+            $customerUsers= User::whereIn('id',$request->cusotmer_user)->get();
             $c_users = array();
             foreach($customerUsers as $item) {
-                array_push($c_users, (string)$item);
+                array_push($c_users, (string)$item->first_name.' '.(string)$item->last_name);
             }
             $client_name = implode(',',$c_users);
             //$customer_user = User::whereId($request->user_id)->first();
             //$client_name = $customer_user->first_name.' '.$customer_user->last_name;
         }else{
-            $client_name = ' ';
+            $client_name = '';
         }
-
-        if($action =='created'){
-            $insertnotificationndata = array(
-                'notice_type'		=> '3',
-                'notice_id'			=> $id,
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new project : ['.$project['project_name'].'] for ['.$client_name.'].',
-                'created_by'		=> $request->user->id,
-                'company_id'		=> $project['company_id'],
-                'project_id'		=> $id,
-                'created_date'		=> date("Y-m-d H:i:s"),
-                'is_read'	    	=> 0,
-            );
+        if($client_name!=''){
+            if($action =='created'){
+                $insertnotificationndata = array(
+                    'notice_type'		=> '3',
+                    'notice_id'			=> $id,
+                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new project: '.$project['project_name'].' for '.$client_name.'.',
+                    'created_by'		=> $request->user->id,
+                    'company_id'		=> $project['company_id'],
+                    'project_id'		=> $id,
+                    'created_date'		=> date("Y-m-d H:i:s"),
+                    'is_read'	    	=> 0,
+                );
+            }
+            else{
+                $insertnotificationndata = array(
+                    'notice_type'		=> '3',
+                    'notice_id'			=> $id,
+                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has updated project : '.$project['project_name'].' for '.$client_name.'.',
+                    'created_by'		=> $request->user->id,
+                    'company_id'		=> $project['company_id'],
+                    'project_id'		=> $id,
+                    'created_date'		=> date("Y-m-d H:i:s"),
+                    'is_read'	    	=> 0,
+                );
+            }
         }
         else{
-            $insertnotificationndata = array(
-                'notice_type'		=> '3',
-                'notice_id'			=> $id,
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has updated project : ['.$project['project_name'].'] for ['.$client_name.'].',
-                'created_by'		=> $request->user->id,
-                'company_id'		=> $project['company_id'],
-                'project_id'		=> $id,
-                'created_date'		=> date("Y-m-d H:i:s"),
-                'is_read'	    	=> 0,
-            );
+            if($action =='created'){
+                $insertnotificationndata = array(
+                    'notice_type'		=> '3',
+                    'notice_id'			=> $id,
+                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new project: '.$project['project_name'].'.',
+                    'created_by'		=> $request->user->id,
+                    'company_id'		=> $project['company_id'],
+                    'project_id'		=> $id,
+                    'created_date'		=> date("Y-m-d H:i:s"),
+                    'is_read'	    	=> 0,
+                );
+            }
+            else{
+                $insertnotificationndata = array(
+                    'notice_type'		=> '3',
+                    'notice_id'			=> $id,
+                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has updated project : '.$project['project_name'].'.',
+                    'created_by'		=> $request->user->id,
+                    'company_id'		=> $project['company_id'],
+                    'project_id'		=> $id,
+                    'created_date'		=> date("Y-m-d H:i:s"),
+                    'is_read'	    	=> 0,
+                );
+            }
         }
         Notification::create($insertnotificationndata);
 
@@ -239,7 +274,7 @@ class ProjectController extends Controller
             'notice_type'		=> '3',
             'notice_id'			=> $id,
             //'notification'		=> 'Project '.$project['project_name'].' have been completed by  '.$request->user->first_name.' '.$request->user->last_name.' ('.$request->user->company_name.').',
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has completed project['.$project['project_name'].']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has completed project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $request->user->company_id,
             'project_id'		=> $id,
@@ -305,237 +340,249 @@ class ProjectController extends Controller
         $res['status'] = "success";
         return response()->json($res);
     }
-    public function projectDetail(Request $request){
+    // public function getProjectInfo(Request $request){
+    //     $res = array();
+    //     if ($request->has('id')) {
+    //         $id = $request->id;
+    //         $res['project'] = Project::whereId($id)->first();
+    //         $res['project']['assign_to'] = Project_user::where(['project_id'=>$id,'type'=>'1'])->pluck('user_id');
+    //         $res['project']['customer_users'] = Project_user::where(['project_id'=>$id,'type'=>'3'])->pluck('user_id');
+    //     }
+    //     if($request->user->user_type <=3){
+    //         $company_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+    //         $res['customer'] = Company::whereIn('id',$company_id)->orderBy('id','desc')->get();
+    //         $res['account_manager'] = User::whereIn('user_type',[0,1,3])
+    //                             ->where('status',1)
+    //                             ->where(function($q) use($company_id,$request){
+    //                                 return $q->whereIn('company_id',$company_id)
+    //                                     ->orwhere('company_id', $request->user->company_id);
+    //                                 })
+    //                             ->get();
+    //         $res['customer_user'] = User::whereIn('user_type',[4,6])->where('status',1)->whereIn('company_id',$company_id)->get();
+    //         $res['assign_to'] = User::where(function($q) use($company_id,$request){
+    //                     return $q->whereIn('company_id',$company_id)
+    //                         ->orwhere('company_id', $request->user->company_id);
+    //                     })
+    //                     ->whereIn('user_type',[0,1,5])->where('status',1)->get();
+    //     }
+    //     else{
+    //         $res['customer'] = Company::where('id',$request->user->company_id)->orderBy('id','desc')->get();
+    //         $res['account_manager'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
+    //         $res['customer_user'] = User::whereIn('user_type',[4,6])->where('status',1)->where('company_id',$request->user->company_id)->get();
+    //         $res['assign_to'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[0,1,5])->where('status',1)->get();
+    //     }
+    //     $res['location_form_rows'] = New_form::where('form_type',0)->get();
+    //     $res['signoff_form_rows'] = New_form::where('form_type',3)->get();
+    //     $res['status'] = 'success';
+    //     return response()->json($res);
+    // }
+    public function projectInfo(Request $request){
         $res = array();
-        $res['schedules'] = array();
-        if(strlen($request->project_id) > 10)
-            $id = Project::where('off_id',$request->project_id)->first()->id;
-        else
-            $id = $request->project_id;
-        $project = Project::where('projects.id',$id)
-            ->leftJoin('companies','projects.company_id','=','companies.id')
-            ->leftJoin('users','users.id','=','projects.created_by')
-            ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
-        $project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
-        $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
-        // $user_cnt = User::where('id',$project->user_id)->count();
-        // if($user_cnt>0)
-        //     $project['customer_user'] = User::where('id',$project->user_id)->first()->first_name;
-        // else
-        //     $project['customer_user'] = '';
-
-        $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
-        $project['room_count'] = Room::where('project_id',$project['id'])->count();
-        $project['user_notifications'] = Notification::where('notice_type','3')->where('notice_id',$id)->count();
-        if(User::where('id',$project['archived_id'])->count()>0)
-            $project['archived_name'] = User::where('id',$project['archived_id'])->first()->first_name;
-        else
-            $project['archived_name'] = '';
-        if(Project::whereId($id)->count()>0)
-            $company_id = Project::whereId($id)->first()->company_id;
-        else
-            $company_id = '';
-        $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
-        // $res['sites'] = Project_site::where('project_id',$project['id'])
-        //     ->leftJoin('sites','project_sites.site_id','=','sites.id')->select('project_sites.*','sites.site_name','sites.city','sites.address','sites.postcode')->withCount('rooms')->orderBy('project_sites.id','desc')->get();
-        $rooms = Room::where('rooms.project_id',$project['id'])
-            ->leftJoin('sites','rooms.site_id','=','sites.id')
-            ->leftJoin('companies','rooms.company_id','=','companies.id')
-            ->leftJoin('buildings','rooms.building_id','=','buildings.id')
-            ->select('rooms.*','sites.site_name','companies.name as company_name','buildings.building_name')
-            ->orderBy('rooms.id','desc')->get();
-        foreach($rooms as $key => $room)
-        {
-            $rooms[$key]['products'] = Product::where('room_id',$room->id)->count();
-            $rooms[$key]['total_tasks'] = Task::where('room_id',$room->id)->count();
-            $rooms[$key]['complete_tasks'] =Task::where('room_id',$room->id)->where('archived',1)->count();
-            $images = Room_photo::where('room_id',$room->id)->get();
-            foreach($images as $k => $image){
-                $images[$k]['comments'] = Room_comment::where('photo_id',$image->id) 
-                    ->leftJoin('users','users.id','=','room_comments.created_by')
-                    ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
-                    ->get();
-            }
-            $rooms[$key]['img_files'] = $images;
-        }
-        $res['rooms'] = $rooms;
-        $room_ids = Room::where('project_id',$project['id'])->pluck('id');
-        $schedules = Schedule::whereIn('schedules.room_id',$room_ids)
-                    ->leftJoin('sites','sites.id','=','schedules.site_id')
-                    ->leftJoin('rooms','rooms.id','=','schedules.room_id')
-                    ->orderBy('schedules.root_id')
-                    ->select('schedules.*','sites.site_name','rooms.room_number')
-                    ->get();
-
-        foreach($schedules as $key => $row) {
-            $schedules[$key]['product_id'] = ScheduleProduct::where([
-                'schedule_products.schedule_id' => $row->id
-            ])->get()->pluck('product_id');
-            $product_name= Product::whereIn('id',$schedules[$key]['product_id'])->pluck('product_name');
-            $products = array();
-            foreach($product_name as $product_item) {
-                array_push($products, (string)$product_item);
-            }
-            $schedules[$key]['product_name'] = implode(',',$products);
-            $schedules[$key]['engineer_id'] = ScheduleEngineer::where([
-                'schedule_engineers.schedule_id' => $row->id
-            ])->get()->pluck('engineer_id');
-        }
-
-        $res['schedules'] = $schedules;
+        if($request->project_id){
         
-        $tasks = Task::where('project_id',$project['id'])->orderBy('id','desc')->get();
-        foreach($tasks as $key=>$row){
-            $tasks[$key]['assign_to'] = Project_user::leftjoin('users','users.id','=','project_users.user_id')
-                ->where(['project_users.project_id'=>$row->id,'type'=>'2'])
-                ->pluck('users.first_name');
-        }
-        $res['tasks'] = $tasks;
-        $res["project"] = $project;
-
-        $res['customer_sites']= Site::where('company_id',$project->company_id)->orderBy('id','desc')->get();
-
-        $res['assign_to'] = Project_user::where(['project_users.project_id'=>$id,'project_users.type'=>'1'])
-                                        ->leftjoin('users','users.id','=','project_users.user_id')
-                                        ->select('users.*')
-                                        ->get();
-        $res['customer_users'] = Project_user::where(['project_users.project_id'=>$id,'project_users.type'=>'3'])
-                                        ->leftjoin('users','users.id','=','project_users.user_id')
-                                        ->select('users.*')
-                                        ->get();
-        $assignId = Project_user::where(['project_id'=>$id,'type'=>1])->pluck('user_id');
-        $com_id = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
-        $res['team'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,5])->where('status',1)->whereNotIn('id',$assignId)->get();
-        $assignId = Project_user::where(['project_id'=>$id,'type'=>3])->pluck('user_id');
-        $res['left_customer_users'] = User::where('company_id',$project->company_id)->whereIn('user_type',[4,6])->where('status',1)->whereNotIn('id',$assignId)->get();
-        $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
-        $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
-        $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
-        $res['unsigned_room'] = Room::where('project_id',$id)->where('signed_off','0')->get();
-        
-        $res['customer_userlist'] = User::whereIn('user_type',[4,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
-        $res['status'] = "success";
-        $res['location_forms'] = New_form::where('created_by', $com_id)
-            ->where('form_type','0')->get();
-        $res['signoff_forms'] = New_form::where('created_by', $com_id)
-            ->where('form_type','3')->get();
-        //$res['testing_forms'] = New_form::where('form_type','1')->get();
-        //$res['commitioning_forms'] = New_form::where('form_type','2')->get();
-        $res['form_fields'] = Form_field::get();
-        $res['project_id'] = $id;
-        $res['test_forms'] = New_form::where('form_type', 1)->get();
-        $res['com_forms'] = New_form::where('form_type', 2)->get();
-        $res['off_form_values'] = Form_value::where('form_type', 3)
-            ->where('parent_id',$project['signoff_form_id'])->get();
-        $res['product_form_values'] = Form_value::whereIn('form_type',[1,2])->get();
-        $versions = Version_control::whereIn('version_controls.room_id',$room_ids)
-                                    ->leftJoin('rooms','rooms.id','=','version_controls.room_id')
-                                    ->leftJoin('users','users.id','=','version_controls.created_by')
-                                    ->select('version_controls.*','rooms.room_number','users.profile_pic','users.first_name','users.last_name')
-                                    ->orderBy('version_controls.group_id','asc')
-                                    ->get();
-        foreach($versions as $key => $version)
-        {
-            if($version['tag'] ==0)
-                $versions[$key]['version_tag'] = "Drawing";
-            else if($version['tag'] ==1)
-                $versions[$key]['version_tag'] = "Document";
+            if(strlen($request->project_id) > 10)
+                $id = Project::where('off_id',$request->project_id)->first()->id;
             else
-                $versions[$key]['version_tag'] = "SpreadSheet";
-        }
-        $res['versions'] = $versions;
-
-        $products = Product::whereIn('room_id',$room_ids)
-                            ->orWhere(function($q) use($id){
-                                return $q->where('project_id',$id)
-                                    ->where('action',3);
-                                })
-                            ->orderBy('id','desc')
-                            ->get();
-        foreach($products as $key => $product)
-        {
-            if(Room::whereId($product->room_id)->count()>0){
-                $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
-                $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
+                $id = $request->project_id;
+            $project = Project::where('projects.id',$id)
+                ->leftJoin('companies','projects.company_id','=','companies.id')
+                ->leftJoin('users','users.id','=','projects.created_by')
+                ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
+            $project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
+            $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
+            $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
+            $project['room_count'] = Room::where('project_id',$project['id'])->count();
+            $project['user_notifications'] = Notification::where('notice_type','3')->where('notice_id',$id)->count();
+            if(User::where('id',$project['archived_id'])->count()>0)
+                $project['archived_name'] = User::where('id',$project['archived_id'])->first()->first_name;
+            else
+                $project['archived_name'] = '';
+            $project['assign_to'] = Project_user::where(['project_id'=>$id,'type'=>'1'])->pluck('user_id');
+            $project['customer_users'] = Project_user::where(['project_id'=>$id,'type'=>'3'])->pluck('user_id');
+            $res["project"] = $project;
+            if(Company_customer::where('customer_id',$project->company_id)->count()>0)
+                $companyId = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
+            else
+                $companyId = '';
+            $res['sites'] = Site::where('company_id',$project->company_id)->orWhere('company_id',$companyId)->orderBy('id','desc')->get();
+            $rooms = Room::where('rooms.project_id',$id)
+                ->leftJoin('sites','rooms.site_id','=','sites.id')
+                ->leftJoin('companies','rooms.company_id','=','companies.id')
+                ->leftJoin('buildings','rooms.building_id','=','buildings.id')
+                ->select('rooms.*','sites.site_name','companies.name as company_name','buildings.building_name')
+                ->orderBy('rooms.id','desc')->get();
+            foreach($rooms as $key => $room)
+            {
+                $rooms[$key]['products'] = Product::where('room_id',$room->id)->count();
+                $rooms[$key]['total_tasks'] = Task::where('room_id',$room->id)->count();
+                $rooms[$key]['complete_tasks'] =Task::where('room_id',$room->id)->where('archived',1)->count();
+                $images = Room_photo::where('room_id',$room->id)->get();
+                foreach($images as $k => $image){
+                    $images[$k]['comments'] = Room_comment::where('photo_id',$image->id) 
+                        ->leftJoin('users','users.id','=','room_comments.created_by')
+                        ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
+                        ->get();
+                }
+                $rooms[$key]['img_files'] = $images;
             }
-            else
-                $products[$key]['room_name'] = '';
-            $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
-            $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
-            $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
-            $products[$key]['company_info'] = Company::whereId($project->company_id)->first();
-            $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
-            $products[$key]['company_name'] = Company::whereId($project->company_id)->first()->name;
-            $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
-                                                    ->leftJoin('users','users.id','=','product_signs.user_id')
-                                                    ->select('product_signs.*','users.first_name','users.profile_pic')
-                                                    ->get();
-            $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
-            $products[$key]['client_name'] = $res['customer_users'];
-            $products[$key]['install_date'] = date('d-m-Y',strtotime($project['survey_start_date']));
+            $res['rooms'] = $rooms;
+            $room_ids = Room::where('project_id',$id)->pluck('id');
+            $schedules = Schedule::whereIn('schedules.room_id',$room_ids)
+                        ->leftJoin('sites','sites.id','=','schedules.site_id')
+                        ->leftJoin('rooms','rooms.id','=','schedules.room_id')
+                        ->orderBy('schedules.root_id')
+                        ->select('schedules.*','sites.site_name','rooms.room_number')
+                        ->get();
 
-            if($product['action'] ==0)
-                $products[$key]['product_action'] = "New Product";
-            else if($product['action'] ==1)
-                $products[$key]['product_action'] = "Dispose";
-            else
-                $products[$key]['product_action'] = "Move To Room";
+            foreach($schedules as $key => $row) {
+                $schedules[$key]['product_id'] = ScheduleProduct::where([
+                    'schedule_products.schedule_id' => $row->id
+                ])->get()->pluck('product_id');
+                $product_name= Product::whereIn('id',$schedules[$key]['product_id'])->pluck('product_name');
+                $products = array();
+                foreach($product_name as $product_item) {
+                    array_push($products, (string)$product_item);
+                }
+                $schedules[$key]['product_name'] = implode(',',$products);
+                $schedules[$key]['engineer_id'] = ScheduleEngineer::where([
+                    'schedule_engineers.schedule_id' => $row->id
+                ])->get()->pluck('engineer_id');
+            }
 
-            //$products[$key]['to_room_name'] = Room::whereId($product->to_room_id)->first()->room_number;
-            //$products[$key]['to_site_name'] = Site::whereId($product->to_site_id)->first()->site_name;
-        }
-        $res['products'] = $products;
-        $res['product_labels'] = Product_label::get();
-        $res['qr_option'] = Qr_option::first();
-        return response()->json($res);
-    }
-    public function getProjectInfo(Request $request){
-        //return response()->json($request);
-        $res = array();
-        if ($request->has('id')) {
-            $id = $request->id;
-            $res['project'] = Project::whereId($id)->first();
-            $res['project']['assign_to'] = Project_user::where(['project_id'=>$id,'type'=>'1'])->pluck('user_id');
-            $res['project']['customer_users'] = Project_user::where(['project_id'=>$id,'type'=>'3'])->pluck('user_id');
+            $res['schedules'] = $schedules;
+            
+            $tasks = Task::where('project_id',$id)->orderBy('id','desc')->get();
+            foreach($tasks as $key=>$row){
+                $tasks[$key]['assign_to'] = Project_user::leftjoin('users','users.id','=','project_users.user_id')
+                    ->where(['project_users.project_id'=>$row->id,'type'=>'2'])
+                    ->pluck('users.first_name');
+            }
+            $res['tasks'] = $tasks;
+            $versions = Version_control::whereIn('version_controls.room_id',$room_ids)
+                                        ->leftJoin('rooms','rooms.id','=','version_controls.room_id')
+                                        ->leftJoin('users','users.id','=','version_controls.created_by')
+                                        ->select('version_controls.*','rooms.room_number','users.profile_pic','users.first_name','users.last_name')
+                                        ->orderBy('version_controls.group_id','asc')
+                                        ->get();
+            foreach($versions as $key => $version)
+            {
+                if($version['tag'] ==0)
+                    $versions[$key]['version_tag'] = "Drawing";
+                else if($version['tag'] ==1)
+                    $versions[$key]['version_tag'] = "Document";
+                else
+                    $versions[$key]['version_tag'] = "SpreadSheet";
+            }
+            $res['versions'] = $versions;
+            $res['assign_to'] = Project_user::where(['project_users.project_id'=>$id,'project_users.type'=>'1'])
+                                            ->leftjoin('users','users.id','=','project_users.user_id')
+                                            ->select('users.*')
+                                            ->get();
+            $res['customer_users'] = Project_user::where(['project_users.project_id'=>$id,'project_users.type'=>'3'])
+                                            ->leftjoin('users','users.id','=','project_users.user_id')
+                                            ->select('users.*')
+                                            ->get();
+            $products = Product::whereIn('room_id',$room_ids)
+                                ->orWhere(function($q) use($id){
+                                    return $q->where('project_id',$id)
+                                        ->where('action',3);
+                                    })
+                                ->orderBy('id','desc')
+                                ->get();
+            foreach($products as $key => $product)
+            {
+                if(Room::whereId($product->room_id)->count()>0){
+                    $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                    $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
+                }
+                else
+                    $products[$key]['room_name'] = '';
+                $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
+                $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
+                $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
+                $products[$key]['company_info'] = Company::whereId($project->company_id)->first();
+                $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
+                $products[$key]['company_name'] = Company::whereId($project->company_id)->first()->name;
+                $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
+                                                        ->leftJoin('users','users.id','=','product_signs.user_id')
+                                                        ->select('product_signs.*','users.first_name','users.profile_pic')
+                                                        ->get();
+                $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
+                $products[$key]['client_name'] = $res['customer_users'];
+                $products[$key]['install_date'] = date('d-m-Y',strtotime($project['survey_start_date']));
+
+                if($product['action'] ==0)
+                    $products[$key]['product_action'] = "New Product";
+                else if($product['action'] ==1)
+                    $products[$key]['product_action'] = "Dispose";
+                else
+                    $products[$key]['product_action'] = "Move To Room";
+            }
+            $res['products'] = $products;
+            $assignId = Project_user::where(['project_id'=>$id,'type'=>1])->pluck('user_id');
+            $com_id = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
+            $res['team'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,5])->where('status',1)->whereNotIn('id',$assignId)->get();
+            $assignId = Project_user::where(['project_id'=>$id,'type'=>3])->pluck('user_id');
+            $res['left_customer_users'] = User::where('company_id',$project->company_id)->whereIn('user_type',[4,6])->where('status',1)->whereNotIn('id',$assignId)->get();
+            $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+            $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
+            $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
+            $res['unsigned_room'] = Room::where('project_id',$id)->where('signed_off','0')->get();
+            
+            $res['customer_userlist'] = User::whereIn('user_type',[4,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
+            $res['status'] = "success";
+            $res['off_form_values'] = Form_value::where('form_type', 3)
+                ->where('parent_id',$project['signoff_form_id'])->get();
+            $productIds = Product::whereIn('room_id',$room_ids)
+            ->orWhere(function($q) use($id){
+                return $q->where('project_id',$id)
+                    ->where('action',3);
+                })
+            ->pluck('id');
+            $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
+            $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
+            $res['project_id'] = $id;
         }
         if($request->user->user_type <=3){
             $company_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-            $res['customer'] = Company::whereIn('id',$company_id)->orderBy('id','desc')->get();
-            $res['account_manager'] = User::whereIn('user_type',[0,1,3])
+            $res['customers'] = Company::whereIn('id',$company_id)->orderBy('id','desc')->get();
+            $res['account_managers'] = User::whereIn('user_type',[0,1,3])
                                 ->where('status',1)
                                 ->where(function($q) use($company_id,$request){
                                     return $q->whereIn('company_id',$company_id)
                                         ->orwhere('company_id', $request->user->company_id);
                                     })
                                 ->get();
-            $res['customer_user'] = User::whereIn('user_type',[4,6])->where('status',1)->whereIn('company_id',$company_id)->get();
-            //$res['assign_to'] = User::whereIn('company_id',$company_id)->whereIn('user_type',[1,5])->where('status',1)->get();
-            $res['assign_to'] = User::where(function($q) use($company_id,$request){
+            $res['client_users'] = User::whereIn('user_type',[4,6])->where('status',1)->whereIn('company_id',$company_id)->get();
+            $res['assign_users'] = User::where(function($q) use($company_id,$request){
                         return $q->whereIn('company_id',$company_id)
                             ->orwhere('company_id', $request->user->company_id);
                         })
                         ->whereIn('user_type',[0,1,5])->where('status',1)->get();
         }
         else{
-            $res['customer'] = Company::where('id',$request->user->company_id)->orderBy('id','desc')->get();
-            $com_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
-            $res['account_manager'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
-            $res['customer_user'] = User::whereIn('user_type',[4,6])->where('status',1)->where('company_id',$request->user->company_id)->get();
-            $res['assign_to'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[0,1,5])->where('status',1)->get();
+            $res['customers'] = Company::where('id',$request->user->company_id)->orderBy('id','desc')->get();
+            $res['account_managers'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
+            $res['client_users'] = User::whereIn('user_type',[4,6])->where('status',1)->where('company_id',$request->user->company_id)->get();
+            $res['assign_users'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[0,1,5])->where('status',1)->get();
         }
-        if($request->user->user_type <=3)
-            $com_id = $request->user->company_id;
-        else
-            $com_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
-        //$res['assign_to'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[1,5])->where('status',1)->get();
-        //$res['customer_user'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[2,6])->where('status',1)->get();
+        $res['form_fields'] = Form_field::get();
         $res['location_form_rows'] = New_form::where('form_type',0)->get();
         $res['signoff_form_rows'] = New_form::where('form_type',3)->get();
-        $res['sites'] = Site::orderBy('id','desc')->get();
-        $res['rooms'] = Site_room::orderBy('id','desc')->get();
-        $res['status'] = 'success';
+        $res['test_forms'] = New_form::where('form_type', 1)->get();
+        $res['com_forms'] = New_form::where('form_type', 2)->get();
+        $res['product_labels'] = Product_label::get();
+        $res['qr_option'] = Qr_option::first();
+        // for offline mode
+        if ( ! $request->project_id) {
+            $res['company_customers'] = Company_customer::get();
+            $res['all_sites'] = Site::get();
+            $res['all_users'] = User::where('status',1)->get();
+            $res['all_site_rooms'] = Site_room::get();
+        }
         return response()->json($res);
     }
+    
     public function setFavourite(request $request)
     {
         Project::whereId($request->id)->update(['favourite'=>$request->favourite]);
@@ -550,11 +597,12 @@ class ProjectController extends Controller
             $id = Project::where('off_id',$request->project_id)->first()->id;
         Project_user::where('project_id',$id)->where('user_id',$request->user_id)->where('type',1)->delete();
         $project = Project::where('id',$id)->first();
-        $client = User::where('id',$request->user_id)->first()->first_name;
+        $remove_user = User::where('id',$request->user_id)->first();
+        $client = $remove_user->first_name.' '.$remove_user->last_name;
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed you from the team member of project['.$project['project_name'].'] for ['.$client.']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed '.$client.' from the team member of project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -574,11 +622,12 @@ class ProjectController extends Controller
             $id = Project::where('off_id',$request->project_id)->first()->id;
         Project_user::create(['user_id'=>$request->user_id,'project_id'=>$id,'type'=>1]);
         $project = Project::where('id',$id)->first();
-        $client = User::where('id',$request->user_id)->first()->first_name;
+        $add_user = User::where('id',$request->user_id)->first();
+        $client = $add_user->first_name.' '.$add_user->last_name;
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added you as a team member for a new project['.$project['project_name'].'] for ['.$client.']',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$client.' as a team member for project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -598,11 +647,12 @@ class ProjectController extends Controller
             $id = Project::where('off_id',$request->project_id)->first()->id;
         Project_user::where('project_id',$id)->where('user_id',$request->user_id)->where('type',3)->delete();
         $project = Project::where('id',$id)->first();
-        $client = User::where('id',$request->user_id)->first()->first_name;
+        $remove_user = User::where('id',$request->user_id)->first();
+        $client = $remove_user->first_name.' '.$remove_user->last_name;
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed '.$client.' from the customer user of project['.$project['project_name'].'].',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed '.$client.' from the customer user of project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -622,11 +672,12 @@ class ProjectController extends Controller
             $id = Project::where('off_id',$request->project_id)->first()->id;
         Project_user::create(['user_id'=>$request->user_id,'project_id'=>$id,'type'=>3]);
         $project = Project::where('id',$id)->first();
-        $client = User::where('id',$request->user_id)->first()->first_name;
+        $add_user = User::where('id',$request->user_id)->first();
+        $client = $add_user->first_name.' '.$add_user->last_name;
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$client.' as a customer user for a new project['.$project['project_name'].'].',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$client.' as a customer user for a new project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -716,7 +767,7 @@ class ProjectController extends Controller
             $insertnotificationdata = array(
                 'notice_type'		=> '6',
                 'notice_id'			=> $request->id,
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has signed off scope of works for ".$project['project_name']." on [".date("d-m-Y H:i:s")."].",
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has signed off scope of works for ".$project['project_name']." on ".date("d-m-Y H:i:s").".",
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $project['company_id'],
                 'project_id'		=> $project->id,

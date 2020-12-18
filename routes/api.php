@@ -46,8 +46,8 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/project/updateProject','ProjectController@updateProject');///
     Route::post('/project/deleteProject','ProjectController@deleteProject');///
     Route::get('/project/projectList','ProjectController@projectList');///
-    Route::get('/project/projectInfo','ProjectController@projectDetail');///
-    Route::get('/project/getprojectInfo','ProjectController@getProjectInfo');///
+    Route::get('/project/projectInfo','ProjectController@projectInfo');///
+    //Route::get('/project/getprojectInfo','ProjectController@getProjectInfo');///
     Route::post('/project/setFavourite','ProjectController@setFavourite');
     Route::post('/project/deleteAssignUser','ProjectController@deleteAssignUser');
     Route::post('/project/signOff','ProjectController@signOff');
@@ -120,13 +120,14 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::get('/product/getBarcodeInfo', 'ProductController@getBarcodeInfo');
     Route::post('/product/newBarcode', 'ProductController@newBarcode');
     Route::post('/product/qrScan', 'ProductController@qrScan');
+    Route::get('/product/labelList', 'ProductController@labelList');
     Route::post('/product/addLabel', 'ProductController@addLabel');
     Route::post('/product/deleteLabel', 'ProductController@deleteLabel');
     Route::post('/product/setProductLabel', 'ProductController@setProductLabel');
     Route::post('/product/uploadTechPdf', 'ProductController@uploadTechPdf');
     Route::post('/product/uploadBrochuresPdf', 'ProductController@uploadBrochuresPdf');
-    Route::get('/product/unassignedProducts','ProductController@unassignedProducts');
     Route::post('/product/updateScanProduct','ProductController@updateScanProduct');
+    Route::post('/product/changeWarrantyTime','ProductController@changeWarrantyTime');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///
@@ -155,6 +156,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/task/commentSubmit','TaskController@commentSubmit');
     Route::get('/task/getComments','TaskController@getComments');
     Route::post('/task/saveImage','TaskController@saveImage');
+    Route::get('/task/labelList', 'TaskController@labelList');
     Route::post('/task/addLabel', 'TaskController@addLabel');
     Route::post('/task/deleteLabel', 'TaskController@deleteLabel');
     Route::post('/task/setTaskLabel', 'TaskController@setTaskLabel');
