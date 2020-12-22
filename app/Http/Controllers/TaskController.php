@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Cache;
 use App\Task;
 use App\Notification;
 use App\Company;
@@ -166,6 +167,7 @@ class TaskController extends Controller
         return response()->json($res);
     }
     public function taskList(Request $request){
+        //return response()->json($request);
         $res = array();
         if($request->has('room_id') && $request->room_id != 'undefined' && $request->room_id){
             $res['room_id'] = $request->room_id;
@@ -495,6 +497,14 @@ class TaskController extends Controller
         $res['task_labels'] = Task_label::get();
         $res['all_users'] = User::get();
         $res['tasks'] = $tasks;
+        $online_users = array();
+        $users = User::get();
+        foreach ($users as $user) {
+            if (Cache::has('user-is-online-'.$user->id)){
+                array_push($online_users,strval($user->id));
+            }
+        }
+        $res['online_users'] = $online_users;
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -573,9 +583,10 @@ class TaskController extends Controller
         $task['deadline']  = $request->deadline;
         if($request->hasFile('file')){
 
-            $fileName = time().'task.'.$request->file->extension();
+            $fileName = time().'comment.'.$request->file->extension();
             $request->file->move(public_path('upload/file/'), $fileName);
             $task['attach_file']  = $fileName;
+            $task['file_size'] = number_format($request->file->getSize()/1024,2);
         }
         $task = TaskComment::create($task);
         if($request->has('commentUserList'))

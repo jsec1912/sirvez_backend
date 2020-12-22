@@ -264,12 +264,8 @@ class RoomController extends Controller
             $room['img_files']  = $images;
             $room['form_value'] = Form_value::where('parent_id',$room_id)->where('form_type',0)->get();
             $room['form_id'] = Project::whereId($projectId)->first()->location_form_id;
-            $res['form_fields'] = Form_field::get();
 
             $res["room"] = $room;
-            $res['product_form_values'] = Form_value::whereIn('form_type',[1,2])->get();
-            $res['test_forms'] = New_form::where('form_type', 1)->get();
-            $res['com_forms'] = New_form::where('form_type', 2)->get();
             // $products= Product::where('room_id',$room_id)->orderBy('id','desc')->get();
             // foreach($products as $key => $product)
             // {
@@ -426,6 +422,10 @@ class RoomController extends Controller
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
+        $res['form_fields'] = Form_field::get();
+        $res['test_forms'] = New_form::where('form_type', 1)->get();
+        $res['com_forms'] = New_form::where('form_type', 2)->get();
+
         $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
         $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
         $res['product_labels'] = Product_label::get();

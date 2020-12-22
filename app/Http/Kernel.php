@@ -38,11 +38,13 @@ class Kernel extends HttpKernel
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            //\App\Http\Middleware\LastUserActivity::class,
         ],
 
         'api' => [
             'throttle:6000,1',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            //\App\Http\Middleware\LastUserActivity::class,
         ],
     ];
 
@@ -67,5 +69,6 @@ class Kernel extends HttpKernel
         'jwt-auth' => \App\Http\Middleware\jwtMiddleware::class,
         'api-header' => \App\Http\Middleware\API::class,
         'cors' => \App\Http\Middleware\Cors::class,
+        //'is_online' => \App\Http\Middleware\LastUserActivity::class,
     ];
 }

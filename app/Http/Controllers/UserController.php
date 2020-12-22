@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Cache;
 use App\User;
 use App\Company;
 use App\Company_customer;
@@ -581,5 +582,18 @@ class UserController extends Controller
         User::where('id',$request->id)->update(['is_feedback'=>$request->is_feedback]);
         $res['status'] = 'success';
         return response()->json($res);
+    }
+    public function userOnlineStatus()
+    {
+        $res = array();
+        $online_users = array();
+        $users = User::get();
+        foreach ($users as $user) {
+            if (Cache::has('user-is-online-' . $user->id))
+                array_push($online_users,$user->id);
+        }
+        $res['result'] = 'success';
+        $res['online_users'] = $online_users;
+        return response()->json(res);
     }
 }

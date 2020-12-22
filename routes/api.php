@@ -23,7 +23,7 @@ Route::group(['middleware' => ['api-header', 'cors']], function () {
 
 Route::get('/company/getCompanyImg','CompanyController@getCompanyImg');
 
-Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
+Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
 
     //dashboard
     Route::get('/dashboard','CompanyCustomerController@getDashboard');////
@@ -172,6 +172,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/user/deleteFeedback','UserController@deleteFeedback');///
     Route::get('/user/getFeedbackList','UserController@getFeedbackList');///
     Route::post('/user/setFeedback','UserController@setFeedback');///
+    Route::get('/user/userOnlineStatus','UserController@userOnlineStatus');///
 
     Route::post('/category/updateCategory','StickerCategoryController@updateCategory');///
     Route::post('/category/deleteCategory','StickerCategoryController@deleteCategory');///

@@ -5,6 +5,10 @@ use Closure;
 use JWTAuth;
 use JWTAuthException;
 use App\Company_customer;
+
+use Cache;
+use Carbon\Carbon;
+
 class jwtMiddleware
 {
     /**
@@ -22,6 +26,8 @@ class jwtMiddleware
                 return response()->json(['status'=>'TokenError','msg'=>'Token does not exist']);
             }
             $request->user = $user;
+            $expiresAt = Carbon::now()->addMinutes(1);
+            Cache::put('user-is-online-'.$user->id, true, $expiresAt);
            
         } catch (Exception $e) {
             return response()->json(['status'=>'TokenError','msg'=>'Token is Invalid']);
