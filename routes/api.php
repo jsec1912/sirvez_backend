@@ -160,6 +160,7 @@ Route::group(['middleware' => ['jwt-auth','api-header', 'cors']], function () {
     Route::post('/task/addLabel', 'TaskController@addLabel');
     Route::post('/task/deleteLabel', 'TaskController@deleteLabel');
     Route::post('/task/setTaskLabel', 'TaskController@setTaskLabel');
+    Route::post('/task/commentComplete', 'TaskController@commentComplete');
 
 
     Route::post('/user/updateUser','UserController@CustomerUpdateUser');///

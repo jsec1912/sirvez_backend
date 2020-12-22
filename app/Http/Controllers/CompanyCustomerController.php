@@ -17,6 +17,7 @@ use App\Product_sign;
 use App\Product_label_value;
 use App\Qr_option;
 use App\New_form;
+use App\Task_label_value;
 use App\Project_user;
 use App\Notification;
 //use Illuminate\Support\Facades\Mail;
@@ -452,7 +453,7 @@ class CompanyCustomerController extends Controller
         }
         $res['recent_messages'] = $recent_messages;
         $res['tasks'] = Task::whereIn('company_id',$customerId)->orwhere('company_id',$id)->count();
-        $res['tasks_favourite'] = Task::where('tasks.favourite',1)
+        $tasks= Task::where('tasks.favourite',1)
                                     ->where(function($q) use($customerId,$id){
                                         return $q->whereIn('tasks.company_id',$customerId)
                                         ->orwhere('tasks.company_id',$id);
@@ -462,6 +463,13 @@ class CompanyCustomerController extends Controller
                                     ->leftjoin('users','users.id','=','tasks.created_by')
                                     ->select('tasks.*','projects.project_name','companies.name as company_name','users.profile_pic')
                                     ->get();
+        foreach($tasks as $key=>$row){
+            $tasks[$key]['label_value'] = Task_label_value::where('task_id',$row->id)->pluck('label_id');
+            $tasks[$key]['client_users'] = Project_user::where(['project_users.project_id'=>$row->id,'type'=>'2'])->pluck('user_id');
+            $tasks[$key]['assign_users'] = Project_user::where(['project_users.project_id'=>$row->id,'type'=>'2'])
+            ->leftJoin('users','users.id','=','project_users.user_id')->get();
+        }
+        $res['tasks_favourite'] =$tasks;
         //$res['project_list'] = array();
         // $res['lives'] = array();
         //$res['messages'] = array();

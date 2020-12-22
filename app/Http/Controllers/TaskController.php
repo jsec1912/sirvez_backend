@@ -14,6 +14,7 @@ use App\Site;
 use App\Room_photo;
 use App\Project_user;
 use App\TaskComment;
+use App\Task_comment_user;
 use App\Task_label;
 use App\Task_label_value;
 use Mail;
@@ -200,7 +201,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->user->company_id)->get();
                 //$res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['projects'] = array();
@@ -231,7 +232,7 @@ class TaskController extends Controller
                     ->orderBy('tasks.id','desc')
                     ->get();
 
-                $res['users'] = User::/* whereIn('company_id',$customer_id)->or */where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::whereIn('company_id',$customer_id)->orwhere('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 // $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['projects'] = array();
@@ -274,7 +275,7 @@ class TaskController extends Controller
                     ->orderBy('tasks.id','desc')
                     ->get();
 
-                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->customer_id)->get();
                 $res['projects'] = Project::where('company_id',$request->customer_id)->get();
                 $res['customerId'] = $request->customer_id;
@@ -302,7 +303,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->customer_id)->get();
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
                 $res['customerId'] = $request->customer_id;
@@ -343,7 +344,7 @@ class TaskController extends Controller
                     ->orderBy('tasks.id','desc')
                     ->get();
 
-                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->user->company_id)->get();
                 $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
@@ -372,7 +373,7 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
@@ -411,7 +412,7 @@ class TaskController extends Controller
                     ->orderBy('tasks.id','desc')
                     ->get();
 
-                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->user->company_id)->get();
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
             }
@@ -439,12 +440,13 @@ class TaskController extends Controller
                     ->orderBy('archived','asc')
                     ->orderBy('tasks.id','desc')
                     ->get();
-                $res['users'] = User::where('company_id',$request->user->company_id)->get();
+                //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 $res['projects'] = Project::whereIn('company_id',$customer_id)->get();
             }
         }
         foreach($tasks as $key=>$row){
+            $tasks[$key]['label_value'] = Task_label_value::where('task_id',$row->id)->pluck('label_id');
             $room = Room::where('id',$row->site_id)->first();
             if(Site::where('id',$row->site_id)->count() > 0 )
                 $tasks[$key]['site_name'] = Site::where('id',$row->site_id)->first()->site_name;
@@ -465,7 +467,7 @@ class TaskController extends Controller
             $tasks[$key]['comment_number'] = $comment_number;
             $task_comments = TaskComment::where('task_comments.task_id',$tasks[$key]['id'])
                 ->leftJoin('users','users.id','=','task_comments.created_by')
-                ->select('task_comments.*','users.first_name as created_user_f','users.last_name as created_user_l')
+                ->select('task_comments.*','users.first_name','users.last_name','users.profile_pic')
                 ->get();
             for($i = 1;$i<=3;$i++){
                 $tasks[$key]['comment'.$i] = '';
@@ -476,15 +478,18 @@ class TaskController extends Controller
                 if($i>3) break;
                 $tasks[$key]['comment'.$i] = $task_comments[$i-1]['comment'];
                 $tasks[$key]['comment'.$i.'_date'] = date('d-m-Y',strtotime($task_comments[$i-1]['created_at']));
-                $tasks[$key]['comment'.$i.'_user'] = $task_comments[$i-1]['created_user_f'].' '.$task_comments[$i-1]['created_user_l'];
+                $tasks[$key]['comment'.$i.'_user'] = $task_comments[$i-1]['first_name'].' '.$task_comments[$i-1]['last_name'];
             }
-            $task_comments = TaskComment::where('task_comments.task_id',$tasks[$key]['id'])
-                ->leftJoin('users','users.id','=','task_comments.created_by')
-                ->select('task_comments.*','users.first_name','users.last_name','users.profile_pic')
-                ->get();
+            
+            foreach($task_comments as $key1 => $comment){
+                $task_comments[$key1]['assign_users'] = Task_comment_user::where('task_comment_users.comment_id',$comment->id)
+                    ->leftJoin('users','users.id','=','task_comment_users.user_id')
+                    ->select('users.*')->get();
+            }
             $tasks[$key]['comments'] = $task_comments;
-            $tasks[$key]['label_value'] = Task_label_value::where('task_id',$row->id)->pluck('label_id');
         }
+        $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+        $res['users'] = User::whereIn('company_id',$customer_id)->orwhere('company_id',$request->user->company_id)->get();
         $labelIds = Task_label_value::whereIn('task_id',$taskIds)->pluck('label_id');
         $res['task_used_labels'] = Task_label::whereIn('id',$labelIds)->get();
         $res['task_labels'] = Task_label::get();
@@ -565,13 +570,26 @@ class TaskController extends Controller
 
         $task['created_by'] = $request->user->id;
         $task['comment']  = $request->message;
+        $task['deadline']  = $request->deadline;
         if($request->hasFile('file')){
 
-            $fileName = time().'task_comment.'.$request->file->extension();
+            $fileName = time().'task.'.$request->file->extension();
             $request->file->move(public_path('upload/file/'), $fileName);
             $task['attach_file']  = $fileName;
         }
         $task = TaskComment::create($task);
+        if($request->has('commentUserList'))
+        {
+            Task_comment_user::where(['comment_id'=>$task->id])->delete();
+            $array_res = array();
+            $array_res =json_decode($request->commentUserList,true);
+            if($array_res){
+                foreach($array_res as $row)
+                {
+                    Task_comment_user::create(['comment_id'=>$task->id,'user_id'=>$row]);
+                }
+            }
+        }
         $res = array();
         $res['comments'] = TaskComment::where('task_comments.task_id',$task['task_id'])
             ->leftJoin('users','users.id','=','task_comments.created_by')
@@ -678,6 +696,12 @@ class TaskController extends Controller
         $res['labels'] = Task_label::leftJoin('users','users.id','=','task_labels.created_by')
                                         ->select('task_labels.*','users.profile_pic','users.first_name','users.last_name')
                                         ->get();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function commentComplete(request $request){
+        $res = array();
+        TaskComment::where('id',$request->id)->update(['complete'=>$request->complete]);
         $res['status'] = 'success';
         return response()->json($res);
     }
