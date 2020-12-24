@@ -54,25 +54,48 @@ class CompanyController extends Controller
             $request->back_cover->move(public_path('upload/img/'), $fileName);
             $company['back_cover']  = $fileName;
         }
-        $company['name'] = $request->post("name");
-        $company['website']  = $request->post("website");
-        $company['parent_id']  = $request->post("parent_id");
+        if ($request->has('name')) {
+            $company['name'] = $request->name;
+        }
+        if ($request->has('website')) {
+            $company['website']  = $request->website;
+        }
+        if ($request->has('parent_id')) {
+            $company['parent_id']  = $request->parent_id;
+        }
         //$company['manager']  = $request->post("manager");
-        $company['company_email']  = $request->post("company_email");
-        $company['address']  = $request->post("address");
-        $company['address2']  = $request->post("address2");
-        $company['city']  = $request->post("city");
-        $company['postcode']  = $request->post("postcode");
-        $company['country']  = $request->post("country");
+        if ($request->has('company_email')) {
+            $company['company_email']  = $request->company_email;
+        }
+        if ($request->has('address')) {
+            $company['address']  = $request->address;
+        }
+        if ($request->has('address2')) {
+            $company['address2']  = $request->address2;
+        }
+        if ($request->has('city')) {
+            $company['city']  = $request->city;
+        }
+        if ($request->has('postcode')) {
+            $company['postcode']  = $request->postcode;
+        }
+        if ($request->has('country')) {
+            $company['country']  = $request->country;
+        }
         //$company['status']  = $request->post("status");
-        $company['telephone']  = $request->post("telephone");
-        $company['is_upload']  = $request->post("is_upload");
+        if ($request->has('telephone')) {
+            $company['telephone']  = $request->telephone;
+        }
+        if ($request->has('is_upload')) {
+            $company['is_upload']  = $request->is_upload;
+        }
 
-        //return response()->json($company );
-        $count = Company::where('id','<>',$id)->where('website',$request->website)->count();
+        $count = 0;
+        if ($request->has('website')) {
+            Company::where('id','<>',$id)->where('website',$request->website)->count();
+        }
 
-        if($count>0)
-        {
+        if($count>0) {
             $res = array();
             $res['status'] = "error";
             $res['msg'] = 'The website has already been taken!';
@@ -90,8 +113,6 @@ class CompanyController extends Controller
         $res = array();
         $res['status'] = 'success';
         $res['company'] = Company::whereId($id)->first();
-        $res['customers'] = Company::where('id','<>',$id)->get();
-        $res['account_manager'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$id)->get();
 
         $sites = Site::where('company_id',$id)->orderBy('id','desc')->get();
         foreach($sites as $key=>$site){

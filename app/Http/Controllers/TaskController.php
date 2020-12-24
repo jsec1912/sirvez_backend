@@ -171,7 +171,7 @@ class TaskController extends Controller
         $res = array();
         if($request->has('room_id') && $request->room_id != 'undefined' && $request->room_id){
             $res['room_id'] = $request->room_id;
-            if($request->user->user_type >1){
+            if($request->user->user_type >4){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -244,7 +244,7 @@ class TaskController extends Controller
         }
         else if($request->has('customer_id') && $request->customer_id != 'undefined' && $request->customer_id != 'null' && $request->customer_id){
             $res['project_id'] = '';
-            if($request->user->user_type >1){
+            if($request->user->user_type >4){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
@@ -313,7 +313,7 @@ class TaskController extends Controller
         }
         else if($request->has('project_id') && $request->project_id != 'undefined' && $request->project_id){
             $res['project_id'] = $request->project_id;
-            if($request->user->user_type >1){
+            if($request->user->user_type >4){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -383,7 +383,7 @@ class TaskController extends Controller
         }
 
         else{
-            if($request->user->user_type >1){
+            if($request->user->user_type >4){
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q)use($taskIdx,$request){
                             return $q->whereIn('tasks.id',$taskIdx)
@@ -579,8 +579,13 @@ class TaskController extends Controller
         }
 
         $task['created_by'] = $request->user->id;
-        $task['comment']  = $request->message;
+        $comment_array = array();
+        $comment_array = explode('@',$request->message);
+        $task['comment']  = $comment_array[0];
         $task['deadline']  = $request->deadline;
+        if($request->parent_id)
+            $task['parent_id'] = $request->parent_id;
+       
         if($request->hasFile('file')){
 
             $fileName = time().'comment.'.$request->file->extension();
@@ -589,6 +594,27 @@ class TaskController extends Controller
             $task['file_size'] = number_format($request->file->getSize()/1024,2);
         }
         $task = TaskComment::create($task);
+        if(count($comment_array)>0){
+            $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+            $com_id = $request->user->company_id;
+            foreach($comment_array as $key=>$row){
+                if($key==0) continue;
+                $name = array();
+                $name = preg_split('/(?=[A-Z])/',$row);
+                $first_name =$name[1];
+                $last_name =$name[2];
+                $assign_user = User::where(function($q) use($customer_id, $com_id){
+                            return $q->whereIn('company_id',$customer_id)
+                            ->orwhere('company_id',$com_id);
+                        })
+                        ->whereRaw("UPPER(first_name) = '". strtoupper($first_name)."'")
+                        ->whereRaw("UPPER(last_name) = '". strtoupper($last_name)."'")
+                        ->first();
+                if($assign_user){
+                    Task_comment_user::create(['comment_id'=>$task->id,'user_id'=>$assign_user->id]);
+                }
+            }
+        }
         if($request->has('commentUserList'))
         {
             Task_comment_user::where(['comment_id'=>$task->id])->delete();
@@ -713,6 +739,18 @@ class TaskController extends Controller
     public function commentComplete(request $request){
         $res = array();
         TaskComment::where('id',$request->id)->update(['complete'=>$request->complete]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addCommentUser(request $request){
+        $res = array();
+        Task_comment_user::Create(['comment_id'=>$request->comment_id,'user_id'=>$request->user_id]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function deleteCommentUser(request $request){
+        $res = array();
+        Task_comment_user::where(['comment_id'=>$request->comment_id,'user_id'=>$request->user_id])->delete();
         $res['status'] = 'success';
         return response()->json($res);
     }

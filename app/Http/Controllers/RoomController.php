@@ -242,8 +242,9 @@ class RoomController extends Controller
     public function roomInfo(Request $request){
         $res = array();
         $res['schedules'] = array();
-        if ($request->has('id')||$request->has('room_number')) {
+        $res['product_used_labels'] = array();
 
+        if ($request->has('id')||$request->has('room_number')) {
             $room_id = $request->id;
             $projectId = $request->project_id;
             $room = Room::where('rooms.id',$room_id)
@@ -263,9 +264,82 @@ class RoomController extends Controller
             }
             $room['img_files']  = $images;
             $room['form_value'] = Form_value::where('parent_id',$room_id)->where('form_type',0)->get();
-            $room['form_id'] = Project::whereId($projectId)->first()->location_form_id;
+            // $room['form_id'] = Project::whereId($projectId)->first()->location_form_id;
+            if ($room->location_form_id) {
+                $room['location_form'] = New_form::where('id', $room->location_form_id)->get()->first();
+            }
 
             $res["room"] = $room;
+
+            $versions = Version_control::where('version_controls.room_id',$room_id)
+                                    ->leftJoin('rooms','rooms.id','=','version_controls.room_id')
+                                    ->leftJoin('users','users.id','=','version_controls.created_by')
+                                    ->select('version_controls.*','rooms.room_number','users.profile_pic','users.first_name','users.last_name')
+                                    ->orderBy('version_controls.group_id','asc')
+                                    ->get();
+            foreach($versions as $key => $version)
+            {
+                if($version['tag'] ==0)
+                    $versions[$key]['version_tag'] = "Drawing";
+                else if($version['tag'] ==1)
+                    $versions[$key]['version_tag'] = "Document";
+                else
+                    $versions[$key]['version_tag'] = "SpreadSheet";
+            }
+            $res['versions'] = $versions;
+
+            $products = Product::where('room_id',$room_id)
+                                ->orWhere(function($q) use($projectId){
+                                    return $q->where('project_id',$projectId)
+                                        ->where('action',3);
+                                })
+                                ->orderBy('id','desc')
+                                ->get();
+
+            $productIds = Product::where('room_id',$room_id)
+            ->orWhere(function($q) use($projectId){
+                return $q->where('project_id',$projectId)
+                    ->where('action',3);
+            })
+            ->pluck('id');
+            $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
+            $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
+                                                        
+            $project = Project::whereId($projectId)->first();
+            foreach($products as $key => $product)
+            {
+                if($product->room_id){
+                    $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
+                    $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
+                }
+                else{
+                    $products[$key]['room_name'] = '';
+                    $products[$key]['project_id'] = '';
+                }
+                $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
+                $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
+                $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
+                $products[$key]['company_info'] = Company::whereId($project->company_id)->first();
+                $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
+                $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
+                                                    ->leftJoin('users','users.id','=','product_signs.user_id')
+                                                    ->select('product_signs.*','users.first_name','users.profile_pic')
+                                                    ->get();
+                $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
+                $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$project_id,'project_users.type'=>'3'])
+                                                            ->leftjoin('users','users.id','=','project_users.user_id')
+                                                            ->select('users.*')
+                                                            ->get();
+                $products[$key]['install_date'] = date('d-m-Y',strtotime(Project::whereId($project_id)->first()->survey_start_date));
+                if($product['action'] ==0)
+                    $products[$key]['product_action'] = "New Product";
+                else if($product['action'] ==1)
+                    $products[$key]['product_action'] = "Dispose";
+                else
+                    $products[$key]['product_action'] = "Move To Room";
+            }
+            $res['products'] = $products;
+
             // $products= Product::where('room_id',$room_id)->orderBy('id','desc')->get();
             // foreach($products as $key => $product)
             // {
@@ -319,71 +393,6 @@ class RoomController extends Controller
                 $project_id = Project::where('project_name',$request->project_name)->first()->id;
             else
                 $project_id = $request->project_id;
-            $room_ids = Room::where('project_id',$project_id)->pluck('id');
-            
-            $versions = Version_control::whereIn('version_controls.room_id',$room_ids)
-                                    ->leftJoin('rooms','rooms.id','=','version_controls.room_id')
-                                    ->leftJoin('users','users.id','=','version_controls.created_by')
-                                    ->select('version_controls.*','rooms.room_number','users.profile_pic','users.first_name','users.last_name')
-                                    ->orderBy('version_controls.group_id','asc')
-                                    ->get();
-            foreach($versions as $key => $version)
-            {
-                if($version['tag'] ==0)
-                    $versions[$key]['version_tag'] = "Drawing";
-                else if($version['tag'] ==1)
-                    $versions[$key]['version_tag'] = "Document";
-                else
-                    $versions[$key]['version_tag'] = "SpreadSheet";
-            }
-            $res['versions'] = $versions;
-            $products = Product::whereIn('room_id',$room_ids)
-                                ->orWhere(function($q) use($project_id){
-                                    return $q->where('project_id',$project_id)
-                                        ->where('action',3);
-                                })
-                                ->orderBy('id','desc')
-                                ->get();
-            $productIds = Product::whereIn('room_id',$room_ids)
-                                ->orWhere(function($q) use($project_id){
-                                    return $q->where('project_id',$project_id)
-                                        ->where('action',3);
-                                })
-                                ->pluck('id');
-            $project = Project::whereId($project_id)->first();
-            foreach($products as $key => $product)
-            {
-                if($product->room_id){
-                    $products[$key]['room_name'] = Room::whereId($product->room_id)->first()->room_number;
-                    $products[$key]['project_id'] = Room::whereId($product->room_id)->first()->project_id;
-                }
-                else{
-                    $products[$key]['room_name'] = '';
-                    $products[$key]['project_id'] = '';
-                }
-                $products[$key]['signoff_user'] =User::whereId($product->signoff_by)->first();
-                $products[$key]['test_signoff_user'] =User::whereId($product->test_signoff_by)->first();
-                $products[$key]['com_signoff_user'] =User::whereId($product->com_signoff_by)->first();
-                $products[$key]['company_info'] = Company::whereId($project->company_id)->first();
-                $products[$key]['website'] = Company::whereId($project->company_id)->first()->website;
-                $products[$key]['sign_in'] = Product_sign::where('product_signs.product_id',$product->id)
-                                                    ->leftJoin('users','users.id','=','product_signs.user_id')
-                                                    ->select('product_signs.*','users.first_name','users.profile_pic')
-                                                    ->get();
-                $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
-                $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$project_id,'project_users.type'=>'3'])
-                                                            ->leftjoin('users','users.id','=','project_users.user_id')
-                                                            ->select('users.*')
-                                                            ->get();
-                $products[$key]['install_date'] = date('d-m-Y',strtotime(Project::whereId($project_id)->first()->survey_start_date));
-                if($product['action'] ==0)
-                    $products[$key]['product_action'] = "New Product";
-                else if($product['action'] ==1)
-                    $products[$key]['product_action'] = "Dispose";
-                else
-                    $products[$key]['product_action'] = "Move To Room";
-            }
-            $res['products'] = $products;
             $company_id = Project::whereId($project_id)->first()->company_id;
             $com_id = Company_customer::where('customer_id',$company_id)->first()->company_id;
             $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
@@ -426,8 +435,6 @@ class RoomController extends Controller
         $res['test_forms'] = New_form::where('form_type', 1)->get();
         $res['com_forms'] = New_form::where('form_type', 2)->get();
 
-        $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
-        $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
         $res['product_labels'] = Product_label::get();
         $res['qr_option'] = Qr_option::first();
         $res['status'] = "success";

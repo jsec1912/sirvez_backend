@@ -214,10 +214,12 @@ class ProductController extends Controller
     }
     public function productList(Request $request){
         $res = array();
-        if($request->user->user_type<4)
+        $company_id = '';
+        if($request->user->user_type<5)
             $company_id = $request->user->company_id;
         else
-            $company_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
+            if(Company_customer::where('customer_id',$request->user->company_id)->count()>0)
+                $company_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
         $comIds = Company_customer::where('company_id',$company_id)->pluck('customer_id');
         $roomIds = Room::whereIn('company_id',$comIds)->pluck('id');
         $res['barcodes'] = product::whereIn('room_id',$roomIds)->whereNotNull('b_barcode')->orderBy('id','desc')->get()->groupBy('b_barcode');

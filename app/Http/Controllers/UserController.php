@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Cache;
 use App\User;
+use App\Partner;
 use App\Company;
 use App\Company_customer;
 use App\Notification;
@@ -58,7 +59,7 @@ class UserController extends Controller
             $user->auth_token = $token;
             $user->rate ='0';
             $user->save();
-            if($user->user_type <=3)
+            if($user->user_type <=4)
             {
                 if(Company::where('id',$user->company_id)->count()>0){
                     $user->co_name = str_replace(' ','-',Company::where('id',$user->company_id)->first()->name);
@@ -595,5 +596,113 @@ class UserController extends Controller
         $res['result'] = 'success';
         $res['online_users'] = $online_users;
         return response()->json(res);
+    }
+    public function partnerlist(request $request)
+    {        
+        $res = array();
+        $res['status'] = 'success';
+        if($request->user->user_type == 0){
+            $res['users'] = Partner::leftJoin('users','users.id','=','partners.partner_id')
+                            ->leftJoin('companies','partners.company_id','=','companies.id')
+                            ->select('users.*','companies.company_type','companies.name as company_name','companies.website')
+                            ->get();
+            $res['customers'] = Company::get();
+        }
+        else if($request->user->user_type <6)
+        {
+            $userIds = Partner::where('company_id',$request->user->company_id)->select('partner_id')->distinct()->pluck('partner_id');
+            $res['users'] = Partner::where('partners.company_id',$request->user->company_id)
+                                    ->leftJoin('users','users.id','=','partners.partner_id')
+                                    ->leftJoin('companies','partners.company_id','=','companies.id')
+                                    ->select('users.*','companies.company_type','companies.name as company_name','companies.website')
+                                    ->get();
+            $comId = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+            $res['customers'] = Company::whereIn('id',$com_id)
+                            ->orwhere('id', $request->user->company_id)->get();
+        }
+        return response()->json($res);
+    }
+    public function setModifySite(request $request){
+        User::where('id',$request->id)->update(['modify_site'=>$request->modify_site]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setModifyLocation(request $request){
+        User::where('id',$request->id)->update(['modify_location'=>$request->modify_location]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setModifyProduct(request $request){
+        User::where('id',$request->id)->update(['modify_product'=>$request->modify_product]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setModifyTask(request $request){
+        User::where('id',$request->id)->update(['modify_task'=>$request->modify_task]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setModifyUser(request $request){
+        User::where('id',$request->id)->update(['modify_user'=>$request->modify_user]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function updatePartnerUser(Request $request)
+    {
+        $v = Validator::make($request->all(), [
+            //user info
+            'email' => 'required',
+        ]);
+        if ($v->fails())
+        {
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'You must input data in the field!'
+            ]);
+        }
+        $user_info = array();
+        if(Partner::where('company_id',$request->user->company_id)->where('partner_id',$request->partner_id)->count()>0)
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'This partner is already exist!'
+            ]);
+        
+        $user_info = User::where('email',$request->email)->first();
+        if(!$user_info)
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'That email is not exist in Sirvez!'
+            ]);
+        $user_info['modify_site'] = $request->modify_site;
+        $user_info['modify_location'] = $request->modify_location;
+        $user_info['modify_product'] = $request->modify_product;
+        $user_info['modify_task'] = $request->modify_task;
+        $user_info['modify_user'] = $request->modify_user;
+        $user_info->save();
+        $id = $request->id;
+        if(!isset($id) || $id==""|| $id=='null'|| $id=='undefined'){
+            Partner::create(['user_id'=>$request->user->id,'partner_id'=>$user_info->id,'company_id'=>$request->user->company_id]);        
+        }
+        $company_name = Company::where('id',$request->user->company_name)->first()->name;
+        $to_name = $user_info->name;
+        $to_email = $user_info['email'];
+        $content = $request->user->first_name.' '.$request->user->last_name.' from '.$company_name.' wants to partner with '.$company_name.'. Please click here to confirm partnership.';
+        $invitationURL = "https://app.sirvez.com/app/dashboard";
+        $data = ['name'=>$to_name, "content" => 'Invite Partner',"title" =>'Dear '.$to_name,"description" =>$content,"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to confirm partnership'];
+        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+            $message->to($to_email, $to_name)
+                    ->subject('sirvez notification.');
+            $message->from('support@sirvez.com','sirvez support team');
+        });
+        return response()->json(['status' => "success",'msg'=>'Save success']);
+    }
+    public function deletePartner(request $request){
+        Partner::where('user_id',$requeset->id)
+                ->where('company_id',$request->user->company_id)
+                ->delete();
+        return response()->json([
+            'status' => 'success',
+            'msg' => 'You deleted selected partner!'
+        ]);
     }
 }

@@ -54,6 +54,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/addAssignUser','ProjectController@addAssignUser');
     Route::post('/project/addCustomerUser','ProjectController@addCustomerUser');
     Route::post('/project/deleteCustomerUser','ProjectController@deleteCustomerUser');
+    Route::post('/project/addPartnerUser','ProjectController@addPartnerUser');
+    Route::post('/project/deletePartnerUser','ProjectController@deletePartnerUser');
     Route::post('/project/changeSummary','ProjectController@changeSummary');
     Route::post('/project/changeProjectName','ProjectController@changeProjectName');
     Route::post('/project/changeContactNumber','ProjectController@changeContactNumber');
@@ -161,6 +163,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/task/deleteLabel', 'TaskController@deleteLabel');
     Route::post('/task/setTaskLabel', 'TaskController@setTaskLabel');
     Route::post('/task/commentComplete', 'TaskController@commentComplete');
+    Route::post('/task/deleteCommentUser', 'TaskController@deleteCommentUser');
+    Route::post('/task/addCommentUser', 'TaskController@addCommentUser');
 
 
     Route::post('/user/updateUser','UserController@CustomerUpdateUser');///
@@ -173,6 +177,14 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/user/getFeedbackList','UserController@getFeedbackList');///
     Route::post('/user/setFeedback','UserController@setFeedback');///
     Route::get('/user/userOnlineStatus','UserController@userOnlineStatus');///
+    Route::get('/user/partnerlist','UserController@partnerlist');///
+    Route::post('/user/setModifySite','UserController@setModifySite');///
+    Route::post('/user/setModifyLocation','UserController@setModifyLocation');///
+    Route::post('/user/setModifyProduct','UserController@setModifyProduct');///
+    Route::post('/user/setModifyTask','UserController@setModifyTask');///
+    Route::post('/user/setModifyUser','UserController@setModifyUser');///
+    Route::post('/user/updatePartnerUser','UserController@updatePartnerUser');///
+    Route::post('/user/deletePartner','UserController@deletePartner');///
 
     Route::post('/category/updateCategory','StickerCategoryController@updateCategory');///
     Route::post('/category/deleteCategory','StickerCategoryController@deleteCategory');///
