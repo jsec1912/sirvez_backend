@@ -8,6 +8,7 @@ use App\Company_customer;
 
 use Cache;
 use Carbon\Carbon;
+//use Illuminate\Support\Facades\Log;
 
 class jwtMiddleware
 {
@@ -25,10 +26,12 @@ class jwtMiddleware
             if(!$user){
                 return response()->json(['status'=>'TokenError','msg'=>'Token does not exist']);
             }
+            
             $request->user = $user;
+            //Log::info($user->email);
             $expiresAt = Carbon::now()->addMinutes(1);
             Cache::put('user-is-online-'.$user->id, true, $expiresAt);
-           
+            
         } catch (Exception $e) {
             return response()->json(['status'=>'TokenError','msg'=>'Token is Invalid']);
             if ($e instanceof \Tymon\JWTAuth\Exceptions\TokenInvalidException){

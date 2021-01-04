@@ -10,7 +10,9 @@ use App\Project;
 use App\Room;
 use App\Site_room;
 use App\User;
+use App\Partner;
 use Illuminate\Support\Facades\Validator;
+use Mail;
 
 class CompanyController extends Controller
 {
@@ -160,4 +162,196 @@ class CompanyController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
+
+    public function updatePartnerCompany(request $request) {
+        $v = Validator::make($request->all(), [
+            //user info
+            'email' => 'required',
+        ]);
+        if ($v->fails())
+        {
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'You need to input a user email.'
+            ]);
+        }
+        $user = User::where('id', $request->user->id)->first();
+        if(!$user)
+        return response()->json([
+            'status' => 'error',
+            'msg' => 'That user is not Sirvez user!'
+        ]);
+        if (User::where('email', $request->email)->count() == 0) {
+            return response()->json([
+                'status' => 'error',
+                'msg' => 'The email you entered is not a registered user.'
+            ]);
+        }
+        $user = User::where('email', $request->email)->first();
+        if($user->user_type<4)
+            $company_id = $user->company_id;
+        else
+            $company_id = Company_customer::where('customer_id',$user->company_id)->first()->company_id;
+        if (Partner::where([
+            'company_id' => $request->user->company_id,
+            'partner_id' => $company_id,
+        ])->count() > 0) {
+            $partner = Partner::where(['company_id' => $request->user->company_id,'partner_id' => $company_id])
+            ->update(
+                [
+                    'from_user' => $request->user->email,
+                    'to_user' => $user->email,
+                    'is_allowed' => '0',
+                    'modify_site' => $request->modify_site,
+                    'modify_location' => $request->modify_location,
+                    'modify_product' => $request->modify_product,
+                    'modify_task' => $request->modify_task,
+                    'modify_user' => $request->modify_user,
+                    'modify_form' => $request->modify_form,
+                    'modify_sticker' => $request->modify_sticker
+                ]
+            );
+            $partner = Partner::where(['company_id' => $company_id,'partner_id' => $request->user->company_id])
+            ->update(
+                [
+                    'from_user' => $user->email,
+                    'to_user' => $request->user->email,
+                    'is_allowed' => '1',
+                    'modify_site' => $request->modify_site,
+                    'modify_location' => $request->modify_location,
+                    'modify_product' => $request->modify_product,
+                    'modify_task' => $request->modify_task,
+                    'modify_user' => $request->modify_user,
+                    'modify_form' => $request->modify_form,
+                    'modify_sticker' => $request->modify_sticker
+                ]
+            );
+           
+        }
+        else{
+            Partner::create([
+                'from_user' => $request->user->email,
+                'to_user' => $user->email,
+                'company_id' => $request->user->company_id,
+                'partner_id' => $company_id,
+                'is_allowed' => '0',
+                'modify_site' => $request->modify_site,
+                'modify_location' => $request->modify_location,
+                'modify_product' => $request->modify_product,
+                'modify_task' => $request->modify_task,
+                'modify_user' => $request->modify_user,
+                'modify_form' => $request->modify_form,
+                'modify_sticker' => $request->modify_sticker
+            ]);
+            Partner::create([
+                'from_user' => $user->email,
+                'to_user' => $request->user->email,
+                'company_id' => $company_id,
+                'partner_id' => $request->user->company_id,
+                'is_allowed' => '1',
+                'modify_site' => $request->modify_site,
+                'modify_location' => $request->modify_location,
+                'modify_product' => $request->modify_product,
+                'modify_task' => $request->modify_task,
+                'modify_user' => $request->modify_user,
+                'modify_form' => $request->modify_form,
+                'modify_sticker' => $request->modify_sticker
+            ]);
+        }
+        $company = Company::where('id',$request->user->company_id)->first();
+        $to_name = $user->first_name . ' ' . $user->last_name;
+        $to_email = $user['email'];
+        $content = $request->user->first_name.' '.$request->user->last_name.' from '.$company->name.' wants your company to be a partner with his company. Please click here to confirm partnership.';
+        $invitationURL = "https://app.sirvez.com/app/settings/partners";
+        $img = 'https://app.sirvez.com/upload/img/'.$company['logo_img'];
+        $data = ['name'=>$to_name, "content" => 'Invite Partner',"title" =>'Dear '.$to_name,"description" =>$content,"img"=>$img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to confirm partnership'];
+        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+            $message->to($to_email, $to_name)
+                    ->subject('sirvez notification.');
+            $message->from('support@sirvez.com','sirvez support team');
+        });
+        return response()->json([
+            'status' => 'success',
+            'msg' => 'You have sent an invitation to apply for a partner company. Please wait until approved.'
+        ]);
+    }
+
+    public function partnerlist(request $request) {
+        $company_id = Company_customer::where('customer_id',$request->user->company_id)->pluck('id');
+        $partners = Partner::leftJoin('companies', 'companies.id', '=', 'partners.partner_id')
+                        ->where('company_id', $request->user->company_id)
+                        ->orWhereIn('company_id', $company_id)
+                        ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
+                        ->get();
+        $res = array();
+        $res['partners'] = $partners;
+        $res['status'] = 'success';
+        return response()->json($res);
+    } 
+
+    public function deletePartner(request $request) {
+        $partner_id = $request->id;
+        Partner::where([
+            'company_id' => $request->user->company_id,
+            'partner_id' => $partner_id
+        ])->delete();
+        Partner::where([
+            'company_id' => $partner_id,
+            'partner_id' => $request->user->company_id
+        ])->delete();
+        return response()->json([
+            'status' => 'success',
+            'msg' => 'You deleted selected partner!'
+        ]);
+    }
+
+    public function setAllowPartner(request $request){
+        if($request->is_allowed==2){
+            Partner::where([
+                'company_id' => $request->company_id,
+                'partner_id' => $request->partner_id
+            ])->update(['is_allowed'=>2]);
+            Partner::where([
+                'company_id' => $request->partner_id,
+                'partner_id' => $request->company_id
+            ])->update(['is_allowed'=>2]);
+        }
+        else{
+            Partner::where([
+                'company_id' => $request->company_id,
+                'partner_id' => $request->partner_id
+            ])->update(['is_allowed'=>1]);
+            Partner::where([
+                'company_id' => $request->partner_id,
+                'partner_id' => $request->company_id
+            ])->update(['is_allowed'=>0]);
+        }
+        return response()->json(['status' => 'success']);
+    }
+    public function setAllowPartnerRequest(request $request){
+        $company = Company::whereId($request->partner->company_id)->first();
+        $partner = Company::whereId($request->partner->partner_id)->first();
+        $users = User::where('users.company_id',$company->id)
+                        ->leftJoin('companies','companies,id','=','users.company_id')
+                        ->select('users.*','companies.name as company_name')
+                        ->get();
+        foreach($users as $user){
+            $to_name = $user->first_name . ' ' . $user->last_name;
+            $to_email = $user['email'];
+            $content = $request->user->first_name.' '.$request->user->last_name.' from '.$user->company_name.' wants your company to be a partner with '.$partner->name.'. Please click here to confirm partnership.';
+            $invitationURL = "https://app.sirvez.com/app/settings/partners";
+            $img = 'https://app.sirvez.com/upload/img/'.$partner['logo_img'];
+            $data = ['name'=>$to_name, "content" => 'Invite Partner',"title" =>'Dear '.$to_name,"description" =>$content,"img"=>$img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to confirm partnership'];
+            Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                $message->to($to_email, $to_name)
+                        ->subject('sirvez notification.');
+                $message->from('support@sirvez.com','sirvez support team');
+            });
+        }
+        $res =array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    
+
 }

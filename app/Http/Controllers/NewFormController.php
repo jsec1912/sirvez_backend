@@ -85,6 +85,19 @@ class NewFormController extends Controller
         return response()->json($res);
     }
 
+    public function saveFormPartner(request $request) {
+        $res = array();
+        $res['status'] = 'success';
+        $form = New_form::whereId($request->form_id)->first();
+        if ($request->form_partner) {
+            $form->form_partner = 1;
+        } else {
+            $form->form_partner = 0;
+        }
+        $form->update();
+        return response()->json($res);
+    }
+
     public function deleteForm(request $request){
         $res = array();
         if(strlen($request->id) > 10)

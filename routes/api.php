@@ -33,6 +33,11 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/company/getCompanyInfo','CompanyController@getCompanyInfo');
     Route::post('/company/changeLogo','CompanyController@changeLogo');
     Route::get('/company/customerList','CompanyController@customerList');
+    Route::post('/company/updatePartnerCompany', 'CompanyController@updatePartnerCompany');
+    Route::get('/company/partnerlist', 'CompanyController@partnerlist');
+    Route::post('/company/deletePartner', 'CompanyController@deletePartner');
+    Route::post('/company/setAllowPartner', 'CompanyController@setAllowPartner');
+    Route::post('/company/setAllowPartnerRequest', 'CompanyController@setAllowPartnerRequest');
     //customer
     Route::Post('/customers/company/customer-edit','CompanyCustomerController@addCompanyCustomer');///
     Route::Post('/customers/DeleteCompanyCustomer','CompanyCustomerController@DeleteCompanyCustomer');///
@@ -42,6 +47,9 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/customers/userList','CompanyCustomerController@userList');///
     Route::Post('/customers/pendingUser','CompanyCustomerController@pendingUser');
     Route::Post('/customers/setFavourite','CompanyCustomerController@setFavourite');
+    Route::get('/customers/partnerlist', 'CompanyCustomerController@partnerlist');
+    Route::post('/customers/addPartner', 'CompanyCustomerController@addPartner');
+    Route::post('/customers/deletePartner', 'CompanyCustomerController@deletePartner');
 
     Route::post('/project/updateProject','ProjectController@updateProject');///
     Route::post('/project/deleteProject','ProjectController@deleteProject');///
@@ -165,6 +173,9 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/task/commentComplete', 'TaskController@commentComplete');
     Route::post('/task/deleteCommentUser', 'TaskController@deleteCommentUser');
     Route::post('/task/addCommentUser', 'TaskController@addCommentUser');
+    Route::post('/task/setDueByDate', 'TaskController@setDueByDate');
+    Route::post('/task/changeTopMenu', 'TaskController@changeTopMenu');
+    Route::post('/task/modifyComment', 'TaskController@modifyComment');
 
 
     Route::post('/user/updateUser','UserController@CustomerUpdateUser');///
@@ -177,14 +188,6 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/user/getFeedbackList','UserController@getFeedbackList');///
     Route::post('/user/setFeedback','UserController@setFeedback');///
     Route::get('/user/userOnlineStatus','UserController@userOnlineStatus');///
-    Route::get('/user/partnerlist','UserController@partnerlist');///
-    Route::post('/user/setModifySite','UserController@setModifySite');///
-    Route::post('/user/setModifyLocation','UserController@setModifyLocation');///
-    Route::post('/user/setModifyProduct','UserController@setModifyProduct');///
-    Route::post('/user/setModifyTask','UserController@setModifyTask');///
-    Route::post('/user/setModifyUser','UserController@setModifyUser');///
-    Route::post('/user/updatePartnerUser','UserController@updatePartnerUser');///
-    Route::post('/user/deletePartner','UserController@deletePartner');///
 
     Route::post('/category/updateCategory','StickerCategoryController@updateCategory');///
     Route::post('/category/deleteCategory','StickerCategoryController@deleteCategory');///
@@ -204,6 +207,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/schedule/changeStart','ScheduleController@changeStart');///
 
     Route::post('/form/saveFrom','NewFormController@saveForm');///
+    Route::post('/form/saveFormPartner', 'NewFormController@saveFormPartner');
     Route::get('/form/infoForm', 'NewFormController@infoForm');///
     Route::post('/form/deleteForm', 'NewFormController@deleteForm');///
     Route::post('/form/duplicateForm', 'NewFormController@duplicateForm');///

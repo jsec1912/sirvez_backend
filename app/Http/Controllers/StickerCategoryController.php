@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Sticker_category;
 use App\Sticker;
+use App\Company_customer;
+use App\Partner;
 use Illuminate\Support\Facades\File;
 
 class StickerCategoryController extends Controller
@@ -27,8 +29,9 @@ class StickerCategoryController extends Controller
         $category = array();
         $id = $request->id;
         $category['name']  = $request->name;
-        $category['description']  = $request->description;
-        $category['created_by']  = $request->user->id;
+        $category['description'] = $request->description;
+        $category['created_by'] = $request->user->id;
+        $category['company_id'] = $request->company_id;
         if(strlen($request->id) > 10)
             if(Sticker_category::where('off_id',$request->id)->count() > 0)
                 $id = Sticker_category::where('off_id',$request->id)->first()->id;
@@ -94,7 +97,19 @@ class StickerCategoryController extends Controller
     }
     public function categoryList(Request $request){
         $res = array();
-        $res['category'] = Sticker_category::withCount('stickers')->orderBy('id','desc')->get();
+        //// super company id
+        $company_id = $request->user->company_id;
+        if (Company_customer::where('customer_id', $company_id)->count() > 0) {
+            $company_id = Company_customer::where('customer_id', $company_id)->first()->company_id;
+        }
+        $partner_ids = Partner::where([
+            'company_id' => $company_id,
+            'is_allowed' => 2,
+            'modify_sticker' => '1'
+        ])->pluck('partner_id')->toArray();
+        array_push($partner_ids, $company_id);
+        
+        $res['category'] = Sticker_category::whereIn('company_id', $partner_ids)->withCount('stickers')->orderBy('id','desc')->get();
         $res["status"] = "success";
         return response()->json($res);
     }

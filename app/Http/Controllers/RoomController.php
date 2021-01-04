@@ -34,6 +34,7 @@ use App\Qr_option;
 use App\Product_sign;
 use App\Product_label;
 use App\Product_label_value;
+use App\Partner;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -239,10 +240,75 @@ class RoomController extends Controller
         $res["status"] = "success";
         return response()->json($res);
     }
+
+    public function room_check($room, $request) {
+        if (!$room) return false;
+        $project = Project::where('id',$room->project_id)->first();
+        if (!$project) return false;
+        if ($request->user->user_type == 0) {
+            return 1;  // super super admin 
+        } else if ($request->user->user_type < 4) {
+            // super admin case
+            $company_ids = Company_customer::where('company_id',$request->user->company_id)
+            ->pluck('customer_id')->toArray();
+            array_push($company_ids, $request->user->company_id);
+            if (in_array($project['company_id'], $company_ids)) {
+                return 2; // super admin
+            }
+        }
+
+        $team_ids = Project_user::where([
+            'user_id' => $request->user->id,
+            'type' => 3
+        ])->pluck('project_id');
+
+        if (in_array($project['id'], $team_ids->toArray())) {
+            // team case
+            return 3; // end user
+        }
+
+        $partner_ids = Project_user::where([
+            'user_id' => $request->user->id,
+            'type' => 4
+        ])->pluck('project_id');
+
+        if (in_array($project['id'], $partner_ids->toArray())) {
+            // partner case
+            $user_company_id = $request->user->company_id;
+            if (Company_customer::where('customer_id', $request->user->company_id)->count() > 0) {
+                $user_company_id = Company_customer::where('customer_id', $request->user->company_id)
+                    ->first()->company_id;
+            }
+            $project_company_id = $project->company_id;
+            if (Company_customer::where('customer_id', $project->company_id)->count() > 0) {
+                $project_company_id = Company_customer::where('customer_id', $project->company_id)
+                    ->first()->company_id;
+            }
+            
+            if (Partner::where([
+                'company_id' => $project_company_id,
+                'partner_id' => $user_company_id,
+            ])->count() > 0) {
+                // partnership case
+                $partner_row = Partner::where([
+                    'company_id' => $project_company_id,
+                    'partner_id' => $user_company_id
+                ])->first();
+                if ($partner_row->is_allowed == '2' && $partner_row->modify_location == '1') {
+                    return 4; // partner
+                }
+                return 0; 
+            }
+            return 0;
+        }
+        return 0;
+    }
+
     public function roomInfo(Request $request){
         $res = array();
         $res['schedules'] = array();
         $res['product_used_labels'] = array();
+        $res['status'] = 'success';
 
         if ($request->has('id')||$request->has('room_number')) {
             $room_id = $request->id;
@@ -254,6 +320,15 @@ class RoomController extends Controller
             ->leftJoin('sites','sites.id','=','rooms.site_id')
             ->select('rooms.*','projects.project_name','projects.location_form_id','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name')
             ->first();
+
+            //// check permission
+            if ($this->room_check($room, $request) == 0) {
+                return response()->json([
+                    'status' => 'error',
+                    'msg' => 'You do not have permission to view this location.'
+                ]);
+            }
+            //// end check permission
 
             $images = Room_photo::where('room_id',$room_id)->get();
             foreach($images as $key => $image){
@@ -384,9 +459,11 @@ class RoomController extends Controller
                                     ->first();
             $res['room_id'] = $room_id;
             $com_id = Company_customer::where('customer_id',$room->company_id)->first()->company_id;
-            $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
-            $res['signed_cnt'] = Product::where('room_id',$room_id)->where('signed_off','<>','2')->count()-Product::where('room_id',$room_id)->where('signed_off','1')->count();
-
+            $res['task_assign_to'] = User::where('company_id',$com_id)
+                ->whereIn('user_type',[0,1,3])
+                ->where('status',1)
+                ->select('id','first_name','last_name','profile_pic')->get();
+            $res['signed_cnt'] = Product::where('room_id',$room_id)->where('signed_off','<>','2')->count() - Product::where('room_id',$room_id)->where('signed_off','1')->count();
         }
         if(($request->has('project_id') && $request->project_id != 'null')||$request->has('project_name')){
             if((!$request->has('project_id') || $request->project_id =='null') && $request->has('project_name'))

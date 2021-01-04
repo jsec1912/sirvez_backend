@@ -38,7 +38,7 @@
                                         </tr>
                                 
                                         <tr>
-                                            <td colspan="2">- {{$title}}</td>
+                                            <td colspan="2">{{$title}}</td>
                                         </tr>
                                         <tr>
                                             <td colspan="2">- {{$description}}</td>

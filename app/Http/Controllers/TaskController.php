@@ -17,14 +17,15 @@ use App\Project_user;
 use App\TaskComment;
 use App\Task_comment_user;
 use App\Task_label;
+use App\Task_top_menu;
 use App\Task_label_value;
+use App\Partner;
 use Mail;
 use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
 {
     public function updateTask(Request $request){
-
         $v = Validator::make($request->all(), [
             'task' =>'required',
             'company_id' => 'required',
@@ -166,12 +167,100 @@ class TaskController extends Controller
 
         return response()->json($res);
     }
+
+    public function tasklist_of_room_check($room, $request) {
+        $check = app('App\Http\Controllers\RoomController')->room_check($room, $request);
+        if ($check == 4) {
+            // partner
+            $user_company_id = $request->user->company_id;
+            if (Company_customer::where('customer_id', $request->user->company_id)->count() > 0) {
+                $user_company_id = Company_customer::where('customer_id', $request->user->company_id)
+                    ->first()->company_id;
+            }
+            $room_company_id = $room->company_id;
+            if (Company_customer::where('customer_id', $room->company_id)->count() > 0) {
+                $room_company_id = Company_customer::where('customer_id', $room->company_id)
+                    ->first()->company_id;
+            }
+            if (Partner::where([
+                'company_id' => $room_company_id,
+                'partner_id' => $user_company_id
+            ])->count() > 0) {
+                $partner_row = Partner::where([
+                    'company_id' => $room_company_id,
+                    'partner_id' => $user_company_id
+                ])->first();
+                if ($partner_row->is_allowed == '2' && $partner_row->modify_task == '1') {
+                    return 4;
+                }
+            }
+            return 0;
+        }
+        return $check;
+    }
+
+    public function tasklist_of_company_check($request) {
+        if ($request->user->user_type == 0) {
+            return 1; // super super admin
+        } else if ($request->user->user_type < 4) {
+            $company_ids = Company_customer::where('company_id', $request->user->company_id)
+                ->pluck('customer_id')->toArray();
+            array_push($company_ids, $request->user->company_id);
+            if (in_array($request['company_id'], $company_ids)) {
+                return 2; // super admin
+            }
+        } else {
+            if ($request->company_id == $request->user->company_id) {
+                return 3; // end user
+            }
+        }
+        return 0;
+    }
+
+    public function tasklist_of_project_check($project, $request) {
+        $check = app('App\Http\Controllers\ProjectController')->project_check($project, $request);
+        if ($check == 4) {
+            // partner case
+            $user_company_id = $request->user->company_id;
+            if (Company_customer::where('customer_id', $request->user->company_id)->count() > 0) {
+                $user_company_id = Company_customer::where('customer_id', $request->user->company_id)
+                    ->first()->company_id;
+            }
+            $project_company_id = $project->company_id;
+            if (Company_customer::where('customer_id', $project->company_id)->count() > 0) {
+                $project_company_id = Company_customer::where('customer_id', $project->company_id)
+                    ->first()->company_id;
+            }
+            if (Partner::where([
+                'company_id' => $project_company_id,
+                'partner_id' => $user_company_id
+            ])->count() > 0) {
+                $partner_row = Partner::where([
+                    'company_id' => $project_company_id,
+                    'partner_id' => $user_company_id
+                ])->first();
+                if ($partner_row->is_allowed == '2' && $partner_row->modify_task == '1') {
+                    return 4;
+                }
+            }
+            return 0;
+        }
+        return $check;
+    }
+
     public function taskList(Request $request){
         //return response()->json($request);
         $res = array();
         if($request->has('room_id') && $request->room_id != 'undefined' && $request->room_id){
             $res['room_id'] = $request->room_id;
-            if($request->user->user_type >4){
+            $room = Room::whereId($request->room_id)->first();
+            if ($this->tasklist_of_room_check($room, $request) == 0) {
+                return response()->json([
+                    'status' => 'error',
+                    'msg' => 'You do not have permission to view tasks of this location.'
+                ]);
+            }
+            if ($request->user->user_type > 4) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -208,8 +297,7 @@ class TaskController extends Controller
                 //$res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['projects'] = array();
                 $res['customerId'] = Room::where('id',$request->room_id)->first()->company_id;
-            }
-            else{
+            } else {
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
                 $taskIds = Task::where('tasks.room_id',$request->room_id)
                             ->where(function($q){
@@ -240,11 +328,15 @@ class TaskController extends Controller
                 $res['projects'] = array();
                 $res['customerId'] = Room::where('id',$request->room_id)->first()->company_id;
             }
-
-        }
-        else if($request->has('customer_id') && $request->customer_id != 'undefined' && $request->customer_id != 'null' && $request->customer_id){
+        } else if ($request->has('customer_id') && $request->customer_id != 'undefined' && $request->customer_id != 'null' && $request->customer_id) {
             $res['project_id'] = '';
-            if($request->user->user_type >4){
+            if ($this->tasklist_of_company_check($request) == 0) {
+                return response()->json([
+                    'status' => 'success',
+                    'msg' => 'You do not have permission to view tasks of this location.'
+                ]);
+            }
+            if ($request->user->user_type > 4) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
@@ -281,8 +373,7 @@ class TaskController extends Controller
                 $res['customers'] = Company::where('id',$request->customer_id)->get();
                 $res['projects'] = Project::where('company_id',$request->customer_id)->get();
                 $res['customerId'] = $request->customer_id;
-            }
-            else{
+            } else {
                 $taskIds = Task::where('tasks.company_id',$request->customer_id)
                         ->where(function($q){
                             return $q->where('tasks.archived',0)
@@ -310,10 +401,16 @@ class TaskController extends Controller
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
                 $res['customerId'] = $request->customer_id;
             }
-        }
-        else if($request->has('project_id') && $request->project_id != 'undefined' && $request->project_id){
+        } else if ($request->has('project_id') && $request->project_id != 'undefined' && $request->project_id){
+            $project = Project::whereId($request->project_id)->first();
+            if ($this->tasklist_of_project_check($project, $request) == 0) {
+                return response()->json([
+                    'status' => 'success',
+                    'msg' => 'You do not have permission to view tasks of this location.'
+                ]);
+            }
             $res['project_id'] = $request->project_id;
-            if($request->user->user_type >4){
+            if ($request->user->user_type >4) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -350,8 +447,7 @@ class TaskController extends Controller
                 $res['customers'] = Company::where('id',$request->user->company_id)->get();
                 $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
-            }
-            else{
+            } else {
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
                 $taskIds = Task::where('tasks.project_id',$request->project_id)
                         ->where(function($q){
@@ -380,10 +476,8 @@ class TaskController extends Controller
                 $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
             }
-        }
-
-        else{
-            if($request->user->user_type >4){
+        } else {
+            if ($request->user->user_type > 4) { // end user
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q)use($taskIdx,$request){
                             return $q->whereIn('tasks.id',$taskIdx)
@@ -417,20 +511,33 @@ class TaskController extends Controller
                 //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::where('id',$request->user->company_id)->get();
                 $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
-            }
-            else{
-                $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-                $taskIds = Task::whereIn('tasks.company_id',$customer_id)
+            } else {
+                $customer_id = Company_customer::where('company_id',$request->user->company_id)
+                ->pluck('customer_id')->toArray();
+                array_push($customer_id, $request->user->company_id);
+
+                $user_company_id = $request->user->company_id;
+                if (Company_customer::where('customer_id', $user_company_id)->count() > 0) {
+                    $user_company_id = Company_customer::where('customer_id', $user_company_id)
+                        ->first()->company_id;
+                }
+
+                $partner_company_ids = Partner::where([
+                    'company_id' => $user_company_id,
+                    'is_allowed' => '2',
+                    'modify_task' => '1'
+                ])->pluck('partner_id')->toArray();
+
+                $company_ids = array_merge($customer_id, $partner_company_ids);
+
+                $taskIds = Task::whereIn('tasks.company_id',$company_ids)
                                 ->where(function($q){
                                     return $q->where('tasks.archived',0)
                                     ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
                                 })
                                 ->pluck('id');
-                $tasks = Task::whereIn('tasks.company_id',$customer_id)
-                    ->where(function($q){
-                        return $q->where('tasks.archived',0)
-                        ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
-                    })
+
+                $tasks = Task::whereIn('tasks.id',$taskIds)
                     ->leftJoin('projects','projects.id','=','tasks.project_id')
                     ->leftJoin('sites','sites.id','=','tasks.site_id')
                     ->leftJoin('rooms','rooms.id','=','tasks.room_id')
@@ -487,6 +594,7 @@ class TaskController extends Controller
                 $task_comments[$key1]['assign_users'] = Task_comment_user::where('task_comment_users.comment_id',$comment->id)
                     ->leftJoin('users','users.id','=','task_comment_users.user_id')
                     ->select('users.*')->get();
+                $task_comments[$key1]['now_time'] = date("Y-m-d H:i:s");
             }
             $tasks[$key]['comments'] = $task_comments;
         }
@@ -497,14 +605,15 @@ class TaskController extends Controller
         $res['task_labels'] = Task_label::get();
         $res['all_users'] = User::get();
         $res['tasks'] = $tasks;
-        $online_users = array();
-        $users = User::get();
-        foreach ($users as $user) {
-            if (Cache::has('user-is-online-'.$user->id)){
-                array_push($online_users,strval($user->id));
-            }
-        }
-        $res['online_users'] = $online_users;
+        // $online_users = array();
+        // $users = User::get();
+        // foreach ($users as $user) {
+        //     if (Cache::has('user-is-online-'.$user->id)){
+        //         array_push($online_users,strval($user->id));
+        //     }
+        // }
+        // $res['online_users'] = $online_users;
+        $res['top_memus_value'] = Task_top_menu::get();
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -751,6 +860,32 @@ class TaskController extends Controller
     public function deleteCommentUser(request $request){
         $res = array();
         Task_comment_user::where(['comment_id'=>$request->comment_id,'user_id'=>$request->user_id])->delete();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setDueByDate(request $request){
+        $id = $request->id;
+        if(strlen($id)>10){
+            Task::where('off_id',$id)->update(['due_by_date'=>$request->due_by_date]);
+        }
+        else
+            Task::whereId($id)->update(['due_by_date'=>$request->due_by_date]);
+        $res["status"] = "success";
+        return response()->json($res);
+    }
+    public function changeTopMenu(request $request){
+        $id = $request->id;
+        if(strlen($id)>10){
+            Task_top_menu::where('off_id',$id)->update(['is_show'=>$request->is_show]);
+        }
+        else
+            Task_top_menu::whereId($id)->update(['is_show'=>$request->is_show]);
+        $res["status"] = "success";
+        return response()->json($res);
+    }
+    public function modifyComment(request $request){
+        $res = array();
+        TaskComment::where(['id'=>$request->id])->update(['comment'=>$request->comment]);
         $res['status'] = 'success';
         return response()->json($res);
     }

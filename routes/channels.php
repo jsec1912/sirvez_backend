@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Broadcast;
+//use Illuminate\Support\Facades\Log;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,4 +16,14 @@ use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('App.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
+});
+
+Broadcast::channel('presence-online-user', function ($user) {    
+    //Log::info('online-user channel: '.$user->email);
+    return $user;    
+});
+
+Broadcast::channel('online-user', function ($user) {    
+    //Log::info('online-user channel: '.$user->email);
+    return $user;    
 });

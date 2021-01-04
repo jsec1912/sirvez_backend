@@ -304,6 +304,8 @@ class ProjectController extends Controller
     }
     public function projectList(Request $request){
         $res = array();
+        $partner_ids = array();
+
         if($request->user->user_type == 0){
             $project_array = Project::where('archived',$request->archived)
             ->leftJoin('companies','companies.id','=','projects.company_id')
@@ -311,33 +313,36 @@ class ProjectController extends Controller
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
             $res['customers'] = Company::get();
             $res['users'] = User::get();
-        }
-        else if($request->user->user_type < 4){
+        } else if ($request->user->user_type < 4) {
             $id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-            $project_array = Project::whereIn('projects.company_id',$id)->where('archived',$request->archived)
+    
+            $partner_ids = Project_user::where([
+                'user_id' => $request->user->id,
+                'type' => 4
+            ])->pluck('project_id');
+
+            $project_array = Project::where(function ($q) use($id, $partner_ids) {
+                return $q->whereIn('projects.company_id',$id)
+                ->orWhereIn('projects.id', $partner_ids);
+            })->where('archived',$request->archived)
             ->leftJoin('companies','companies.id','=','projects.company_id')
             ->leftJoin('users','users.id','=','projects.manager_id')
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
             $res['customers'] = Company::whereIn('id',$id)->orwhere('id',$request->user->company_id)->get();
             $res['users'] = User::whereIn('company_id',$id)->orwhere('company_id',$request->user->company_id)->get();
-        }
-        else if($request->user->user_type = 4){
-            $id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-            $projectIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'4'])->pluck('project_id');
-            $project_array = Project::whereIn('projects.id',$projectIdx)->where('archived',$request->archived)
-            ->leftJoin('companies','companies.id','=','projects.company_id')
-            ->leftJoin('users','users.id','=','projects.manager_id')
-            ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
-            $res['customers'] = Company::whereIn('id',$id)->orwhere('id',$request->user->company_id)->get();
-            $res['users'] = User::whereIn('company_id',$id)->orwhere('company_id',$request->user->company_id)->get();
-        }
-        else{
-            $projectIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'3'])->pluck('project_id');
+        } else {
+            $projectIdx = Project_user::where('user_id', $request->user->id)
+            ->where(function ($q) {
+                return $q->where('type', 3) // team member case
+                ->orWhere('type', 4); // partner user case
+            })
+            ->pluck('project_id');
             $project_array = Project::whereIn('projects.id',$projectIdx)->where('archived',$request->archived)
             ->leftJoin('companies','companies.id','=','projects.company_id')
             ->leftJoin('users','users.id','=','projects.manager_id')
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
         }
+
         foreach($project_array as $key => $row){
             $project_array[$key]['survey_start_date'] = date('d-m-Y', strtotime($row['survey_start_date']));
             $project_array[$key]['site_count'] = Project_site::where('project_id',$row['id'])->count();
@@ -345,14 +350,72 @@ class ProjectController extends Controller
             $project_array[$key]['product_count'] = Product::whereIn('room_id',$room_idx)->count();
             $project_array[$key]['room_count'] = Room::where('project_id',$row['id'])->count();
             $project_array[$key]['messages'] = Notification::where('notice_type','3')->where('notice_id',$row['id'])->count();
-
+            ///////  partner part
+            $partner_users = Project_user::where([
+                'project_id' => $row['id'],
+                'type' => '4'
+            ])->pluck('user_id');
+            if (in_array($request->user->id, $partner_users->toArray())) {
+                $project_array[$key]['is_partner'] = 1;
+            } else {
+                $project_array[$key]['is_partner'] = 0;
+            }
+            if ($project_array[$key]['is_partner'] == 1){
+                
+                $companyIds = Company_customer::where('customer_id',$row['company_id'])->pluck('company_id');
+                if(count($companyIds)>0)
+                    $project_array[$key]['partner_logos'] = Company::whereIn('id', $companyIds)->get();
+                else
+                    $project_array[$key]['partner_logos'] = Company::where('id',$row['company_id'])->get();
+            }else{
+                $partner_company_ids = User::whereIn('id', $partner_users)->pluck('company_id');
+                $project_array[$key]['partner_logos'] = Company::whereIn('id', $partner_company_ids)->get();
+            }
         }
         $res["projects"] = $project_array;
         $res['status'] = "success";
         return response()->json($res);
     }
+
+    public function project_check($project, $request) {
+        if (!$project) {
+            return 0;
+        }
+        if ($request->user->user_type == 0) {
+            return 1; // super super admin
+        } else if ($request->user->user_type < 4) {
+            // case : user admin
+            $company_ids = Company_customer::where('company_id',$request->user->company_id)
+            ->pluck('customer_id')->toArray();
+            array_push($company_ids, $request->user->company_id);
+            if (in_array($project['company_id'], $company_ids)) {
+                return 2; // super admin
+            }
+        }
+        
+        $partner_ids = Project_user::where([
+            'user_id' => $request->user->id,
+            'type' => 3
+        ])->pluck('project_id');
+
+        if (in_array($project['id'], $partner_ids->toArray())) {
+            return 3; // end user
+        }
+
+        $partner_ids = Project_user::where([
+            'user_id' => $request->user->id,
+            'type' => 4
+        ])->pluck('project_id');
+        
+        if (in_array($project['id'], $partner_ids->toArray())) {
+            return 4; // partner user
+        }
+        return 0;
+    }
+
     public function projectInfo(Request $request){
         $res = array();
+        $res['status'] = "success";
         if($request->project_id){
         
             if(strlen($request->project_id) > 10)
@@ -363,6 +426,16 @@ class ProjectController extends Controller
                 ->leftJoin('companies','projects.company_id','=','companies.id')
                 ->leftJoin('users','users.id','=','projects.created_by')
                 ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
+            
+            /////  check permission
+            if ($this->project_check($project, $request) == 0) {
+                return response()->json([
+                    'status' => 'error',
+                    'msg' => 'You do not have permission to view this project.'
+                ]);
+            }
+            /////  end check permission
+
             $project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
             $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
             $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
@@ -375,19 +448,38 @@ class ProjectController extends Controller
             $project['assign_to'] = Project_user::where(['project_id'=>$id,'type'=>'1'])->pluck('user_id');
             $project['customer_users'] = Project_user::where(['project_id'=>$id,'type'=>'3'])->pluck('user_id');
             $project['partner_users'] = Project_user::where(['project_id'=>$id,'type'=>'4'])->pluck('user_id');
-            $res["project"] = $project;
             if(Company_customer::where('customer_id',$project->company_id)->count()>0)
                 $companyId = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
             else
                 $companyId = '';
+
             $res['partners'] = Partner::where(function($q) use($project,$companyId){
                                         return $q->where('partners.company_id',$project->company_id)
                                         ->orwhere('partners.company_id',$companyId);
                                     })
-                                    ->leftJoin('users','users.id','=','partners.partner_id')
+                                    ->leftJoin('users','users.company_id','=','partners.partner_id')
                                     ->select('users.*')
                                     ->orderBy('partners.id','desc')
                                     ->get();
+            if (in_array($request->user->id, $project['partner_users']->toArray())) {
+                $project['is_partner'] = 1;
+            } else {
+                $project['is_partner'] = 0;
+            }
+            if ($project['is_partner'] == 1){
+                
+                $companyIds = Company_customer::where('customer_id',$project['company_id'])->pluck('company_id');
+                if(count($companyIds)>0)
+                    $project['partner_logos'] = Company::whereIn('id', $companyIds)->get();
+                else
+                    $project['partner_logos'] = Company::where('id',$project['company_id'])->get();
+            }else{
+                $partner_company_ids = User::whereIn('id', $project['partner_users'])->pluck('company_id');
+                $project['partner_logos'] = Company::whereIn('id', $partner_company_ids)->get();
+            }
+
+            $res["project"] = $project;
+
             $res['sites'] = Site::where('company_id',$project->company_id)->orWhere('company_id',$companyId)->orderBy('id','desc')->get();
             $rooms = Room::where('rooms.project_id',$id)
                 ->leftJoin('sites','rooms.site_id','=','sites.id')
@@ -514,7 +606,6 @@ class ProjectController extends Controller
             $res['unsigned_room'] = Room::where('project_id',$id)->where('signed_off','0')->get();
             
             $res['customer_userlist'] = User::whereIn('user_type',[5,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
-            $res['status'] = "success";
             $res['off_form_values'] = Form_value::where('form_type', 3)
                 ->where('parent_id',$project['signoff_form_id'])->get();
             $productIds = Product::whereIn('room_id',$room_ids)
@@ -543,8 +634,7 @@ class ProjectController extends Controller
                             ->orwhere('company_id', $request->user->company_id);
                         })
                         ->whereIn('user_type',[0,1,5])->where('status',1)->get();
-        }
-        else{
+        } else {
             $res['customers'] = Company::where('id',$request->user->company_id)->orderBy('id','desc')->get();
             $res['account_managers'] = User::whereIn('user_type',[0,1,3])->where('status',1)->where('company_id',$request->user->company_id)->get();
             $res['client_users'] = User::whereIn('user_type',[5,6])->where('status',1)->where('company_id',$request->user->company_id)->get();

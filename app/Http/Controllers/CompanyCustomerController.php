@@ -20,6 +20,8 @@ use App\New_form;
 use App\Task_label_value;
 use App\Project_user;
 use App\Notification;
+use App\Customer_partner;
+use App\Partner;
 //use Illuminate\Support\Facades\Mail;
 use Mail;
 use Illuminate\Support\Facades\Validator;
@@ -191,6 +193,13 @@ class CompanyCustomerController extends Controller
             $row['project_count'] = Project::where('company_id',$row['id'])->count();
             $row['site_count'] = Site::where('company_id',$row['id'])->count();
             $row['room_count'] = Site_room::where('company_id',$row['id'])->count();
+            //// partners /////
+            $partner_ids = Customer_partner::where('customer_id', $row->id)->pluck('partner_id');
+            $row['partners'] = Partner::leftJoin('companies', 'companies.id', '=', 'partners.partner_id')
+                            ->WhereIn('partners.id', $partner_ids)
+                            ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
+                            ->get();                                
+
             $customers[$key] = $row;
         }
         // $customers = Company::with(['company_customers'=> function ($query) use($userid) {
@@ -298,6 +307,14 @@ class CompanyCustomerController extends Controller
         $res['test_forms'] = New_form::where('form_type', 1)->get();
         $res['com_forms'] = New_form::where('form_type', 2)->get();
         $res['qr_option'] = Qr_option::first();
+        $partner_ids = Customer_partner::where('customer_id', $company_id)->pluck('partner_id');
+
+        $partners = Partner::leftJoin('companies', 'companies.id', '=', 'partners.partner_id')
+                        ->WhereIn('partners.id', $partner_ids)
+                        ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
+                        ->get();
+        $res['partners'] = $partners;
+
         return response()->json($res);
     }
     public function getCustomerInfo(Request $request){
@@ -485,6 +502,50 @@ class CompanyCustomerController extends Controller
         Company::whereId($request->id)->update(['favourite'=>$request->favourite]);
         $res = array();
         $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function partnerlist(request $request) {
+        $partner_ids = Customer_partner::where('customer_id', $request->id)->pluck('partner_id');
+
+        $partners = Partner::leftJoin('companies', 'companies.id', '=', 'partners.partner_id')
+                        ->WhereIn('partners.id', $partner_ids)
+                        ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
+                        ->get();
+        $res = array();
+        $res['partners'] = $partners;
+        $res['status'] = 'success';
+
+        $company_id = Company_customer::where('customer_id',$request->user->company_id)->pluck('id')->toArray();
+        array_push($company_id, $request->user['company_id']);
+        $allpartners = Partner::leftJoin('companies', 'companies.id', '=', 'partners.partner_id')
+                        ->where('is_allowed', 2)
+                        ->WhereIn('company_id', $company_id)
+                        ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
+                        ->get();
+        $res['allpartners'] = $allpartners;
+
+        return response()->json($res);
+    }
+
+    public function addPartner(request $request) {
+        $res = array();
+        $res['status'] = 'success';
+        $partner = Customer_partner::create([
+            'customer_id' => $request->customer_id,
+            'partner_id' => $request->partner_id
+        ]);
+        $res['partner'] = $partner;
+        return response()->json($res);
+    }
+
+    public function deletePartner(request $request) {
+        $res = array();
+        $res['status'] = 'success';
+        Customer_partner::where([
+            'customer_id' => $request->customer_id,
+            'partner_id' => $request->partner_id
+        ])->delete();
         return response()->json($res);
     }
 }
