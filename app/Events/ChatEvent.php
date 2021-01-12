@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Events;
+
 use App\Project_chat;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -10,10 +11,11 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class OnUserEvent implements ShouldBroadcast
+class ChatEvent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
     public $chat;
+   
     public function __construct(Project_chat $chat)
     {
         $this->chat = $chat;
@@ -26,8 +28,8 @@ class OnUserEvent implements ShouldBroadcast
      */
     public function broadcastOn()
     {
-        return new PresenceChannel('online-user');
-    }
+        return new PresenceChannel('chat');
+    }   
     public function broadcastAs()
     {
         return 'send_message';

@@ -31,12 +31,12 @@ class StickerCategoryController extends Controller
         $category['name']  = $request->name;
         $category['description'] = $request->description;
         $category['created_by'] = $request->user->id;
-        $category['company_id'] = $request->company_id;
         if(strlen($request->id) > 10)
             if(Sticker_category::where('off_id',$request->id)->count() > 0)
                 $id = Sticker_category::where('off_id',$request->id)->first()->id;
             else $id = '';
         if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+            $category['company_id'] = $request->user->company_id;
             $v = Validator::make($request->all(), [
                 'name' => 'unique:sticker_categories',
             ]);

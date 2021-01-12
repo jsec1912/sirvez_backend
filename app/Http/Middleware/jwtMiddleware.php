@@ -29,8 +29,8 @@ class jwtMiddleware
             
             $request->user = $user;
             //Log::info($user->email);
-            $expiresAt = Carbon::now()->addMinutes(1);
-            Cache::put('user-is-online-'.$user->id, true, $expiresAt);
+            // $expiresAt = Carbon::now()->addMinutes(1);
+            // Cache::put('user-is-online-'.$user->id, true, $expiresAt);
             
         } catch (Exception $e) {
             return response()->json(['status'=>'TokenError','msg'=>'Token is Invalid']);

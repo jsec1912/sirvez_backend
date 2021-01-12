@@ -9,6 +9,7 @@ use App\Project_site;
 use App\Site;
 use App\Site_room;
 use App\Task;
+use App\TaskComment;
 use App\Notification;
 use App\User;
 use App\Room;
@@ -17,6 +18,7 @@ use App\Company;
 use App\Product;
 use App\Company_customer;
 use App\Project_user;
+use App\ProjectModule;
 use App\Schedule;
 use App\ScheduleProduct;
 use App\ScheduleEngineer;
@@ -30,6 +32,7 @@ use App\Product_sign;
 use App\Product_label;
 use App\Product_label_value;
 use App\Partner;
+use App\Calendar_event;
 use Mail;
 
 class ProjectController extends Controller
@@ -344,7 +347,7 @@ class ProjectController extends Controller
         }
 
         foreach($project_array as $key => $row){
-            $project_array[$key]['survey_start_date'] = date('d-m-Y', strtotime($row['survey_start_date']));
+            //$project_array[$key]['survey_start_date'] = date('d-m-Y', strtotime($row['survey_start_date']));
             $project_array[$key]['site_count'] = Project_site::where('project_id',$row['id'])->count();
             $room_idx = Room::where('project_id',$row['id'])->pluck('id');
             $project_array[$key]['product_count'] = Product::whereIn('room_id',$room_idx)->count();
@@ -436,7 +439,11 @@ class ProjectController extends Controller
             }
             /////  end check permission
 
-            $project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
+            //$project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
+            if(ProjectModule::where('user_id',$request->user->id)->count()>0)
+                $res['module_status'] = ProjectModule::where('user_id',$request->user->id)->first();
+            else
+                $res['module_status'] = array();
             $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
             $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
             $project['room_count'] = Room::where('project_id',$project['id'])->count();
@@ -445,23 +452,47 @@ class ProjectController extends Controller
                 $project['archived_name'] = User::where('id',$project['archived_id'])->first()->first_name;
             else
                 $project['archived_name'] = '';
-            $project['assign_to'] = Project_user::where(['project_id'=>$id,'type'=>'1'])->pluck('user_id');
-            $project['customer_users'] = Project_user::where(['project_id'=>$id,'type'=>'3'])->pluck('user_id');
-            $project['partner_users'] = Project_user::where(['project_id'=>$id,'type'=>'4'])->pluck('user_id');
+            $project['project_users'] = Project_user::where('project_id', $id)->where('type', '!=', '2')->pluck('user_id');
+
             if(Company_customer::where('customer_id',$project->company_id)->count()>0)
                 $companyId = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
             else
                 $companyId = '';
 
-            $res['partners'] = Partner::where(function($q) use($project,$companyId){
-                                        return $q->where('partners.company_id',$project->company_id)
-                                        ->orwhere('partners.company_id',$companyId);
-                                    })
-                                    ->leftJoin('users','users.company_id','=','partners.partner_id')
-                                    ->select('users.*')
-                                    ->orderBy('partners.id','desc')
-                                    ->get();
-            if (in_array($request->user->id, $project['partner_users']->toArray())) {
+            $partner_ids = Partner::where('company_id', $companyId)
+                ->pluck('partner_id')->toArray();
+            $allow_partners = User::where('status', 1)
+                ->whereIn('company_id', $partner_ids)
+                ->pluck('id')->toArray();
+            $allow_teams = User::where('company_id', $companyId)
+                ->where('status', 1)->whereIn('user_type', [0, 1, 3])
+                ->pluck('id')->toArray();
+            $allow_customers = User::where('company_id', $project->company_id)
+                ->where('status', 1)->whereIn('user_type', [5, 6])
+                ->pluck('id')->toArray();
+
+            $res['allow_users'] = User::whereIn('users.id', $allow_partners)
+                ->orWhereIn('users.id', $allow_teams)
+                ->orWhereIn('users.id', $allow_customers)
+                ->leftJoin('companies', 'users.company_id', '=', 'companies.id')
+                ->select('users.*', 'companies.name as company_name')
+                ->get();
+            foreach($res['allow_users'] as $key => $user) {
+                if (in_array($user['id'], $allow_partners)) {
+                    $res['allow_users'][$key]['type'] = 4;
+                } else if (in_array($user['id'], $allow_teams)) {
+                    $res['allow_users'][$key]['type'] = 1;
+                } else {
+                    $res['allow_users'][$key]['type'] = 3;
+                }
+            }
+
+            $partner_users = Project_user::where([
+                'project_id' => $id,
+                'type' => '4'
+            ])->pluck('user_id');
+
+            if (in_array($request->user->id, $partner_users->toArray())) {
                 $project['is_partner'] = 1;
             } else {
                 $project['is_partner'] = 0;
@@ -474,10 +505,14 @@ class ProjectController extends Controller
                 else
                     $project['partner_logos'] = Company::where('id',$project['company_id'])->get();
             }else{
-                $partner_company_ids = User::whereIn('id', $project['partner_users'])->pluck('company_id');
+                $partner_company_ids = User::whereIn('id', $partner_users)->pluck('company_id');
                 $project['partner_logos'] = Company::whereIn('id', $partner_company_ids)->get();
             }
-
+            $owner_company = Company_customer::where('customer_id',$project['company_id'])->first();
+            if($owner_company)
+                $project['owner'] = Company::whereId($owner_company->company_id)->first();
+            else
+                $project['owner'] = Company::whereId($project->company_id)->first();
             $res["project"] = $project;
 
             $res['sites'] = Site::where('company_id',$project->company_id)->orWhere('company_id',$companyId)->orderBy('id','desc')->get();
@@ -550,14 +585,6 @@ class ProjectController extends Controller
                     $versions[$key]['version_tag'] = "SpreadSheet";
             }
             $res['versions'] = $versions;
-            $res['assign_to'] = Project_user::where(['project_users.project_id'=>$id,'project_users.type'=>'1'])
-                                            ->leftjoin('users','users.id','=','project_users.user_id')
-                                            ->select('users.*')
-                                            ->get();
-            $res['customer_users'] = Project_user::where(['project_users.project_id'=>$id,'project_users.type'=>'3'])
-                                            ->leftjoin('users','users.id','=','project_users.user_id')
-                                            ->select('users.*')
-                                            ->get();
             $products = Product::whereIn('room_id',$room_ids)
                                 ->orWhere(function($q) use($id){
                                     return $q->where('project_id',$id)
@@ -584,7 +611,6 @@ class ProjectController extends Controller
                                                         ->select('product_signs.*','users.first_name','users.profile_pic')
                                                         ->get();
                 $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
-                $products[$key]['client_name'] = $res['customer_users'];
                 $products[$key]['install_date'] = date('d-m-Y',strtotime($project['survey_start_date']));
 
                 if($product['action'] ==0)
@@ -597,9 +623,7 @@ class ProjectController extends Controller
             $res['products'] = $products;
             $assignId = Project_user::where(['project_id'=>$id,'type'=>1])->pluck('user_id');
             $com_id = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
-            $res['team'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,3])->where('status',1)->whereNotIn('id',$assignId)->get();
             $assignId = Project_user::where(['project_id'=>$id,'type'=>3])->pluck('user_id');
-            $res['left_customer_users'] = User::where('company_id',$project->company_id)->whereIn('user_type',[5,6])->where('status',1)->whereNotIn('id',$assignId)->get();
             $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
             $res['task_assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[0,1,3])->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
             $res['signed_cnt'] = Room::where('project_id',$id)->where('signed_off','<>','2')->count()-Room::where('project_id',$id)->where('signed_off','1')->count();
@@ -617,7 +641,38 @@ class ProjectController extends Controller
             $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
             $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
             $res['project_id'] = $id;
+        } else {
+            $user_company_id = $request->user->company_id;
+            if (Company_customer::where('customer_id', $user_company_id)->count() > 0) {
+                $user_company_id = Company_customer::where('customer_id', $user_company_id)->first()->company_id;
+            }
+            $partner_ids = Partner::where('company_id', $user_company_id)
+                ->pluck('partner_id')->toArray();
+            $allow_partners = User::where('status', 1)
+                ->whereIn('company_id', $partner_ids)->pluck('id')->toArray();
+            $allow_teams = User::where('company_id', $user_company_id)
+                ->where('status', 1)->whereIn('user_type', [0, 1, 3])->pluck('id')->toArray();
+            $allow_customers = User::where('company_id', $request->user->company_id)
+                ->where('status', 1)->whereIn('user_type', [5, 6])->pluck('id')->toArray();
+
+            $res['allow_users'] = User::whereIn('users.id', $allow_partners)
+                ->orWhereIn('users.id', $allow_teams)
+                ->orWhereIn('users.id', $allow_customers)
+                ->leftJoin('companies', 'users.company_id', '=', 'companies.id')
+                ->select('users.*', 'companies.name as company_name')
+                ->get();
+                
+            foreach($res['allow_users'] as $key => $user) {
+                if (in_array($user['id'], $allow_partners)) {
+                    $res['allow_users'][$key]['type'] = 4;
+                } else if (in_array($user['id'], $allow_teams)) {
+                    $res['allow_users'][$key]['type'] = 1;
+                } else {
+                    $res['allow_users'][$key]['type'] = 3;
+                }
+            }
         }
+        
         if($request->user->user_type <=3){
             $company_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['customers'] = Company::whereIn('id',$company_id)->orderBy('id','desc')->get();
@@ -715,19 +770,19 @@ class ProjectController extends Controller
         return response()->json($res);
     }
 
-    public function deleteCustomerUser(request $request)
+    public function deleteProjectUser(request $request)
     {
         $id = $request->project_id;
         if(strlen($request->project_id)>10)
             $id = Project::where('off_id',$request->project_id)->first()->id;
-        Project_user::where('project_id',$id)->where('user_id',$request->user_id)->where('type',3)->delete();
+        Project_user::where('project_id',$id)->where('user_id',$request->user_id)->where('type',$request->user_type)->delete();
         $project = Project::where('id',$id)->first();
         $remove_user = User::where('id',$request->user_id)->first();
         $client = $remove_user->first_name.' '.$remove_user->last_name;
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed '.$client.' from the customer user of project: '.$project['project_name'].'.',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed '.$client.' from ' . ($request->user_type == 1 ? 'team member' : ($request->user_type == 3 ? 'customer user' : 'partner user')) . ' user of project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -740,19 +795,23 @@ class ProjectController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
-    public function addCustomerUser(request $request)
+    public function addProjectUser(request $request)
     {
         $id = $request->project_id;
         if(strlen($request->project_id)>10)
             $id = Project::where('off_id',$request->project_id)->first()->id;
-        Project_user::create(['user_id'=>$request->user_id,'project_id'=>$id,'type'=>3]);
+        Project_user::create([
+            'user_id' => $request->user_id,
+            'project_id' => $id,
+            'type' => $request->user_type
+        ]);
         $project = Project::where('id',$id)->first();
         $add_user = User::where('id',$request->user_id)->first();
         $client = $add_user->first_name.' '.$add_user->last_name;
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$client.' as a customer user for a new project: '.$project['project_name'].'.',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$client.' as a ' . ($request->user_type == 1 ? 'team member' : ($request->user_type == 3 ? 'customer user' : 'partner user')) . ' for a new project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -773,6 +832,7 @@ class ProjectController extends Controller
             $project['signed_off'] = 2;
         else
             $project['signed_off'] = 1;
+        $project['signoff_date'] = new date('Y-m-d h:i:s');
         if($request->hasFile('sign_file')){
             $fileName = time().'.'.$request->sign_file->extension();
             $request->sign_file->move(public_path('upload/file/'), $fileName);
@@ -1025,6 +1085,7 @@ class ProjectController extends Controller
         $id = $request->project_id;
         if(strlen($request->project_id)>10)
             $id = Project::where('off_id',$request->project_id)->first()->id;
+        
         Project_user::create(['user_id'=>$request->user_id,'project_id'=>$id,'type'=>4]);
         $project = Project::where('id',$id)->first();
         $add_user = User::where('id',$request->user_id)->first();
@@ -1044,6 +1105,205 @@ class ProjectController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
-
+    public function getEvents(request $request){
+        $res = array();
+        $customerIds = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id')->toArray();
+        array_push($customerIds, $request->user->company_id);
+        $res['customers'] = Company::whereIn('id',$customerIds)->get();
+        $res['projects'] = project::whereIn('company_id',$customerIds)->get();
+        $res['users'] = User::whereIn('company_id',$customerIds)->get();
+        $res['rooms'] = Room::whereIn('company_id',$customerIds)->get();
+        $res['status'] = 'success';
+        $events = array();
+        $roomIds = Room::whereIn('company_id',$customerIds)->pluck('id');
+        $schedules = Schedule::whereIn('schedules.room_id',$roomIds)
+                    ->where('schedules.created_by',$request->user->id)
+                    ->leftJoin('rooms','rooms.id','=','schedules.room_id')
+                    ->select('schedules.*','rooms.project_id')
+                    ->get();
+        foreach($schedules as $key => $schedule){
+            array_push($events,['title'=>'schedule-'.$schedule->schedule_name,
+                                'start'=>date('Y-m-d h:i:s', strtotime($schedule['start_date'])),
+                                'end'=>date('Y-m-d h:i:s', strtotime($schedule['end_date'])),
+                                'desc'=>$schedule->note,
+                                'created_by'=>$schedule->created_by,
+                                'project_id'=>$schedule->project_id,
+                                'id'=>$schedule->id,
+                                'type' => 1
+                                ]);
+        }
+        $tasks = Task::whereIn('company_id',$customerIds)->whereNotNull('due_by_date')->get();
+        foreach($tasks as $key => $task){
+            array_push($events,['title'=>'task-'.$task->task,
+                                'start'=>date('Y-m-d h:i:s', strtotime($task->created_at)),
+                                'end'=>date('Y-m-d h:i:s', strtotime($task['due_by_date'])),
+                                'desc'=>$task->description,
+                                'created_by'=>$task->created_by,
+                                'project_id'=>$task->project_id,
+                                'id'=>$task->id,
+                                'type' => 2
+                                ]);
+        }
+        $taskIds = Task::whereIn('company_id',$customerIds)->pluck('id');
+        $tasks = TaskComment::whereIn('task_id',$taskIds)->whereNotNull('deadline')->get();
+        foreach($tasks as $key => $task){
+            array_push($events,['title'=>'todo-'.$task->comment,
+                                'start'=>date('Y-m-d h:i:s', strtotime($task->created_at)),
+                                'end'=>date('Y-m-d h:i:s', strtotime($task['deadline'])),
+                                'desc'=>'',
+                                'created_by'=>$task->created_by,
+                                'project_id'=>$task->project_id,
+                                'id'=>$task->id,
+                                'type' => 3
+                                ]);
+        }
+        $projects = Project::whereIn('company_id',$customerIds)->get();
+        foreach($projects as $key => $project){
+            array_push($events,['title'=>'project-'.$project->project_name,
+                                'start'=>date('Y-m-d h:i:s', strtotime($project->created_at)),
+                                'end'=>date('Y-m-d h:i:s', strtotime($project['survey_start_date'])),
+                                'desc'=>$project->project_summary,
+                                'created_by'=>$project->created_by,
+                                'project_id'=>$project->id,
+                                'id'=>$project->id,
+                                'type' => 4
+                                ]);
+        }
+        $projects = Project::whereIn('company_id',$customerIds)
+                            ->where('signed_off',2)
+                            ->whereNotNull('signoff_date')
+                            ->get();
+        foreach($projects as $key => $project){
+            array_push($events,['title'=>'project-'.$project->project_name,
+                                'start'=>date('Y-m-d h:i:s', strtotime($project['signoff_date'])),
+                                'end'=>date('Y-m-d h:i:s', strtotime($project['signoff_date'])),
+                                'desc'=>$project->project_summary,
+                                'created_by'=>$project->created_by,
+                                'project_id'=>$project->id,
+                                'id'=>$project->id,
+                                'type' => 5
+                                ]);
+        }
+        $calendar_events = Calendar_event::where('created_by',$request->user->id)->get();
+        foreach($calendar_events as $key => $calendar_event){
+            array_push($events,['title'=>'event-'.$calendar_event->title,
+                                'start'=>date('Y-m-d h:i:s', strtotime($calendar_event->start)),
+                                'end'=>date('Y-m-d h:i:s', strtotime($calendar_event->end)),
+                                'desc'=>$calendar_event->description,
+                                'created_by'=>$calendar_event->created_by,
+                                'project_id'=>'',
+                                'id'=>$calendar_event->id,
+                                'type' => 6
+                                ]);
+        }
+        $res['events'] = $events;
+        return response()->json($res);
+    }
+    public function saveEvent(request $request){
+        $res = array();
+        if($request->type==1){
+            Schedule::whereId($request->id)->update(['start_date'=>$request->start,'end_date'=>$request->end]);
+        }else if($request->type==2){
+            Task::whereId($request->id)->update(['due_by_date'=>$request->end]);
+        }else if($request->type==3){
+            TaskComment::whereId($request->id)->update(['deadline'=>$request->end]);
+        }else if($request->type==4){
+            Project::whereId($request->id)->update(['survey_start_date'=>$request->end]);
+        }else if($request->type==5){
+            Project::whereId($request->id)->update(['signoff_date'=>$request->end]);
+        }
+        else if($request->type==6){
+            if($request->id==''){
+                Calendar_event::create([
+                    'title'=>$request->title,
+                    'start'=>$request->start,
+                    'end'=>$request->end,
+                    'created_by'=>$request->user->id,
+                    ]);
+            }
+            else
+            Calendar_event::whereId($request->id)->update([
+                'title'=>$request->title,
+                'start'=>$request->start,
+                'end'=>$request->end,
+                'created_by'=>$request->user->id,
+                ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function deleteEvent(request $request){
+        $res = array();
+        if($request->type==1){
+            if(strlen($request->id)>10)
+                $id = Schedule::where(['off_id'=>$request->id])->first()->id;
+            else
+                $id = $request->id;
+            if(Schedule::where('parent_id',$id)->count()==0){
+                Schedule::where(['id'=>$request->id])->delete();
+                $res["status"] = "success";
+                ScheduleProduct::where('schedule_id', $id)->delete();
+            }
+            else{
+                $res["status"] = 'error';
+                $res["msg"] = "This schedule has already child. Please first delete child!";
+            }
+        }else if($request->type==2){
+            Task::whereId($request->id)->update(['due_by_date'=>null]);
+        }else if($request->type==3){
+            TaskComment::whereId($request->id)->update(['deadline'=>null]);
+        }else if($request->type==4){
+            Project::whereId($request->id)->update(['survey_start_date'=>null]);
+        }else if($request->type==5){
+            Project::whereId($request->id)->update(['signoff_date'=>null]);
+        }
+        else if($request->type==6){
+            Calendar_event::whereId($request->id)->delete();
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function getProjectModule(request $request){
+        
+        $res = array();
+        if(ProjectModule::where('user_id',$request->user->id)->count()>0)
+            $res['module_status'] = ProjectModule::where('user_id',$request->user->id)->first();
+        else
+            $res['module_status'] = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function updateProjectModule(request $request){
+        
+        $data = array();
+        if($request->in_project==1){
+            $data[$request->caption] = 1;
+            if(ProjectModule::where('user_id',$request->user->id)->count()>0)
+                ProjectModule::where('user_id',$request->user->id)->update($data);
+            else{
+                $data['user_id']= $request->user->id;
+                ProjectModule::create($data);
+            }
+        }else{
+            $data['user_id'] = $request->user->id;
+            $data['task'] = $request->task;
+            $data['version'] = $request->version;
+            $data['schedule'] = $request->schedule;
+            $data['calendar'] = $request->calendar;
+            $data['chat'] = $request->chat;
+            $data['product'] = $request->product;
+            $data['activity'] = $request->activity;
+            if(ProjectModule::where('user_id',$request->user->id)->count()>0)
+                ProjectModule::where('user_id',$request->user->id)->update($data);
+            else{
+                $data['user_id']= $request->user->id;
+                ProjectModule::create($data);
+            }
+        }
+        
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 
 }

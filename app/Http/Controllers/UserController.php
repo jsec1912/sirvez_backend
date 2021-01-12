@@ -48,7 +48,7 @@ class UserController extends Controller
 
     public function login(Request $request)
     {
-        $user = \App\User::where('email', $request->email)->get()->first();
+        $user = User::where('email', $request->email)->get()->first();
         if (is_null($user)) return response()->json(['status'=>'error','msg'=>'That email does not exist!']);
         //if($user->status !='1') return response()->json(['status'=>'error','msg'=>'Please wait until allow!']);
         if ($user && \Hash::check($request->password, $user->password)) // The passwords match...

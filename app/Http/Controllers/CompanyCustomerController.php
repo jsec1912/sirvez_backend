@@ -54,7 +54,8 @@ class CompanyCustomerController extends Controller
         //$company['name'] = str_replace(' ','',$request->post("company_name"));
         $company['name'] = $request->post("company_name");
         $company['website']  = $request->post("website");
-        $company['parent_id']  = $request->post("parent_id");
+        if($request->post("parent_id"))
+            $company['parent_id']  = $request->post("parent_id");
         $company['company_email']  = $request->post("company_email");
         $company['address']  = $request->post("address");
         $company['city']  = $request->post("city");
@@ -233,7 +234,7 @@ class CompanyCustomerController extends Controller
         $res['company'] = Company::whereId($company_id)->first();
         $comIds = Company_customer::where('company_id',$company_id)->pluck('customer_id');
         
-        $res['users'] = User::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->whereIn('status',[1,3])->get();
+        $res['users'] = User::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->get();
         $projects = Project::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->orderBy('id','desc')->get();
         if(!is_null($projects)){
             foreach($projects as $key=>$project){

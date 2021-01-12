@@ -206,11 +206,11 @@ class TaskController extends Controller
             $company_ids = Company_customer::where('company_id', $request->user->company_id)
                 ->pluck('customer_id')->toArray();
             array_push($company_ids, $request->user->company_id);
-            if (in_array($request['company_id'], $company_ids)) {
+            if (in_array($request['customer_id'], $company_ids)) {
                 return 2; // super admin
             }
         } else {
-            if ($request->company_id == $request->user->company_id) {
+            if ($request->customer_id == $request->user->company_id) {
                 return 3; // end user
             }
         }
@@ -260,7 +260,7 @@ class TaskController extends Controller
                     'msg' => 'You do not have permission to view tasks of this location.'
                 ]);
             }
-            if ($request->user->user_type > 4) {
+            if ($request->user->user_type > 1) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -336,7 +336,7 @@ class TaskController extends Controller
                     'msg' => 'You do not have permission to view tasks of this location.'
                 ]);
             }
-            if ($request->user->user_type > 4) {
+            if ($request->user->user_type > 1) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
@@ -410,7 +410,7 @@ class TaskController extends Controller
                 ]);
             }
             $res['project_id'] = $request->project_id;
-            if ($request->user->user_type >4) {
+            if ($request->user->user_type >1) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -477,7 +477,7 @@ class TaskController extends Controller
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
             }
         } else {
-            if ($request->user->user_type > 4) { // end user
+            if ($request->user->user_type > 1) { // end user
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q)use($taskIdx,$request){
                             return $q->whereIn('tasks.id',$taskIdx)
@@ -692,8 +692,10 @@ class TaskController extends Controller
         $comment_array = explode('@',$request->message);
         $task['comment']  = $comment_array[0];
         $task['deadline']  = $request->deadline;
-        if($request->parent_id)
+        if($request->parent_id){
             $task['parent_id'] = $request->parent_id;
+            $task['complete'] = 1;
+        }
        
         if($request->hasFile('file')){
 

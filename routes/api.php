@@ -60,8 +60,10 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/deleteAssignUser','ProjectController@deleteAssignUser');
     Route::post('/project/signOff','ProjectController@signOff');
     Route::post('/project/addAssignUser','ProjectController@addAssignUser');
-    Route::post('/project/addCustomerUser','ProjectController@addCustomerUser');
-    Route::post('/project/deleteCustomerUser','ProjectController@deleteCustomerUser');
+    Route::post('/project/addProjectUser', 'ProjectController@addProjectUser');
+    // Route::post('/project/addCustomerUser','ProjectController@addCustomerUser');
+    // Route::post('/project/deleteCustomerUser','ProjectController@deleteCustomerUser');
+    Route::post('/project/deleteProjectUser', 'ProjectController@deleteProjectUser');
     Route::post('/project/addPartnerUser','ProjectController@addPartnerUser');
     Route::post('/project/deletePartnerUser','ProjectController@deletePartnerUser');
     Route::post('/project/changeSummary','ProjectController@changeSummary');
@@ -69,6 +71,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/changeContactNumber','ProjectController@changeContactNumber');
     Route::post('/project/changeLocationForm','ProjectController@changeLocationForm');
     Route::post('/project/changeSignoffForm','ProjectController@changeSignoffForm');
+    Route::get('/project/getProjectModule','ProjectController@getProjectModule');
+    Route::post('/project/updateProjectModule','ProjectController@updateProjectModule');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -219,5 +223,17 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/version/changeVersionTag', 'VersionControlController@changeVersionTag');
     Route::post('/version/changeVersionRoom', 'VersionControlController@changeVersionRoom');
     Route::post('/version/changeVersionDescription', 'VersionControlController@changeVersionDescription');
+
+    Route::get('/calendar/getEvents','ProjectController@getEvents');///
+    Route::post('/calendar/saveEvent','ProjectController@saveEvent');///
+    Route::post('/calendar/deleteEvent','ProjectController@deleteEvent');///
+
+    Route::post('/chat/sendMessage','ProjectChatController@sendMessage');///
+    Route::get('/chat/getChats','ProjectChatController@getChats');///
+    Route::post('/chat/readMessage','ProjectChatController@readMessage');///
+    Route::post('/chat/createGroup','ProjectChatController@createGroup');///
+    Route::post('/chat/addUserToGroup','ProjectChatController@addUserToGroup');///
+    Route::post('/chat/removeUserToGroup','ProjectChatController@removeUserToGroup');///
+    Route::post('/chat/changeGroupName','ProjectChatController@changeGroupName');///
 
 });

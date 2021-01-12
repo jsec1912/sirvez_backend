@@ -401,11 +401,11 @@ class RoomController extends Controller
                                                     ->select('product_signs.*','users.first_name','users.profile_pic')
                                                     ->get();
                 $products[$key]['label_value'] = Product_label_value::where('product_id',$product->id)->pluck('label_id');
-                $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$project_id,'project_users.type'=>'3'])
+                $products[$key]['client_name'] = Project_user::where(['project_users.project_id'=>$projectId,'project_users.type'=>'3'])
                                                             ->leftjoin('users','users.id','=','project_users.user_id')
                                                             ->select('users.*')
                                                             ->get();
-                $products[$key]['install_date'] = date('d-m-Y',strtotime(Project::whereId($project_id)->first()->survey_start_date));
+                $products[$key]['install_date'] = date('d-m-Y',strtotime(Project::whereId($projectId)->first()->survey_start_date));
                 if($product['action'] ==0)
                     $products[$key]['product_action'] = "New Product";
                 else if($product['action'] ==1)

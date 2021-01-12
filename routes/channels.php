@@ -24,6 +24,8 @@ Broadcast::channel('presence-online-user', function ($user) {
 });
 
 Broadcast::channel('online-user', function ($user) {    
-    //Log::info('online-user channel: '.$user->email);
+    return $user;    
+});
+Broadcast::channel('chat', function ($user) {    
     return $user;    
 });
