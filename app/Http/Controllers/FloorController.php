@@ -9,7 +9,9 @@ use App\Floor;
 use App\Room;
 use App\Site_room;
 use App\Site;
+use App\Product;
 use App\Company_customer;
+use App\LocationPoint;
 use Illuminate\Support\Facades\Validator;
 class FloorController extends Controller
 {
@@ -29,12 +31,27 @@ class FloorController extends Controller
         }
         $floor = array();
         $id = $request->id;
-        $floor['site_id']  = $request->site_id;
+        
+        if(strlen($floor->site_id) > 10){
+            if(Site::where('off_id',$request->site_id)->count()>0){
+                $floor['site_id'] = Site::where('off_id',$request->site_id)->first()->id;
+            }
+            else
+                return response()->json([
+                    'status' => 'error',
+                    'msg' => 'The Site is not exist!'
+                ]);
+        }
+        else
+            $floor['site_id']  = $request->site_id;
         if(strlen($request->building_id) > 10){
             if(Building::where('off_id',$request->building_id)->count()>0)
                 $floor['building_id'] = Building::where('off_id',$request->building_id)->first()->id;
             else
-                $floor['building_id'] = '';
+                return response()->json([
+                    'status' => 'error',
+                    'msg' => 'The building is not exist!'
+                ]);
         }
         else
             $floor['building_id'] = $request->building_id;
@@ -85,13 +102,20 @@ class FloorController extends Controller
         $res = array();
         $res['floor'] = Floor::whereId($request->id)->first();
         $rooms = Site_room::where('site_rooms.floor_id',$request->id)
+        ->with('point')
         ->leftJoin('buildings','buildings.id','=','site_rooms.building_id')
         ->leftJoin('floors','floors.id','=','site_rooms.floor_id')
         ->leftJoin('departments','departments.id','=','site_rooms.department_id')
-        ->select('site_rooms.*','buildings.building_name','floors.floor_name','departments.department_name')
+        ->select('site_rooms.*','buildings.building_name','floors.floor_name','departments.department_name','departments.colour')
         ->orderBy('site_rooms.id','desc')
         ->get();
+        foreach($rooms as $key=>$room){
+            $roomIds = Room::where('room_site_id',$room->id)->pluck('id');
+            $rooms[$key]['products_count'] = Product::whereIn('room_id',$roomIds)->count();
+        }
+       
         $res['rooms'] = $rooms;
+        $res['departments'] = Department::where('company_id',$request->user->company_id)->orderBy('id','desc')->get();
         $res["status"] = "success";
         return response()->json($res);
     }

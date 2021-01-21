@@ -73,6 +73,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/changeSignoffForm','ProjectController@changeSignoffForm');
     Route::get('/project/getProjectModule','ProjectController@getProjectModule');
     Route::post('/project/updateProjectModule','ProjectController@updateProjectModule');
+    Route::get('/project/getActivity','ProjectController@getActivity');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -82,6 +83,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/siteroom/updateRoom','SiteController@updateRoom');
     Route::post('/siteroom/deleteRoom','SiteController@deleteRoom');
     Route::get('/siteroom/roomInfo','SiteController@roomInfo');
+    Route::post('/siteroom/savePolygon','SiteController@savePolygon');
+    
 
     Route::post('/department/updateDepartment','DepartmentController@updateDepartment');
     Route::post('/department/deleteDepartment','DepartmentController@deleteDepartment');
@@ -226,6 +229,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
 
     Route::get('/calendar/getEvents','ProjectController@getEvents');///
     Route::post('/calendar/saveEvent','ProjectController@saveEvent');///
+    Route::post('/calendar/saveNewEvent','ProjectController@saveNewEvent');///
     Route::post('/calendar/deleteEvent','ProjectController@deleteEvent');///
 
     Route::post('/chat/sendMessage','ProjectChatController@sendMessage');///

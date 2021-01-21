@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Company;
 use App\Company_customer;
 use App\Site;
+use App\Building;
+use App\Floor;
 use App\User;
 use App\Task;
 use App\Site_room;
@@ -251,6 +253,8 @@ class CompanyCustomerController extends Controller
 
             $sites[$key]['rooms'] = Site_room::where('site_id',$site->id)->count();
             $sites[$key]['projects'] = Project::where('company_id',$company_id)->count();
+            $sites[$key]['buildings'] = Building::where('site_id',$site->id)->count();
+            $sites[$key]['floors'] = Floor::where('site_id',$site->id)->count();
         }
 
         $res['sites'] =$sites;

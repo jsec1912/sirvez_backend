@@ -29,13 +29,13 @@ class ProjectChatController extends Controller
             broadcast(new OnUserEvent($chat))->toOthers();
             $cnt = 0;
             foreach($onlineUsers as $key){
-                if($key->id==$request->receiver_id)
+                if(strval($key->id)==$request->receiver_id)
                 {
-                    $cnt==1;
+                    $cnt=1;
                     break;
                 }
-                
             }
+           
             if($cnt==0 && User::whereId($request->receiver_id)->count()>0){
                 $pending_user=User::whereId($request->receiver_id)->first();
                 $to_name = $pending_user['first_name'];
@@ -82,12 +82,10 @@ class ProjectChatController extends Controller
                 foreach($onlineUsers as $key){
                     if($key->id==$user->user_id)
                     {
-                        $cnt==1;
+                        $cnt=1;
                         break;
                     }
-                    
                 }
-
                 if($cnt ==0 && User::whereId($user->user_id)->count()>0){
                     $pending_user=User::whereId($user->user_id)->first();
                     $to_name = $pending_user['first_name'];

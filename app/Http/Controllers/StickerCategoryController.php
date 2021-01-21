@@ -86,11 +86,15 @@ class StickerCategoryController extends Controller
         return response()->json($res);
     }
     public function deleteCategory(Request $request){
-        //$stiker = {stiker_id}
         if(strlen($request->id)>10)
-            Sticker_category::where(['off_id'=>$request->id])->delete();
+            $id = Sticker_category::where(['off_id'=>$request->id])->first()->id;
         else
-            Sticker_category::where(['id'=>$request->id])->delete();
+            $id = $request->id;
+        $catetory_name = Sticker_category::where(['id'=>$id])->first()->name;
+        $directory = 'pixie/assets/images/stickers/'.$catetory_name;
+        File::deleteDirectory(public_path($directory));
+        Sticker_category::where(['id'=>$id])->delete();
+        Sticker::where('category_id',$id)->delete();
         $res["status"] = "success";
         
         return response()->json($res);
@@ -109,14 +113,25 @@ class StickerCategoryController extends Controller
         ])->pluck('partner_id')->toArray();
         array_push($partner_ids, $company_id);
         
-        $res['category'] = Sticker_category::whereIn('company_id', $partner_ids)->withCount('stickers')->orderBy('id','desc')->get();
+        $res['category'] = Sticker_category::whereIn('company_id', $partner_ids)
+                                            ->where('id','!=' ,1)
+                                            ->withCount('stickers')->orderBy('id','desc')->get();
         $res["status"] = "success";
         return response()->json($res);
     }
     public function getCategoryInfo(Request $request){
         $res = array();
-        $res['category'] = Sticker_category::whereId($request->id)->first();
-        $res['stickers'] =Sticker::where('category_id',$request->id)->orderBy('id','desc')->get();
+        if($request->id > 0)
+            $res['stickers'] =Sticker::where('stickers.category_id',$request->id)
+                                    ->leftJoin('sticker_categories','sticker_categories.id','=','stickers.category_id')
+                                    ->select('stickers.*','sticker_categories.name as category_name')
+                                    ->orderBy('id','desc')->get();
+        else
+            $res['stickers'] =Sticker::where('stickers.category_id','!=',1)
+                                    ->leftJoin('sticker_categories','sticker_categories.id','=','stickers.category_id')
+                                    ->select('stickers.*','sticker_categories.name as category_name')
+                                    ->orderBy('id','desc')->get();
+        $res['categories'] = Sticker_category::get();
         $res["status"] = "success";
         return response()->json($res);
     }

@@ -10,6 +10,7 @@ use App\Site;
 use App\Site_room;
 use App\Task;
 use App\TaskComment;
+use App\Task_comment_user;
 use App\Notification;
 use App\User;
 use App\Room;
@@ -30,6 +31,7 @@ use App\Version_control;
 use App\Qr_option;
 use App\Product_sign;
 use App\Product_label;
+use App\Task_label_value;
 use App\Product_label_value;
 use App\Partner;
 use App\Calendar_event;
@@ -440,7 +442,9 @@ class ProjectController extends Controller
             /////  end check permission
 
             //$project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
-            if(ProjectModule::where('user_id',$request->user->id)->count()>0)
+            if(ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$id])->count()>0)
+                $res['module_status'] = ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$id])->first();
+            else if(ProjectModule::where('user_id',$request->user->id)->count()>0)
                 $res['module_status'] = ProjectModule::where('user_id',$request->user->id)->first();
             else
                 $res['module_status'] = array();
@@ -452,8 +456,9 @@ class ProjectController extends Controller
                 $project['archived_name'] = User::where('id',$project['archived_id'])->first()->first_name;
             else
                 $project['archived_name'] = '';
-            $project['project_users'] = Project_user::where('project_id', $id)->where('type', '!=', '2')->pluck('user_id');
-
+            $project_users = Project_user::where('project_id', $id)->where('type', '!=', '2')->pluck('user_id')->toArray();
+            array_push($project_users,strval($project->manager_id));
+            $project['project_users'] = $project_users;
             if(Company_customer::where('customer_id',$project->company_id)->count()>0)
                 $companyId = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
             else
@@ -782,7 +787,7 @@ class ProjectController extends Controller
         $insertnotificationndata = array(
             'notice_type'		=> '3',
             'notice_id'			=> $id,
-            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed '.$client.' from ' . ($request->user_type == 1 ? 'team member' : ($request->user_type == 3 ? 'customer user' : 'partner user')) . ' user of project: '.$project['project_name'].'.',
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has removed '.$client.' from ' . ($request->user_type == 1 ? 'team member' : ($request->user_type == 3 ? 'customer user' : 'partner user')) . ' of project: '.$project['project_name'].'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $project['company_id'],
             'project_id'		=> $id,
@@ -832,7 +837,7 @@ class ProjectController extends Controller
             $project['signed_off'] = 2;
         else
             $project['signed_off'] = 1;
-        $project['signoff_date'] = new date('Y-m-d h:i:s');
+        $project['signoff_date'] = new date('Y-m-d H:i:s');
         if($request->hasFile('sign_file')){
             $fileName = time().'.'.$request->sign_file->extension();
             $request->sign_file->move(public_path('upload/file/'), $fileName);
@@ -1108,90 +1113,247 @@ class ProjectController extends Controller
     public function getEvents(request $request){
         $res = array();
         $customerIds = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id')->toArray();
-        array_push($customerIds, $request->user->company_id);
-        $res['customers'] = Company::whereIn('id',$customerIds)->get();
-        $res['projects'] = project::whereIn('company_id',$customerIds)->get();
-        $res['users'] = User::whereIn('company_id',$customerIds)->get();
-        $res['rooms'] = Room::whereIn('company_id',$customerIds)->get();
+        array_push($customerIds, intval($request->user->company_id));
+        if($request->user->user_type>0){
+            $res['customers'] = Company::whereIn('id',$customerIds)->get();
+            $res['projects'] = project::whereIn('company_id',$customerIds)->get();
+            $res['users'] = User::whereIn('company_id',$customerIds)->get();
+            $res['rooms'] = Room::whereIn('company_id',$customerIds)->get();
+        }
+        else
+        {
+            $res['customers'] = Company::get();
+            $res['projects'] = project::get();
+            $res['users'] = User::get();
+            $res['rooms'] = Room::get();
+        }
+        $res['project_users'] = Project_user::where('type', '!=', '2')->get();
+        $res['all_users'] = User::where('status',1)->get();
         $res['status'] = 'success';
         $events = array();
-        $roomIds = Room::whereIn('company_id',$customerIds)->pluck('id');
+        if($request->project_id)
+            $roomIds = Room::where('project_id',$request->project_id)->pluck('id');
+        else
+            $roomIds = Room::whereIn('company_id',$customerIds)->pluck('id');
+        $scheduleIds = ScheduleEngineer::where('engineer_id',$request->user->id)->pluck('schedule_id');
         $schedules = Schedule::whereIn('schedules.room_id',$roomIds)
+                    ->where(function($q) use($request,$scheduleIds){
+                        return $q->whereIn('schedules.id',$scheduleIds)
+                        ->orwhere('schedules.created_by',$request->user->id);
+                    })
                     ->where('schedules.created_by',$request->user->id)
                     ->leftJoin('rooms','rooms.id','=','schedules.room_id')
-                    ->select('schedules.*','rooms.project_id')
+                    ->leftJoin('users','users.id','=','schedules.created_by')
+                    ->leftJoin('projects','projects.id','=','rooms.project_id')
+                    ->select('schedules.*','rooms.project_id','users.first_name','users.last_name','users.profile_pic','projects.project_name')
                     ->get();
         foreach($schedules as $key => $schedule){
-            array_push($events,['title'=>'schedule-'.$schedule->schedule_name,
-                                'start'=>date('Y-m-d h:i:s', strtotime($schedule['start_date'])),
-                                'end'=>date('Y-m-d h:i:s', strtotime($schedule['end_date'])),
+            $engineers = ScheduleEngineer::where('schedule_id',$schedule->id)->pluck('engineer_id')->toArray();
+            array_push($engineers, intval($schedule->created_by));
+            array_push($events,['title'=>$schedule->schedule_name,
+                                'start'=>date('Y-m-d H:i:s', strtotime($schedule['start_date'])),
+                                'end'=>date('Y-m-d H:i:s', strtotime($schedule['end_date'])),
                                 'desc'=>$schedule->note,
                                 'created_by'=>$schedule->created_by,
                                 'project_id'=>$schedule->project_id,
+                                'room_id'=>$schedule->room_id,
+                                'user_name'=>$schedule->first_name.' '.$schedule->last_name,
+                                'profile_pic'=>$schedule->profile_pic,
+                                'users'=>join(',',$engineers),
+                                'project_name'=>$schedule->project_name,
                                 'id'=>$schedule->id,
                                 'type' => 1
                                 ]);
         }
-        $tasks = Task::whereIn('company_id',$customerIds)->whereNotNull('due_by_date')->get();
+        $taskIds = Project_user::where('user_id',$request->user->id)->where('type',2)->pluck('project_id');
+        if($request->project_id)
+            $tasks = Task::where('tasks.project_id',$request->project_id)
+                                ->whereNotNull('tasks.due_by_date')
+                                ->where(function($q) use($request,$taskIds){
+                                    return $q->whereIn('tasks.id',$taskIds)
+                                    ->orwhere('tasks.created_by',$request->user->id);
+                                })
+                                ->leftJoin('users','users.id','=','tasks.created_by')
+                                ->leftJoin('projects','projects.id','=','tasks.project_id')
+                                ->leftJoin('companies','companies.id','=','tasks.company_id')
+                                ->select('tasks.*','users.first_name','users.last_name','users.profile_pic','companies.name as company_name','projects.project_name')
+                                ->get();
+        else
+            $tasks = Task::whereIn('tasks.company_id',$customerIds)
+                                ->whereNotNull('tasks.due_by_date')
+                                ->where(function($q) use($request,$taskIds){
+                                    return $q->whereIn('tasks.id',$taskIds)
+                                    ->orwhere('tasks.created_by',$request->user->id);
+                                })
+                                ->leftJoin('users','users.id','=','tasks.created_by')
+                                ->leftJoin('projects','projects.id','=','tasks.project_id')
+                                ->leftJoin('companies','companies.id','=','tasks.company_id')
+                                ->select('tasks.*','users.first_name','users.last_name','users.profile_pic','companies.name as company_name','projects.project_name')
+                                ->get();
+        foreach($tasks as $key=>$row){
+            $tasks[$key]['label_value'] = Task_label_value::where('task_id',$row->id)->pluck('label_id');
+            $tasks[$key]['client_users'] = Project_user::where(['project_users.project_id'=>$row->id,'type'=>'2'])->pluck('user_id');
+            $tasks[$key]['assign_users'] = Project_user::where(['project_users.project_id'=>$row->id,'type'=>'2'])
+            ->leftJoin('users','users.id','=','project_users.user_id')->get();
+        }      
+        $res['tasks'] = $tasks;
         foreach($tasks as $key => $task){
-            array_push($events,['title'=>'task-'.$task->task,
-                                'start'=>date('Y-m-d h:i:s', strtotime($task->created_at)),
-                                'end'=>date('Y-m-d h:i:s', strtotime($task['due_by_date'])),
+            array_push($events,['title'=>$task->task,
+                                'start'=>date('Y-m-d H:i:s', strtotime($task['due_by_date'])),
+                                'end'=>date('Y-m-d H:i:s', strtotime($task['due_by_date'])),
                                 'desc'=>$task->description,
                                 'created_by'=>$task->created_by,
                                 'project_id'=>$task->project_id,
+                                'room_id'=>$task->room_id,
+                                'task_id'=>$task->id,
+                                'user_name'=>$task->first_name.' '.$task->last_name,
+                                'profile_pic'=>$task->profile_pic,
+                                'users'=>$task->created_by.','.$task->archived_id,
+                                'project_name'=>$task->project_name,
                                 'id'=>$task->id,
                                 'type' => 2
                                 ]);
         }
-        $taskIds = Task::whereIn('company_id',$customerIds)->pluck('id');
-        $tasks = TaskComment::whereIn('task_id',$taskIds)->whereNotNull('deadline')->get();
+        if($request->project_id)
+            $taskIds = Task::where('project_id',$request->project_id)->pluck('id');
+        else
+            $taskIds = Task::whereIn('company_id',$customerIds)->pluck('id');
+        $commentIds = Task_comment_user::where('user_id',$request->user->id)->pluck('comment_id');
+        $tasks = TaskComment::whereIn('task_comments.task_id',$taskIds)
+                            ->where(function($q) use($request,$commentIds){
+                                return $q->whereIn('task_comments.id',$commentIds)
+                                ->orwhere('task_comments.created_by',$request->user->id);
+                            })
+                            ->whereNotNull('task_comments.deadline')
+                            ->leftJoin('tasks','tasks.id','=','task_comments.task_id')
+                            ->leftJoin('users','users.id','=','task_comments.created_by')
+                            ->leftJoin('projects','projects.id','=','tasks.project_id')
+                            ->select('tasks.*','users.first_name','users.last_name','users.profile_pic','projects.project_name')
+                            ->get();
         foreach($tasks as $key => $task){
-            array_push($events,['title'=>'todo-'.$task->comment,
-                                'start'=>date('Y-m-d h:i:s', strtotime($task->created_at)),
-                                'end'=>date('Y-m-d h:i:s', strtotime($task['deadline'])),
+            $comment_users = Task_comment_user::where('comment_id',$task->id)->pluck('user_id')->toArray();
+            array_push($comment_users,$task->created_by);
+            array_push($events,['title'=>$task->comment,
+                                'start'=>date('Y-m-d H:i:s', strtotime($task->created_at)),
+                                'end'=>date('Y-m-d H:i:s', strtotime($task['deadline'])),
                                 'desc'=>'',
                                 'created_by'=>$task->created_by,
                                 'project_id'=>$task->project_id,
+                                'room_id'=>$task->room_id,
+                                'task_id'=>$task->task_id,
+                                'user_name'=>$task->first_name.' '.$task->last_name,
+                                'profile_pic'=>$task->profile_pic,
+                                'users'=>join(',',$comment_users),
+                                'project_name'=>$task->project_name,
                                 'id'=>$task->id,
                                 'type' => 3
                                 ]);
         }
-        $projects = Project::whereIn('company_id',$customerIds)->get();
+        $projectIds = Project_user::where('user_id',$request->user->id)->where('type',3)->pluck('project_id');
+        if($request->project_id)
+            $projects = Project::where('projects.id',$request->project_id)
+                                ->where(function($q) use($request,$projectIds){
+                                    return $q->whereIn('projects.id',$projectIds)
+                                    ->orwhere('projects.created_by',$request->user->id);
+                                })
+                                ->leftJoin('users','users.id','=','projects.created_by')
+                                ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
+                                ->get();
+        else
+            $projects = Project::whereIn('projects.company_id',$customerIds) 
+                                ->where(function($q) use($request,$projectIds){
+                                    return $q->whereIn('projects.id',$projectIds)
+                                    ->orwhere('projects.created_by',$request->user->id);
+                                })
+                                ->leftJoin('users','users.id','=','projects.created_by')
+                                ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
+                                ->get();;
         foreach($projects as $key => $project){
-            array_push($events,['title'=>'project-'.$project->project_name,
-                                'start'=>date('Y-m-d h:i:s', strtotime($project->created_at)),
-                                'end'=>date('Y-m-d h:i:s', strtotime($project['survey_start_date'])),
+            $project_users = Project_user::where('project_id',$project->id)->pluck('user_id')->toArray();
+            array_push($project_users,$project->created_by);
+            array_push($project_users,$project->manager_id);
+            array_push($events,['title'=>$project->project_name,
+                                'start'=>date('Y-m-d H:i:s', strtotime($project['survey_start_date'])),
+                                'end'=>date('Y-m-d H:i:s', strtotime($project['survey_start_date'])),
                                 'desc'=>$project->project_summary,
                                 'created_by'=>$project->created_by,
                                 'project_id'=>$project->id,
+                                'room_id'=>'',
+                                'user_name'=>$project->first_name.' '.$project->last_name,
+                                'profile_pic'=>$project->profile_pic,
+                                'users'=>join(',',$project_users),
+                                'project_name'=>$project->project_name,
                                 'id'=>$project->id,
                                 'type' => 4
                                 ]);
         }
-        $projects = Project::whereIn('company_id',$customerIds)
-                            ->where('signed_off',2)
-                            ->whereNotNull('signoff_date')
+        $projectIds = Project_user::where('user_id',$request->user->id)->where('type',3)->pluck('project_id');
+        if($request->project_id)
+             $projects = Project::where('projects.id',$request->project_id)
+                            ->where(function($q) use($request,$projectIds){
+                                return $q->whereIn('projects.id',$projectIds)
+                                ->orwhere('projects.created_by',$request->user->id);
+                            })
+                            ->where('projects.signed_off',2)
+                            ->whereNotNull('projects.signoff_date')
+                            ->leftJoin('users','users.id','=','projects.created_by')
+                            ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
+                            ->get();
+        else
+            $projects = Project::whereIn('projects.company_id',$customerIds)
+                            ->where(function($q) use($request,$projectIds){
+                                return $q->whereIn('projects.id',$projectIds)
+                                ->orwhere('projects.created_by',$request->user->id);
+                            })
+                            ->where('projects.signed_off',2)
+                            ->whereNotNull('projects.signoff_date')
+                            ->leftJoin('users','users.id','=','projects.created_by')
+                            ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
                             ->get();
         foreach($projects as $key => $project){
-            array_push($events,['title'=>'project-'.$project->project_name,
-                                'start'=>date('Y-m-d h:i:s', strtotime($project['signoff_date'])),
-                                'end'=>date('Y-m-d h:i:s', strtotime($project['signoff_date'])),
+            $project_users = Project_user::where('project_id',$project->id)->pluck('user_id')->toArray();
+            array_push($project_users,$project->created_by);
+            array_push($project_users,$project->manager_id);
+            array_push($events,['title'=>$project->project_name,
+                                'start'=>date('Y-m-d H:i:s', strtotime($project['signoff_date'])),
+                                'end'=>date('Y-m-d H:i:s', strtotime($project['signoff_date'])),
                                 'desc'=>$project->project_summary,
                                 'created_by'=>$project->created_by,
                                 'project_id'=>$project->id,
+                                'room_id'=>'',
+                                'user_name'=>$project->first_name.' '.$project->last_name,
+                                'profile_pic'=>$project->profile_pic,
+                                'users'=>join(',',$project_users),
+                                'project_name'=>$project->project_name,
                                 'id'=>$project->id,
                                 'type' => 5
                                 ]);
         }
-        $calendar_events = Calendar_event::where('created_by',$request->user->id)->get();
+        if($request->project_id)
+            $calendar_events = Calendar_event::where('calendar_events.users','like','%,'.$request->user->id.',%')
+                                ->where('calendar_events.project_id',$request->project_id)
+                                ->leftJoin('users','users.id','=','calendar_events.created_by')
+                                ->leftJoin('projects','projects.id','=','calendar_events.project_id')
+                                ->select('calendar_events.*','users.first_name','users.last_name','users.profile_pic','projects.project_name')
+                                ->get();
+        else
+            $calendar_events = Calendar_event::where('calendar_events.users','like','%,'.$request->user->id.',%')
+                                ->leftJoin('users','users.id','=','calendar_events.created_by')
+                                ->leftJoin('projects','projects.id','=','calendar_events.project_id')
+                                ->select('calendar_events.*','users.first_name','users.last_name','users.profile_pic','projects.project_name')
+                                ->get();
         foreach($calendar_events as $key => $calendar_event){
-            array_push($events,['title'=>'event-'.$calendar_event->title,
-                                'start'=>date('Y-m-d h:i:s', strtotime($calendar_event->start)),
-                                'end'=>date('Y-m-d h:i:s', strtotime($calendar_event->end)),
+            array_push($events,['title'=>$calendar_event->title,
+                                'start'=>date('Y-m-d H:i:s', strtotime($calendar_event->start)),
+                                'end'=>date('Y-m-d H:i:s', strtotime($calendar_event->end)),
                                 'desc'=>$calendar_event->description,
                                 'created_by'=>$calendar_event->created_by,
-                                'project_id'=>'',
+                                'project_id'=>$calendar_event->project_id,
+                                'room_id'=>$calendar_event->room_id,
+                                'project_name'=>$calendar_event->project_name,
+                                'user_name'=>$calendar_event->first_name.' '.$calendar_event->last_name,
+                                'profile_pic'=>$calendar_event->profile_pic,
+                                'users'=>$calendar_event->users.',',
                                 'id'=>$calendar_event->id,
                                 'type' => 6
                                 ]);
@@ -1201,33 +1363,71 @@ class ProjectController extends Controller
     }
     public function saveEvent(request $request){
         $res = array();
+        $event_users = json_decode($request->added_users,true);
         if($request->type==1){
-            Schedule::whereId($request->id)->update(['start_date'=>$request->start,'end_date'=>$request->end]);
+            Schedule::whereId($request->id)->update([
+                'schedule_name'=>$request->title,
+                'note'=>$request->desc,
+                'start_date'=>$request->start,
+                'end_date'=>$request->end]);
+            foreach($event_users as $user){
+                ScheduleEngineer::create(['schedule_id'=>$request->id,'engineer_id'=>$user]);
+            }
         }else if($request->type==2){
-            Task::whereId($request->id)->update(['due_by_date'=>$request->end]);
+            Task::whereId($request->id)->update([
+                'task'=>$request->title,
+                'description'=>$request->desc,
+                'due_by_date'=>$request->end
+                ]);
+                foreach($event_users as $user){
+                    Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>2]);
+                }
         }else if($request->type==3){
-            TaskComment::whereId($request->id)->update(['deadline'=>$request->end]);
+            TaskComment::whereId($request->id)->update([
+                'comment'=>$request->title,
+                'deadline'=>$request->end]);
+            foreach($event_users as $user){
+                Task_comment_user::create(['comment_id'=>$request->id,'user_id'=>$user]);
+            }
         }else if($request->type==4){
-            Project::whereId($request->id)->update(['survey_start_date'=>$request->end]);
+            Project::whereId($request->id)->update([
+                'project_name'=>$request->title,
+                'project_summary'=>$request->desc,
+                'survey_start_date'=>$request->end]);
+            foreach($event_users as $user){
+                Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>3]);
+            }
         }else if($request->type==5){
-            Project::whereId($request->id)->update(['signoff_date'=>$request->end]);
+            Project::whereId($request->id)->update([
+                'project_name'=>$request->title,
+                'project_summary'=>$request->desc,
+                'signoff_date'=>$request->end]);
+            foreach($event_users as $user){
+                Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>3]);
+            }
         }
         else if($request->type==6){
             if($request->id==''){
                 Calendar_event::create([
                     'title'=>$request->title,
+                    'description'=>$request->desc,
                     'start'=>$request->start,
-                    'end'=>$request->end,
+                    'end'=>$request->is_fullDay==0?$request->end:$request->start,
                     'created_by'=>$request->user->id,
                     ]);
             }
-            else
-            Calendar_event::whereId($request->id)->update([
-                'title'=>$request->title,
-                'start'=>$request->start,
-                'end'=>$request->end,
-                'created_by'=>$request->user->id,
-                ]);
+            else{
+                $event = Calendar_event::whereId($request->id)->first();
+                $users =  explode(',',$event->users);
+                $event_users = array_merge($users,$event_users);
+                Calendar_event::whereId($request->id)->update([
+                    'title'=>$request->title,
+                    'start'=>$request->start,
+                    'end'=>$request->is_fullDay==0?$request->end:$request->start,
+                    'created_by'=>$request->user->id,
+                    'users'=>join(',',$event_users).','
+                    ]);
+            }
         }
         $res['status'] = 'success';
         return response()->json($res);
@@ -1277,14 +1477,73 @@ class ProjectController extends Controller
         
         $data = array();
         if($request->in_project==1){
-            $data[$request->caption] = 1;
-            if(ProjectModule::where('user_id',$request->user->id)->count()>0)
-                ProjectModule::where('user_id',$request->user->id)->update($data);
+            $data[$request->caption] = $request->value;
+            if(ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$request->project_id])->count()>0)
+                ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$request->project_id])->update($data);
             else{
-                $data['user_id']= $request->user->id;
-                ProjectModule::create($data);
+                if(ProjectModule::where(['user_id'=>$request->user->id])->count()>0){
+                    $data = ProjectModule::where(['user_id'=>$request->user->id])->first();
+                    $data[$request->caption] = $request->value;
+                    unset($data['id']);
+                    unset($data['created_at']);
+                    unset($data['updated_at']);
+                    $data['user_id']= $request->user->id;
+                    $data['project_id']= $request->project_id;
+                    ProjectModule::create($data->toArray());
+                } else {
+                    $data['user_id']= $request->user->id;
+                    $data['project_id']= $request->project_id;
+                    ProjectModule::create($data);
+                }
             }
-        }else{
+            if ($request->has('option') && $request->option == 2) {
+                $project = Project::whereId($request->project_id)->first();
+                // type == 1 ; team member, type == 3 ; customer users, type == 4; partner users
+                $project_users = Project_user::where('project_id', $project->id)
+                    ->where('type', '!=', '2')->pluck('user_id')->toArray();
+                
+                // super admin
+                $project_company = $project->company_id;
+                Company_customer::where('customer_id',$project->company_id)->first()->company_id;
+                $admin_users = User::where('company_id', $project_company)
+                    ->where('status', 1)->whereIn('user_type', [1, 3])
+                    ->pluck('id')->toArray();
+
+                // super super admin
+                $super_users = User::where('status', 1)->where('user_type', 0)
+                    ->pluck('id')->toArray();
+
+                // account manager
+                $account_manager = $project->manager_id;
+
+                array_push($project_users, $admin_users);
+                array_push($project_users, $super_users);
+                array_push($project_users, $account_manager);
+
+                foreach ($project_users as $user) {
+                    $data = array();
+                    $data[$request->caption] = $request->value;
+                    if(ProjectModule::where(['user_id'=>$user,'project_id'=>$request->project_id])->count()>0)
+                        ProjectModule::where(['user_id'=>$user,'project_id'=>$request->project_id])->update($data);
+                    else{
+                        if(ProjectModule::where(['user_id'=>$user])->count()>0){
+                            $data = ProjectModule::where(['user_id'=>$user])->first();
+                            $data[$request->caption] = $request->value;
+                            unset($data['id']);
+                            unset($data['created_at']);
+                            unset($data['updated_at']);
+                            $data['user_id']= $user;
+                            $data['project_id']= $request->project_id;
+                            ProjectModule::create($data->toArray());
+                        } else {
+                            $data['user_id']= $user;
+                            $data['project_id']= $request->project_id;
+                            ProjectModule::create($data);
+                        }
+                    }
+                }
+            }
+        } else {
             $data['user_id'] = $request->user->id;
             $data['task'] = $request->task;
             $data['version'] = $request->version;
@@ -1301,6 +1560,67 @@ class ProjectController extends Controller
             }
         }
         
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function getActivity(request $request){
+        $res = array();
+        $recent_messages = Notification::where('notifications.notice_type','>',2)
+                        ->where('notifications.project_id',$request->project_id)
+                        ->orderBy('id','desc')
+                        ->leftJoin('projects','projects.id','=','notifications.project_id')
+                        ->leftJoin('users','users.id','=','projects.user_id')
+                        ->select('notifications.*','projects.project_name','projects.id as project_id','users.first_name','users.last_name')
+                        ->get();
+        foreach($recent_messages as $key => $row){
+            $recent_messages[$key]['user_img'] = '';
+            $recent_messages[$key]['current_time'] = date("Y-m-d H:i:s");
+            $recent_messages[$key]['room_number'] = '';
+            $recent_messages[$key]['room_id'] = '';
+            if(User::where('id',$row['created_by'])->count()==0) continue;
+            $user = User::where('id',$row['created_by'])->first();
+            $recent_messages[$key]['user_img'] = $user['profile_pic'];
+            if(($row->notice_type==5)||($row->notice_type==7))
+            {
+                if(Room::whereId($row['notice_id'])->count()==0) continue;
+                $recent_messages[$key]['room_number'] = Room::whereId($row['notice_id'])->first()->room_number;
+                $recent_messages[$key]['room_id'] = Room::whereId($row['notice_id'])->first()->id;
+            }
+            else if($row->notice_type==8){
+                if(Product::whereId($row['notice_id'])->count()==0) continue;
+                $roomId = Product::whereId($row['notice_id'])->first()->room_id;
+                if(Room::whereId($roomId)->count()==0) continue;
+                $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
+                $recent_messages[$key]['room_id']  = Room::whereId($roomId)->first()->id;
+            }
+            else if($row->notice_type==4){
+                if(Task::whereId($row['notice_id'])->count()==0) continue;
+                $roomId = Task::whereId($row['notice_id'])->first()->room_id;
+                if(Room::whereId($roomId)->count()==0) continue;
+                $recent_messages[$key]['room_number']  = Room::whereId($roomId)->first()->room_number;
+                $recent_messages[$key]['room_id']  = Room::whereId($roomId)->first()->id;
+            }
+        }
+        $res['activities'] = $recent_messages;
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function saveNewEvent(request $request){
+        
+        $event_users = json_decode($request->event_users,true);
+        array_push($event_users,strval($request->user->id));
+        Calendar_event::create([
+            'title'=>$request->title,
+            'description'=>$request->description,
+            'start'=>$request->start_date,
+            'end'=>$request->is_fullDay==0?$request->end_date:$request->start_date,
+            'created_by'=>$request->user->id,
+            'project_id'=>$request->project_id,
+            'room_id'=>$request->room_ids,
+            'users'=>','.join(',',$event_users).','
+            ]);
+       
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);

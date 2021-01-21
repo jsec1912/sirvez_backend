@@ -158,10 +158,16 @@ class TaskController extends Controller
     {
         $id = $request->id;
         if(strlen($id)>10){
-            Task::where('off_id',$id)->update(['archived'=>$request->archived,'archived_day'=>date('Y-m-d')]);
+            Task::where('off_id',$id)->update([
+                'archived'=>$request->archived,
+                'archived_id'=>$request->user->id,
+                'archived_day'=>date('Y-m-d')]);
         }
         else
-            Task::whereId($id)->update(['archived'=>$request->archived,'archived_day'=>date('Y-m-d')]);
+            Task::whereId($id)->update([
+                'archived'=>$request->archived,
+                'archived_id'=>$request->user->id,
+                'archived_day'=>date('Y-m-d')]);
         //Task::where(['id'=>$request->id])->delete();
         $res["status"] = "success";
 
@@ -604,6 +610,7 @@ class TaskController extends Controller
         $res['task_used_labels'] = Task_label::whereIn('id',$labelIds)->get();
         $res['task_labels'] = Task_label::get();
         $res['all_users'] = User::get();
+        $res['project_users'] = Project_user::where('type', '!=', '2')->get();
         $res['tasks'] = $tasks;
         // $online_users = array();
         // $users = User::get();
@@ -643,7 +650,9 @@ class TaskController extends Controller
         }
         else{
             $companyId = array();
-            if($request->user->user_type<6)
+            if($request->user->user_tpe==0)
+                $companyId = Company::pluck('id');
+            else if($request->user->user_type<6)
                 $companyId = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
             $res['customer'] = Company::whereIn('id',$companyId)->orWhere('id',$request->user->company_id)->orderBy('id','desc')->get();
             $res['project'] = Project::whereIn('company_id',$companyId)->orWhere('id',$request->user->company_id)->orderBy('id','desc')->get();
@@ -657,7 +666,7 @@ class TaskController extends Controller
             $com_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
 
         $res['assign_to'] = User::where('company_id',$com_id)->whereIn('user_type',[1,3])->where('status',1)->get();
-
+        $res['project_users'] = Project_user::where('type', '!=', '2')->get();
         return response()->json($res);
     }
     public function setFavourite(request $request)

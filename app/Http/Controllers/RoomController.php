@@ -70,6 +70,7 @@ class RoomController extends Controller
             $room['room_number']  = $request->room_number;
         $room['estimate_day']  = $request->estimate_day;
         $room['estimate_time']  = $request->estimate_time;
+        $room['location_form_id'] = $request->location_form_id;
         $room['notes']  = $request->notes;
         if($request->has('ceiling_height'))
             $room['ceiling_height']  = $request->ceiling_height;
@@ -318,7 +319,9 @@ class RoomController extends Controller
             ->leftJoin('projects','projects.id','=','rooms.project_id')
             ->leftJoin('companies','companies.id','=','rooms.company_id')
             ->leftJoin('sites','sites.id','=','rooms.site_id')
-            ->select('rooms.*','projects.project_name','projects.location_form_id','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name')
+            ->leftJoin('site_rooms','site_rooms.id','=','rooms.room_site_id')
+            ->leftJoin('floors','floors.id','=','site_rooms.floor_id')
+            ->select('rooms.*','projects.project_name','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name','floors.upload_img')
             ->first();
 
             //// check permission
@@ -343,6 +346,19 @@ class RoomController extends Controller
             if ($room->location_form_id) {
                 $room['location_form'] = New_form::where('id', $room->location_form_id)->get()->first();
             }
+            if($room->room_site_id > 0 && Site_room::whereId($room->room_site_id)->first()){
+                $floor_id = Site_room::whereId($room->room_site_id)->first()->floor_id;
+                if($floor_id > 0)
+                    $room['floor_rooms'] = Site_room::where('floor_id',$floor_id)
+                    ->with('point')
+                    ->leftJoin('departments','departments.id','=','site_rooms.department_id')
+                    ->select('site_rooms.*','departments.colour')
+                    ->get();
+                else
+                    $room['floor_rooms'] = [];
+            }
+            else
+                $room['floor_rooms'] = [];
 
             $res["room"] = $room;
 
@@ -511,7 +527,7 @@ class RoomController extends Controller
         $res['form_fields'] = Form_field::get();
         $res['test_forms'] = New_form::where('form_type', 1)->get();
         $res['com_forms'] = New_form::where('form_type', 2)->get();
-
+        $res['project_users'] = Project_user::where('type', '!=', '2')->pluck('user_id')->toArray();
         $res['product_labels'] = Product_label::get();
         $res['qr_option'] = Qr_option::first();
         $res['status'] = "success";

@@ -33,7 +33,10 @@ class BuildingController extends Controller
                 $building['site_id'] = Site::where('off_id',$request->site_id)->first()->id;
             }
             else
-                $building['site_id'] = '';
+                return response()->json([
+                    'status' => 'error',
+                    'msg' => 'The Site is not exist!'
+                ]);
         }
         else
             $building['site_id'] = $request->site_id;

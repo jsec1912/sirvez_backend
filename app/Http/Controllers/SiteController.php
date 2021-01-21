@@ -13,7 +13,9 @@ use App\Department;
 use App\Floor;
 use App\Company_customer;
 use App\Company;
+use App\Product;
 use App\Notification;
+use App\LocationPoint;
 class SiteController extends Controller
 {
     public function updateSite(Request $request){
@@ -243,7 +245,31 @@ class SiteController extends Controller
         else
             $company_id = $request->user->company_id;
         $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
-        $res['room'] = Site_room::where('site_rooms.id',$request->id)->first(); 
+        $room = Site_room::where('site_rooms.id',$request->id)
+                                ->with('point')
+                                ->leftJoin('buildings','buildings.id','=','site_rooms.building_id')
+                                ->leftJoin('floors','floors.id','=','site_rooms.floor_id')
+                                ->leftJoin('departments','departments.id','=','site_rooms.department_id')
+                                ->select('site_rooms.*','buildings.building_name','floors.floor_name','floors.upload_img','departments.department_name','departments.colour')
+                                ->first(); 
+        $roomIds = Room::where('room_site_id',$room->id)->pluck('id');
+        $room['products_count'] = Product::whereIn('room_id',$roomIds)->count();
+        $res['room'] = $room;
+        $res['rooms'] = Site_room::where('floor_id',$room->floor_id)
+                                ->with('point')
+                                ->leftJoin('departments','departments.id','=','site_rooms.department_id')
+                                ->select('site_rooms.*','departments.colour')
+                                ->get();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function savePolygon(request $request){
+        $res = array();
+        Site_room::where('id',$request->room_id)->update(['is_assigned'=>1,'assign_user'=>$request->user->id]);
+        $points = json_decode($request->room_points,true);
+        foreach($points as $point){
+            LocationPoint::create(['room_id'=>$request->room_id,'point_x'=>$point['x'],'point_y'=>$point['y']]);
+        }
         $res['status'] = 'success';
         return response()->json($res);
     }
