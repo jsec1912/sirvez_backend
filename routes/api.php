@@ -38,6 +38,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/company/deletePartner', 'CompanyController@deletePartner');
     Route::post('/company/setAllowPartner', 'CompanyController@setAllowPartner');
     Route::post('/company/setAllowPartnerRequest', 'CompanyController@setAllowPartnerRequest');
+    Route::post('/company/setPrimaryUser', 'CompanyController@setPrimaryUser');
     //customer
     Route::Post('/customers/company/customer-edit','CompanyCustomerController@addCompanyCustomer');///
     Route::Post('/customers/DeleteCompanyCustomer','CompanyCustomerController@DeleteCompanyCustomer');///
@@ -59,6 +60,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/setFavourite','ProjectController@setFavourite');
     Route::post('/project/deleteAssignUser','ProjectController@deleteAssignUser');
     Route::post('/project/signOff','ProjectController@signOff');
+    Route::post('/project/finalSignOff','ProjectController@finalSignOff');
     Route::post('/project/addAssignUser','ProjectController@addAssignUser');
     Route::post('/project/addProjectUser', 'ProjectController@addProjectUser');
     // Route::post('/project/addCustomerUser','ProjectController@addCustomerUser');
@@ -71,6 +73,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/changeContactNumber','ProjectController@changeContactNumber');
     Route::post('/project/changeLocationForm','ProjectController@changeLocationForm');
     Route::post('/project/changeSignoffForm','ProjectController@changeSignoffForm');
+    Route::post('/project/changeFinalSignoffForm','ProjectController@changeFinalSignoffForm');
     Route::get('/project/getProjectModule','ProjectController@getProjectModule');
     Route::post('/project/updateProjectModule','ProjectController@updateProjectModule');
     Route::get('/project/getActivity','ProjectController@getActivity');
@@ -151,6 +154,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/room/roomInfo','RoomController@roomInfo');///
     Route::get('/room/editPhoto','RoomController@editPhoto');///
     Route::post('/room/signoff','RoomController@signoff');///
+    Route::post('/room/finalSignOff','RoomController@finalSignOff');///
     Route::post('/room/changeRequest','RoomController@changeRequest');///
     Route::post('/room/setFavourite','RoomController@setFavourite');
     Route::post('/room/changeNotes','RoomController@changeNotes');
@@ -231,6 +235,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/calendar/saveEvent','ProjectController@saveEvent');///
     Route::post('/calendar/saveNewEvent','ProjectController@saveNewEvent');///
     Route::post('/calendar/deleteEvent','ProjectController@deleteEvent');///
+    Route::post('/calendar/saveEventID', 'ProjectController@saveEventID');
 
     Route::post('/chat/sendMessage','ProjectChatController@sendMessage');///
     Route::get('/chat/getChats','ProjectChatController@getChats');///
@@ -239,5 +244,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/chat/addUserToGroup','ProjectChatController@addUserToGroup');///
     Route::post('/chat/removeUserToGroup','ProjectChatController@removeUserToGroup');///
     Route::post('/chat/changeGroupName','ProjectChatController@changeGroupName');///
+
+    Route::get('/page/pageList','PageController@pageList');///
 
 });

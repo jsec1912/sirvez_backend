@@ -35,6 +35,7 @@ use App\Task_label_value;
 use App\Product_label_value;
 use App\Partner;
 use App\Calendar_event;
+use App\CalendarEventSync;
 use Mail;
 
 class ProjectController extends Controller
@@ -139,13 +140,12 @@ class ProjectController extends Controller
                         'company_id'		=> $project['company_id'],
                         'project_id'		=> $id,
                         'created_date'		=> date("Y-m-d H:i:s"),
-                        'is_read'	    	=> 0,
+                        'is_read'       	=> 0,
                     );
                     Notification::create($insertnotificationndata);
                 }
             }
-        }
-        else{
+        } else {
             // $project_cnt = Project::where('project_name',$project['project_name'])->where('id','<>',$id)->count();
             // if($project_cnt > 0)
             // {
@@ -651,13 +651,15 @@ class ProjectController extends Controller
             if (Company_customer::where('customer_id', $user_company_id)->count() > 0) {
                 $user_company_id = Company_customer::where('customer_id', $user_company_id)->first()->company_id;
             }
+            $customerIds = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id')->toArray();
+            array_push($customerIds,intval($request->user->company_id));
             $partner_ids = Partner::where('company_id', $user_company_id)
                 ->pluck('partner_id')->toArray();
             $allow_partners = User::where('status', 1)
                 ->whereIn('company_id', $partner_ids)->pluck('id')->toArray();
             $allow_teams = User::where('company_id', $user_company_id)
                 ->where('status', 1)->whereIn('user_type', [0, 1, 3])->pluck('id')->toArray();
-            $allow_customers = User::where('company_id', $request->user->company_id)
+            $allow_customers = User::whereIn('company_id', $customerIds)
                 ->where('status', 1)->whereIn('user_type', [5, 6])->pluck('id')->toArray();
 
             $res['allow_users'] = User::whereIn('users.id', $allow_partners)
@@ -708,10 +710,10 @@ class ProjectController extends Controller
         $res['product_labels'] = Product_label::get();
         $res['qr_option'] = Qr_option::first();
         // for offline mode
+        $res['all_users'] = User::where('status',1)->get();
         if ( ! $request->project_id) {
             $res['company_customers'] = Company_customer::get();
             $res['all_sites'] = Site::get();
-            $res['all_users'] = User::where('status',1)->get();
             $res['all_site_rooms'] = Site_room::get();
             $res['all_partners'] = Partner::get();
         }
@@ -837,12 +839,14 @@ class ProjectController extends Controller
             $project['signed_off'] = 2;
         else
             $project['signed_off'] = 1;
-        $project['signoff_date'] = new date('Y-m-d H:i:s');
+        $project['signoff_date'] = date("Y-m-d H:i:s");
         if($request->hasFile('sign_file')){
             $fileName = time().'.'.$request->sign_file->extension();
             $request->sign_file->move(public_path('upload/file/'), $fileName);
             $project['sign_file']  = $fileName;
         }
+        $project['signoff_user'] = $request->user->id;
+        $project['signoff_form_id'] = $request->signoff_form;
 
         if($request->sign_user_id) $project['sign_user_id'] = $request->sign_user_id;
         if($request->sign_first_name) $project['sign_first_name'] = $request->sign_first_name;
@@ -858,7 +862,7 @@ class ProjectController extends Controller
         
         if($request->field_values){
             $values = array();
-            $values = json_decode($request->field_values);
+            $values = json_decode($request->field_values,false);
             $value = array();
             foreach($values as $row){
                 $value['field_name'] = $row->field_name;
@@ -868,14 +872,17 @@ class ProjectController extends Controller
                 $value['field_value'] = $row->field_value;
                 $value['is_checked'] = $row->is_checked;
                 $value['form_type'] = $row->form_type;
-                $value['parent_id'] = $room->id;
+                $value['parent_id'] = $request->id;
+                $value['is_final'] = 0;
                 $cnt = Form_value::where('field_name',$row->field_name)
                                 ->where('new_form_id',$row->new_form_id)
-                                ->where('parent_id',$room->id)->count();
+                                ->where('is_final',0)
+                                ->where('parent_id',$request->id)->count();
                 if($cnt>0)
                     Form_value::where('field_name',$row->field_name)
                                 ->where('new_form_id',$row->new_form_id)
-                                ->where('parent_id',$room->id)
+                                ->where('parent_id',$request->id)
+                                ->where('is_final',0)
                                 ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
                 else
                     Form_value::create($value);
@@ -893,9 +900,7 @@ class ProjectController extends Controller
             $insertnotificationdata = array(
                 'notice_type'		=> '6',
                 'notice_id'			=> $request->id,
-                //'notification'		=> "Signed Off request was sent to ".$project['customer_user']->first_name." by ".$request->user->first_name.". ".date("d-m-Y H:i:s").'['.$project['project_name'].']',
-                //'notification'		=> "Scope of works signed off on ".date("d-m-Y H:i:s")." by ".$request->user->first_name.".",
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested sign off on [".date("d-m-Y H:i:s")."].",
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested sign off on ".date("d-m-Y H:i:s").".",
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $project['company_id'],
                 'project_id'		=> $project->id,
@@ -923,7 +928,7 @@ class ProjectController extends Controller
             if($request->user->user_type <6){
                 $customer_users = Project_user::where('project_id',$request->id)->where('type','3')->pluck('user_id');
                 foreach($customer_users as $row){
-                    $pending_user = User::where('user_id',$row)->first();
+                    $pending_user = User::where('id',$row)->first();
                     //$pending_user = $project['customer_user'];
                     $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
                     $to_name = $pending_user['first_name'];
@@ -1000,6 +1005,124 @@ class ProjectController extends Controller
         return response()->json($res);
     }
 
+    public function finalSignOff(request $request)
+    {
+        
+        $fileName = '';
+        $project = array();
+        if ($request->user->user_type ==6)
+            $project['final_signoff'] = 2;
+        else
+            $project['final_signoff'] = 1;
+        $project['final_signoff_date'] = date("Y-m-d H:i:s");
+        $project['final_signoff_user'] = $request->user->id;
+        $project['final_signoff_form_id']= $request->signoff_form;
+
+        Project::whereId($request->id)->update($project);
+        
+        if($request->field_values){
+            $values = array();
+            $values = json_decode($request->field_values,false);
+            $value = array();
+            foreach($values as $row){
+                $value['field_name'] = $row->field_name;
+                $value['field_type'] = $row->field_type;
+                $value['field_label'] = $row->field_label;
+                $value['new_form_id'] = $row->new_form_id;
+                $value['field_value'] = $row->field_value;
+                $value['is_checked'] = $row->is_checked;
+                $value['form_type'] = $row->form_type;
+                $value['parent_id'] = $request->id;
+                $value['is_final'] = 1;
+                $cnt = Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('is_final',0)
+                                ->where('parent_id',$request->id)->count();
+                if($cnt>0)
+                    Form_value::where('field_name',$row->field_name)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->where('parent_id',$request->id)
+                                ->where('new_form_id',$row->new_form_id)
+                                ->update(['field_value'=>$row->field_value,'is_checked'=>$row->is_checked]);
+                else
+                    Form_value::create($value);
+            }
+        }
+        
+        $project=Project::where('projects.id',$request->id)
+                ->leftJoin('companies','companies.id','=','projects.company_id')
+                ->leftJoin('users','users.id','=','projects.created_by')
+                ->select('projects.*','companies.name as company_name','users.first_name','users.last_name','users.email','users.password')
+                ->first();
+        $project['account_manager'] = User::where('id',$project['manager_id'])->first()->first_name;
+        $project['customer_user'] = User::where('id',$project['user_id'])->first();
+        if($request->user->user_type<6)
+            $insertnotificationdata = array(
+                'notice_type'		=> '6',
+                'notice_id'			=> $request->id,
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has requested final sign off on ".date("d-m-Y H:i:s").".",
+                'created_by'		=> $request->user->id,
+                'company_id'		=> $project['company_id'],
+                'project_id'		=> $project->id,
+                'created_date'		=> date("Y-m-d H:i:s"),
+                'is_read'	    	=> 0,
+                'is_signed'	    	=> 0,
+            );
+        else
+            $insertnotificationdata = array(
+                'notice_type'		=> '6',
+                'notice_id'			=> $request->id,
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name." has final signed off scope of works for ".$project['project_name']." on ".date("d-m-Y H:i:s").".",
+                'created_by'		=> $request->user->id,
+                'company_id'		=> $project['company_id'],
+                'project_id'		=> $project->id,
+                'created_date'		=> date("Y-m-d H:i:s"),
+                'is_read'	    	=> 0,
+                'is_signed'	    	=> 1,
+            );
+        Notification::create($insertnotificationdata);
+
+        //send mail
+        if(Project_user::where('project_id',$request->id)->where('type','3')->count() > 0){
+            $content = "";
+            if($request->user->user_type <6){
+                $customer_users = Project_user::where('project_id',$request->id)->where('type','3')->pluck('user_id');
+                foreach($customer_users as $row){
+                    $pending_user = User::where('id',$row)->first();
+                    //$pending_user = $project['customer_user'];
+                    $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
+                    $to_name = $pending_user['first_name'];
+                    $to_email = $pending_user['email'];
+                    $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
+                    $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
+                    Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
+                        $message->to($to_email, $to_name)
+                                ->subject('sirvez notification.');
+                        $message->from('support@sirvez.com','support team');
+                    });
+                }
+
+            }
+            else{
+                $pending_user = User::where('id',$project->created_by)->first();
+                $content = "Project was signed off by ".$request->user->first_name.". ".date("d-m-Y H:i:s");
+                $to_name = $pending_user['first_name'];
+                $to_email = $pending_user['email'];
+                $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
+                $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
+                Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
+                    $message->to($to_email, $to_name)
+                            ->subject('sirvez notification.');
+                    $message->from('support@sirvez.com','support team');
+                });
+            }
+        }
+        
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
     public function changeSummary(request $request){
         if(strlen($request->id) > 10)
             $id = Project::where('off_id',$request->id)->first()->id;
@@ -1059,6 +1182,17 @@ class ProjectController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
+    public function changeFinalSignoffForm(request $request){
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+        Project::whereId($id)->update(['final_signoff_form_id'=>$request->signoff_form_id]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 
     public function deletePartnerUser(request $request)
     {
@@ -1114,19 +1248,11 @@ class ProjectController extends Controller
         $res = array();
         $customerIds = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id')->toArray();
         array_push($customerIds, intval($request->user->company_id));
-        if($request->user->user_type>0){
-            $res['customers'] = Company::whereIn('id',$customerIds)->get();
-            $res['projects'] = project::whereIn('company_id',$customerIds)->get();
-            $res['users'] = User::whereIn('company_id',$customerIds)->get();
-            $res['rooms'] = Room::whereIn('company_id',$customerIds)->get();
-        }
-        else
-        {
-            $res['customers'] = Company::get();
-            $res['projects'] = project::get();
-            $res['users'] = User::get();
-            $res['rooms'] = Room::get();
-        }
+      
+        $res['customers'] = Company::get();
+        $res['projects'] = project::get();
+        $res['users'] = User::get();
+        $res['rooms'] = Room::get();
         $res['project_users'] = Project_user::where('type', '!=', '2')->get();
         $res['all_users'] = User::where('status',1)->get();
         $res['status'] = 'success';
@@ -1269,7 +1395,7 @@ class ProjectController extends Controller
                                 ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
                                 ->get();;
         foreach($projects as $key => $project){
-            $project_users = Project_user::where('project_id',$project->id)->pluck('user_id')->toArray();
+            $project_users = Project_user::where(['project_id'=>$project->id,'type'=>[1,3,4]])->pluck('user_id')->toArray();
             array_push($project_users,$project->created_by);
             array_push($project_users,$project->manager_id);
             array_push($events,['title'=>$project->project_name,
@@ -1311,7 +1437,7 @@ class ProjectController extends Controller
                             ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
                             ->get();
         foreach($projects as $key => $project){
-            $project_users = Project_user::where('project_id',$project->id)->pluck('user_id')->toArray();
+            $project_users = Project_user::where(['project_id'=>$project->id,'type'=>3])->pluck('user_id')->toArray();
             array_push($project_users,$project->created_by);
             array_push($project_users,$project->manager_id);
             array_push($events,['title'=>$project->project_name,
@@ -1359,17 +1485,67 @@ class ProjectController extends Controller
                                 ]);
         }
         $res['events'] = $events;
+        $res['eventsyncs'] = CalendarEventSync::all();
+        return response()->json($res);
+    }
+    public function saveEventID(request $request) {
+        $res = array();
+        if ($request->has('google_event_id')) {
+            if (CalendarEventSync::where([
+                'event_id' => $request->event_id,
+                'event_type' => $request->event_type
+            ])->count() > 0) {
+                CalendarEventSync::where([
+                    'event_id' => $request->event_id,
+                    'event_type' => $request->event_type,
+                ])->update([
+                    'google_event_id' => $request->google_event_id
+                ]);
+            } else {
+                $sync = CalendarEventSync::create([
+                    'event_id' => $request->event_id,
+                    'event_type' => $request->event_type,
+                    'google_event_id' => $request->google_event_id
+                ]);
+                $res['sync'] = $sync;
+            }
+        }
+        if ($request->has('office365_event_id')) {
+            if (CalendarEventSync::where([
+                'event_id' => $request->event_id,
+                'event_type' => $request->event_type
+            ])->count() > 0) {
+                CalendarEventSync::where([
+                    'event_id' => $request->event_id,
+                    'event_type' => $request->event_type
+                ])->update([
+                    'office365_event_id' => $request->office365_event_id
+                ]);
+            } else {
+                $sync = CalendarEventSync::creat([
+                    'event_id' => $request->event_id,
+                    'event_type' => $request->event_type,
+                    'office365_event_id' => $request->office365_event_id
+                ]);
+                $res['sync'] = $sync;
+            }
+        }
+        $res['status'] = 'success';
         return response()->json($res);
     }
     public function saveEvent(request $request){
         $res = array();
         $event_users = json_decode($request->added_users,true);
+        $deleted_users = json_decode($request->deleted_users,true);
         if($request->type==1){
             Schedule::whereId($request->id)->update([
                 'schedule_name'=>$request->title,
                 'note'=>$request->desc,
                 'start_date'=>$request->start,
                 'end_date'=>$request->end]);
+            foreach($deleted_users as $user){
+                ScheduleEngineer::where(['schedule_id'=>$request->id,'engineer_id'=>$user])->delete();
+            }    
             foreach($event_users as $user){
                 ScheduleEngineer::create(['schedule_id'=>$request->id,'engineer_id'=>$user]);
             }
@@ -1377,15 +1553,21 @@ class ProjectController extends Controller
             Task::whereId($request->id)->update([
                 'task'=>$request->title,
                 'description'=>$request->desc,
-                'due_by_date'=>$request->end
+                'due_by_date'=>$request->start
                 ]);
+                foreach($deleted_users as $user){
+                    Project_user::where(['schedule_id'=>$request->id,'user_id'=>$user,'type'=>2])->delete();
+                }    
                 foreach($event_users as $user){
                     Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>2]);
                 }
         }else if($request->type==3){
             TaskComment::whereId($request->id)->update([
                 'comment'=>$request->title,
-                'deadline'=>$request->end]);
+                'deadline'=>$request->start]);
+            foreach($deleted_users as $user){
+                Task_comment_user::where(['comment_id'=>$request->id,'user_id'=>$user])->delete();
+            }   
             foreach($event_users as $user){
                 Task_comment_user::create(['comment_id'=>$request->id,'user_id'=>$user]);
             }
@@ -1393,7 +1575,10 @@ class ProjectController extends Controller
             Project::whereId($request->id)->update([
                 'project_name'=>$request->title,
                 'project_summary'=>$request->desc,
-                'survey_start_date'=>$request->end]);
+                'survey_start_date'=>$request->start]);
+            foreach($deleted_users as $user){
+                Project_user::where(['project_id'=>$request->id,'user_id'=>$user,'type'=>3])->delete();
+            }   
             foreach($event_users as $user){
                 Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>3]);
             }
@@ -1401,7 +1586,10 @@ class ProjectController extends Controller
             Project::whereId($request->id)->update([
                 'project_name'=>$request->title,
                 'project_summary'=>$request->desc,
-                'signoff_date'=>$request->end]);
+                'signoff_date'=>$request->start]);
+            foreach($deleted_users as $user){
+                Project_user::where(['project_id'=>$request->id,'user_id'=>$user,'type'=>3])->delete();
+            }   
             foreach($event_users as $user){
                 Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>3]);
             }
@@ -1418,7 +1606,12 @@ class ProjectController extends Controller
             }
             else{
                 $event = Calendar_event::whereId($request->id)->first();
+                //$calender_user = $event->users;
+                // foreach($deleted_users as $user){
+                //     str_replace(','.$user.',',',',$calender_user);
+                // }
                 $users =  explode(',',$event->users);
+                $users = array_diff($user,$deleted_users);
                 $event_users = array_merge($users,$event_users);
                 Calendar_event::whereId($request->id)->update([
                     'title'=>$request->title,

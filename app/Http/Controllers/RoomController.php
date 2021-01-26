@@ -70,6 +70,7 @@ class RoomController extends Controller
             $room['room_number']  = $request->room_number;
         $room['estimate_day']  = $request->estimate_day;
         $room['estimate_time']  = $request->estimate_time;
+        if($request->location_form_id>0)
         $room['location_form_id'] = $request->location_form_id;
         $room['notes']  = $request->notes;
         if($request->has('ceiling_height'))
@@ -321,7 +322,12 @@ class RoomController extends Controller
             ->leftJoin('sites','sites.id','=','rooms.site_id')
             ->leftJoin('site_rooms','site_rooms.id','=','rooms.room_site_id')
             ->leftJoin('floors','floors.id','=','site_rooms.floor_id')
-            ->select('rooms.*','projects.project_name','projects.survey_start_date','companies.name as company_name','companies.logo_img as logo_img','sites.site_name as site_name','departments.department_name','floors.upload_img')
+            ->select('rooms.*','projects.project_name','projects.signed_off as project_signed_off',
+                    'projects.signoff_user as project_signoff_user','projects.survey_start_date',
+                    'projects.signoff_date as project_signoff_date', 'projects.final_signoff_date as project_final_signoff_date',
+                    'projects.final_signoff as project_final_signoff','projects.final_signoff_user as project_final_signoff_user',
+                    'companies.name as company_name','companies.logo_img as logo_img',
+                    'sites.site_name as site_name','departments.department_name','floors.upload_img')
             ->first();
 
             //// check permission
@@ -524,6 +530,7 @@ class RoomController extends Controller
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
+        $res['all_users'] = User::where('status',1)->get();
         $res['form_fields'] = Form_field::get();
         $res['test_forms'] = New_form::where('form_type', 1)->get();
         $res['com_forms'] = New_form::where('form_type', 2)->get();
@@ -571,7 +578,7 @@ class RoomController extends Controller
         $res['status'] = "success";
         Room::whereId($id)->update([
             'signed_off'=>1,
-            'completed_date'=>date("d-m-Y H:i:s"),
+            'completed_date'=>date("Y-m-d H:i:s"),
             'completed_by'=>$request->user->id
         ]);
 
@@ -584,6 +591,37 @@ class RoomController extends Controller
             'notice_id'			=> $id,
             //'notification'		=> "The room(".$room->room_number.") was signed off by ".$request->user->first_name."  on date ".date("d-m-Y H:i:s"),
             'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has signed off location: ".$room->room_number." on ".date("d-m-Y H:i:s").'.',
+            'created_by'		=> $request->user->id,
+            'company_id'		=> $room->company_id,
+            'project_id'		=> $room->project_id,
+            'created_date'		=> date("Y-m-d H:i:s"),
+            'is_read'	    	=> 0,
+        );
+        Notification::create($insertnotificationdata);
+        return response()->json($res);
+    }
+    public function finalSignOff(request $request){
+        if(strlen($request->id) > 10)
+            $id = Room::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        $res = array();
+        $res['status'] = "success";
+        Room::whereId($id)->update([
+            'final_signoff'=>1,
+            'final_signoff_date'=>date("Y-m-d H:i:s"),
+            'final_signoff_user'=>$request->user->id
+        ]);
+
+        //Product::where('room_id',$id)->update(['signed_off'=>1]);
+        $room = Room::whereId($id)->first();
+        // if(Room::where('project_id',$room->project_id)->where('signed_off','0')->count()==0)
+        //     Project::whereId($room->project_id)->update(['signed_off'=>2]);
+        $insertnotificationdata = array(
+            'notice_type'		=> '7',
+            'notice_id'			=> $id,
+            //'notification'		=> "The room(".$room->room_number.") was signed off by ".$request->user->first_name."  on date ".date("d-m-Y H:i:s"),
+            'notification'		=> $request->user->first_name.' '.$request->user->last_name. " has final signed off location: ".$room->room_number." on ".date("d-m-Y H:i:s").'.',
             'created_by'		=> $request->user->id,
             'company_id'		=> $room->company_id,
             'project_id'		=> $room->project_id,

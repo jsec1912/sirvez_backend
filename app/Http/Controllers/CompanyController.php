@@ -20,7 +20,7 @@ class CompanyController extends Controller
 
         $v = Validator::make($request->all(), [
             //company info
-            'name' => 'required',
+            //'name' => 'required',
             // 'address' => 'required',
             // 'city' => 'required',
             // 'postcode' => 'required',
@@ -142,6 +142,18 @@ class CompanyController extends Controller
         Company::whereId($request->company_id)->update($company);
         $res['status'] = 'success';
         return response()->json($res);
+    }
+    public function setPrimaryUser(request $request){
+        $id = $request->id;
+        if(strlen($request->id) > 10)
+            if(company::where('off_id',$request->id)->count() > 0)
+                $id = company::where('off_id',$request->id)->first()->id;
+            else $id = '';
+        company::where('id',$id)->update(['primary_user'=>$request->primary_id]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+            
     }
     public function customerList(request $request){
         $res = array();

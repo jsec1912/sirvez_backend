@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Sticker;
 use App\Sticker_category;
 use Illuminate\Support\Facades\File; 
+use ZipArchive;
 
 class StickerController extends Controller
 {
@@ -17,7 +18,6 @@ class StickerController extends Controller
         $v = Validator::make($request->all(), [
             //company info
             'category_id' => 'required',
-            'name' => 'required',
             'status' => 'required',
             'category' => 'required',
            
@@ -34,9 +34,9 @@ class StickerController extends Controller
         $path = 'pixie/assets/images/stickers/'.$request->category;
         $favourite_path = 'pixie/assets/images/stickers/favourites';
         if(strlen($request->category_id)>10)
-            $stiker_info['category_id'] = Sticker_category::where('off_id',$request->category_id)->first()->id;
+            $category_id = Sticker_category::where('off_id',$request->category_id)->first()->id;
         else
-            $stiker_info['category_id'] = $request->category_id;
+            $category_id = $request->category_id;
         $stiker_info['name']  = $request->name;
         $stiker_info['user_id']  = $request->user->id;
         $stiker_info['status']  = $request->status;
@@ -62,7 +62,54 @@ class StickerController extends Controller
                     File::copy(public_path($path).'/'.$fileName,public_path($favourite_path).'/'.$fileName);
                 }
                 $stiker_info['stiker_img'] = $fileName;
-            } else {
+            } else if($request->has('lib_file') && isset($request->lib_file) && $request->lib_file!='null') {
+                $images = $request->lib_file;
+                foreach($images as $img_file) {
+                    if (isset($img_file)) {
+                        $fileName = $img_file->getClientOriginalName();
+                        $img_file->move(public_path($path), $fileName);
+                        if($request->is_favourite=='1'){
+                            File::copy(public_path($path).'/'.$fileName,public_path($favourite_path).'/'.$fileName);
+                        }
+                        $stiker_info['category_id'] = $category_id;
+                        $stiker_info['parent_id']=0;
+                        $stiker_info['name']  = explode(".", $fileName)[0];
+                        $stiker_info['stiker_img'] = $fileName;
+                        $stiker = sticker::create($stiker_info);
+                        if($request->is_favourite=='1'){
+                            $stiker_info['category_id']=1;
+                            $stiker_info['parent_id']=$stiker->id;
+                            sticker::create($stiker_info);
+                        }
+                    }
+                }
+                // $zip = new ZipArchive;
+                // $zip->open($request->lib_file);
+                // $zip->extractTo($path);
+                // if($request->is_favourite=='1'){
+                //     $zip->extractTo($favourite_path);
+                // }
+                // for ($i=0; $i<$zip->numFiles;$i++) {
+                //     $cur_file=$zip->statIndex($i);
+                //     $result[$i] = $cur_file['name'];
+                //     if($cur_file['size'] > 0){
+                //         $fileName = $cur_file['name'];
+                //         $stiker_info['category_id'] = $category_id;
+                //         $stiker_info['parent_id']=0;
+                //         $stiker_info['name']  = explode(".", $fileName)[0];
+                //         $stiker_info['stiker_img'] = $fileName;
+                //         $stiker = sticker::create($stiker_info);
+                //         if($request->is_favourite=='1'){
+                //             $stiker_info['category_id']=1;
+                //             $stiker_info['parent_id']=$stiker->id;
+                //             sticker::create($stiker_info);
+                //         }
+                //     }
+                // }
+                // $res["status"] = "success";
+                // return response()->json($res);
+                // $zip->close();
+            } else{
                 return response()->json([
                     'status' => 'error',
                     'msg' => 'You must input image file!'
@@ -70,6 +117,7 @@ class StickerController extends Controller
             }
             if(strlen($request->id)>10)
                 $stiker_info['off_id'] = $request->id;
+            $stiker_info['category_id'] = $category_id;
             $stiker = sticker::create($stiker_info);
             if($request->is_favourite=='1'){
                 $stiker_info['off_id'] = '';
