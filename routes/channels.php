@@ -29,3 +29,6 @@ Broadcast::channel('online-user', function ($user) {
 Broadcast::channel('chat', function ($user) {    
     return $user;    
 });
+Broadcast::channel('notification', function ($user) {    
+    return $user;
+});

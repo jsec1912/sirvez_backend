@@ -7,6 +7,9 @@ use Cache;
 use App\User;
 use App\Partner;
 use App\Company;
+use App\Project;
+use App\Project_user;
+use App\Task;
 use App\Company_customer;
 use App\Notification;
 use App\User_feedback;
@@ -227,7 +230,6 @@ class UserController extends Controller
             'job_title' => 'required',
             'user_type' => 'required',
             'status' => 'required',
-            'mobile' => 'required',
         ]);
         if ($v->fails())
         {
@@ -298,7 +300,7 @@ class UserController extends Controller
             }
             if(strlen($request->id) > 10)
                 $user_info['off_id'] = $request->id;
-            User::create($user_info);        
+            $user = User::create($user_info);        
         }
         else{
             $count = User::where('id','<>',$id)->where('email',$request->email)->count() ;
@@ -311,7 +313,11 @@ class UserController extends Controller
                 return response()->json($res);
             }
             User::whereId($id)->update($user_info);
+            $user = User::whereId($id)->first();
+
         }
+        if($request->is_primary==1)
+            Company::where('id',$user->company_id)->update(['primary_user'=>$user->id]);
         return response()->json(['status' => "success",'msg'=>'Save success']);
         
     }
@@ -390,7 +396,6 @@ class UserController extends Controller
             'job_title' => 'required',
             'user_type' => 'required',
             'status' => 'required',
-            'mobile' => 'required',
         ]);
         if ($v->fails())
         {
@@ -596,5 +601,73 @@ class UserController extends Controller
         $res['result'] = 'success';
         $res['online_users'] = $online_users;
         return response()->json(res);
+    }
+    public function getProjectTaskCount(request $request){
+        $res = array();
+        if($request->user->user_type==0){
+            $res['project_count'] = Project::count();
+        }
+        else if($request->user->user_type< 4){
+            $id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+            $partner_ids = Project_user::where([
+                'user_id' => $request->user->id,
+                'type' => 4
+            ])->pluck('project_id');
+
+            $res['project_count'] = Project::where(function ($q) use($id, $partner_ids) {
+                return $q->whereIn('projects.company_id',$id)
+                ->orWhereIn('projects.id', $partner_ids);
+            })->count();
+        }else{
+            $projectIdx = Project_user::where('user_id', $request->user->id)
+            ->where(function ($q) {
+                return $q->where('type', 3) // team member case
+                ->orWhere('type', 4); // partner user case
+            })
+            ->pluck('project_id');
+            $res['project_count'] = Project::whereIn('projects.id',$projectIdx)->count();
+        }
+        if($request->user->user_type<=1){
+            $customer_id = Company_customer::where('company_id',$request->user->company_id)
+            ->pluck('customer_id')->toArray();
+            array_push($customer_id, $request->user->company_id);
+            $user_company_id = $request->user->company_id;
+            if (Company_customer::where('customer_id', $user_company_id)->count() > 0) {
+                $user_company_id = Company_customer::where('customer_id', $user_company_id)
+                    ->first()->company_id;
+            }
+            $partner_company_ids = Partner::where([
+                'company_id' => $user_company_id,
+                'is_allowed' => '2',
+                'modify_task' => '1'
+            ])->pluck('partner_id')->toArray();
+            $company_ids = array_merge($customer_id, $partner_company_ids);
+            $res['task_count'] = Task::whereIn('tasks.company_id',$company_ids)
+                            ->where(function($q){
+                                return $q->where('tasks.archived',0)
+                                ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                            })->count();
+        }else{
+            $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
+            $taskIds = Task::where(function($q)use($taskIdx,$request){
+                        return $q->whereIn('tasks.id',$taskIdx)
+                        ->orwhere('tasks.created_by',$request->user->id);
+                    })
+                    ->where(function($q){
+                        return $q->where('tasks.archived',0)
+                        ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                    })
+                    ->pluck('id');
+            $res['task_count'] = Task::where(function($q)use($taskIdx,$request){
+                                return $q->whereIn('tasks.id',$taskIdx)
+                                ->orwhere('tasks.created_by',$request->user->id);
+                            })
+                ->where(function($q){
+                    return $q->where('tasks.archived',0)
+                    ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
+                })->count();
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
     }
 }

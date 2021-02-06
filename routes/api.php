@@ -70,6 +70,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/deletePartnerUser','ProjectController@deletePartnerUser');
     Route::post('/project/changeSummary','ProjectController@changeSummary');
     Route::post('/project/changeProjectName','ProjectController@changeProjectName');
+    Route::post('/project/changeProjectRef','ProjectController@changeProjectRef');
+    Route::post('/project/changeProjectDate','ProjectController@changeProjectDate');
     Route::post('/project/changeContactNumber','ProjectController@changeContactNumber');
     Route::post('/project/changeLocationForm','ProjectController@changeLocationForm');
     Route::post('/project/changeSignoffForm','ProjectController@changeSignoffForm');
@@ -77,6 +79,11 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/project/getProjectModule','ProjectController@getProjectModule');
     Route::post('/project/updateProjectModule','ProjectController@updateProjectModule');
     Route::get('/project/getActivity','ProjectController@getActivity');
+    Route::post('/project/addProjectPage','ProjectController@addProjectPage');
+    Route::post('/project/removeProjectPage','ProjectController@removeProjectPage');
+    Route::post('/project/subscription', 'ProjectController@createSubscription');
+    Route::post('/project/changeOrderProjectPage', 'ProjectController@changeOrderProjectPage');
+    Route::post('/project/changeTopMenu', 'ProjectController@changeTopMenu');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -199,6 +206,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/user/getFeedbackList','UserController@getFeedbackList');///
     Route::post('/user/setFeedback','UserController@setFeedback');///
     Route::get('/user/userOnlineStatus','UserController@userOnlineStatus');///
+    Route::get('/user/getProjectTaskCount','UserController@getProjectTaskCount');///
+    
 
     Route::post('/category/updateCategory','StickerCategoryController@updateCategory');///
     Route::post('/category/deleteCategory','StickerCategoryController@deleteCategory');///
@@ -245,6 +254,10 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/chat/removeUserToGroup','ProjectChatController@removeUserToGroup');///
     Route::post('/chat/changeGroupName','ProjectChatController@changeGroupName');///
 
+    Route::post('/page/updatePage','PageController@updatePage');///
     Route::get('/page/pageList','PageController@pageList');///
+    Route::post('/page/duplicatePage','PageController@duplicatePage');///
+    Route::post('/page/deletePage','PageController@deletePage');///
+    Route::post('/page/uploadPdf','PageController@uploadPdf');///
 
 });

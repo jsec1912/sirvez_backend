@@ -781,13 +781,8 @@ class RoomController extends Controller
             $id = Room::where('off_id',$request->id)->first()->id;
         else
             $id = $request->id;
-        if($request->asbestos =='yes')
-            $asbestos = 1;
-        else if($request->asbestos =='no')
-            $asbestos = 0;
-        else
-            $asbestos = 2;
-        Room::whereId($id)->update(['asbestos'=>$asbestos]);
+       
+        Room::whereId($id)->update(['asbestos'=>$request->asbestos]);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);

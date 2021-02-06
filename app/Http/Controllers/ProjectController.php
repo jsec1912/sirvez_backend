@@ -36,11 +36,16 @@ use App\Product_label_value;
 use App\Partner;
 use App\Calendar_event;
 use App\CalendarEventSync;
+use App\ProjectPage;
+use App\ProjectTopMenu;
+use App\Events\NotificationEvent;
+use App\Events\ChatEvent;
 use Mail;
 
 class ProjectController extends Controller
 {
     public function updateProject(Request $request){
+
         $v = Validator::make($request->all(), [
             //company info
             'customer_id' => 'required',
@@ -59,6 +64,7 @@ class ProjectController extends Controller
             ]);
         }
         $project = array();
+        $users = array();
 
         $id = $request->id;
         if($request->hasFile('upload_doc')){
@@ -118,6 +124,7 @@ class ProjectController extends Controller
                 foreach($array_res as $row)
                 {
                     Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>3]);
+                    $users[] = $row;
                 }
             }
 
@@ -128,6 +135,7 @@ class ProjectController extends Controller
                 foreach($array_res as $row)
                 {
                     Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>1]);
+                    $users[] = $row;
                     if(User::where('id',$row)->count()>0)
                         $client = User::where('id',$row)->first()->first_name;
                     else
@@ -163,6 +171,7 @@ class ProjectController extends Controller
                 foreach($array_res as $row)
                 {
                     Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>3]);
+                    $users[] = $row;
                 }
             }
 
@@ -174,13 +183,15 @@ class ProjectController extends Controller
                 foreach($array_res as $row)
                 {
                     Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>1]);
+                    $users[] = $row;
                 }
             }
         }
 
         //$notice_type ={1:pending_user,2:createcustomer 3:project}
-        if($request->cusotmer_user){
-            $customerUsers= User::whereIn('id',$request->cusotmer_user)->get();
+        if($request->customer_user){
+            $customer_users = json_decode($request->customer_user, true);
+            $customerUsers= User::whereIn('id',$customer_users)->get();
             $c_users = array();
             foreach($customerUsers as $item) {
                 array_push($c_users, (string)$item->first_name.' '.(string)$item->last_name);
@@ -193,10 +204,11 @@ class ProjectController extends Controller
         }
         if($client_name!=''){
             if($action =='created'){
+                $text = $request->user->first_name.' '.$request->user->last_name.' has created a new project: '.$project['project_name'].' for '.$client_name.'.';
                 $insertnotificationndata = array(
                     'notice_type'		=> '3',
                     'notice_id'			=> $id,
-                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new project: '.$project['project_name'].' for '.$client_name.'.',
+                    'notification'		=> $text,
                     'created_by'		=> $request->user->id,
                     'company_id'		=> $project['company_id'],
                     'project_id'		=> $id,
@@ -205,10 +217,11 @@ class ProjectController extends Controller
                 );
             }
             else{
+                $text = $request->user->first_name.' '.$request->user->last_name.' has updated project : '.$project['project_name'].' for '.$client_name.'.';
                 $insertnotificationndata = array(
                     'notice_type'		=> '3',
                     'notice_id'			=> $id,
-                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has updated project : '.$project['project_name'].' for '.$client_name.'.',
+                    'notification'		=> $text,
                     'created_by'		=> $request->user->id,
                     'company_id'		=> $project['company_id'],
                     'project_id'		=> $id,
@@ -219,10 +232,11 @@ class ProjectController extends Controller
         }
         else{
             if($action =='created'){
+                $text = $request->user->first_name.' '.$request->user->last_name.' has created a new project: '.$project['project_name'].'.';
                 $insertnotificationndata = array(
                     'notice_type'		=> '3',
                     'notice_id'			=> $id,
-                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has created a new project: '.$project['project_name'].'.',
+                    'notification'		=> $text,
                     'created_by'		=> $request->user->id,
                     'company_id'		=> $project['company_id'],
                     'project_id'		=> $id,
@@ -231,10 +245,11 @@ class ProjectController extends Controller
                 );
             }
             else{
+                $text = $request->user->first_name.' '.$request->user->last_name.' has updated project : '.$project['project_name'].'.';
                 $insertnotificationndata = array(
                     'notice_type'		=> '3',
                     'notice_id'			=> $id,
-                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has updated project : '.$project['project_name'].'.',
+                    'notification'		=> $text,
                     'created_by'		=> $request->user->id,
                     'company_id'		=> $project['company_id'],
                     'project_id'		=> $id,
@@ -244,6 +259,14 @@ class ProjectController extends Controller
             }
         }
         Notification::create($insertnotificationndata);
+        if ($request->id == 140) {
+            $notification['title'] = 'Project';
+            $notification['text'] = $text;
+            $notification['project_id'] = $id;
+            $notification['user_id'] = $users;
+            // broadcast(new ChatEvent($notification))->toOthers();
+            broadcast(new NotificationEvent($notification))->toOthers();
+        }
 
         //sending gmail to user
         if($request->has('cusotmer_user'))
@@ -265,8 +288,7 @@ class ProjectController extends Controller
             }
         }
 
-
-        $response = ['status'=>'success', 'msg'=>'Project Saved Successfully!'];
+        $response = ['status'=>'success', 'msg'=>'Project Saved Successfully!', 'note'=>$notification];
         return response()->json($response);
     }
     public function deleteProject(Request $request)
@@ -312,8 +334,7 @@ class ProjectController extends Controller
         $partner_ids = array();
 
         if($request->user->user_type == 0){
-            $project_array = Project::where('archived',$request->archived)
-            ->leftJoin('companies','companies.id','=','projects.company_id')
+            $project_array = Project::leftJoin('companies','companies.id','=','projects.company_id')
             ->leftJoin('users','users.id','=','projects.manager_id')
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
             $res['customers'] = Company::get();
@@ -329,7 +350,7 @@ class ProjectController extends Controller
             $project_array = Project::where(function ($q) use($id, $partner_ids) {
                 return $q->whereIn('projects.company_id',$id)
                 ->orWhereIn('projects.id', $partner_ids);
-            })->where('archived',$request->archived)
+            })
             ->leftJoin('companies','companies.id','=','projects.company_id')
             ->leftJoin('users','users.id','=','projects.manager_id')
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
@@ -342,7 +363,7 @@ class ProjectController extends Controller
                 ->orWhere('type', 4); // partner user case
             })
             ->pluck('project_id');
-            $project_array = Project::whereIn('projects.id',$projectIdx)->where('archived',$request->archived)
+            $project_array = Project::whereIn('projects.id',$projectIdx)
             ->leftJoin('companies','companies.id','=','projects.company_id')
             ->leftJoin('users','users.id','=','projects.manager_id')
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
@@ -377,6 +398,7 @@ class ProjectController extends Controller
                 $project_array[$key]['partner_logos'] = Company::whereIn('id', $partner_company_ids)->get();
             }
         }
+        $res['top_memus_value'] = ProjectTopMenu::get();
         $res["projects"] = $project_array;
         $res['status'] = "success";
         return response()->json($res);
@@ -441,13 +463,8 @@ class ProjectController extends Controller
             }
             /////  end check permission
 
+            
             //$project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
-            if(ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$id])->count()>0)
-                $res['module_status'] = ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$id])->first();
-            else if(ProjectModule::where('user_id',$request->user->id)->count()>0)
-                $res['module_status'] = ProjectModule::where('user_id',$request->user->id)->first();
-            else
-                $res['module_status'] = array();
             $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
             $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
             $project['room_count'] = Room::where('project_id',$project['id'])->count();
@@ -463,6 +480,46 @@ class ProjectController extends Controller
                 $companyId = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
             else
                 $companyId = '';
+
+            $res['module_status'] = array();
+            $res['module_lock'] = array();
+            if(ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$id])->count()>0){
+                $res['module_status'] = ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$id])->first();
+                if ($request->user->user_type < 4) {
+                    if (ProjectModule::where(['company_id' => $request->user->company_id])->count() > 0) {
+                        $res['module_lock'] = ProjectModule::where([
+                            'company_id' => $request->user->company_id
+                        ])->first();
+                    }
+                } else {
+                    if (ProjectModule::where(['company_id' => $companyId])->count() > 0) {
+                        $res['module_lock'] = ProjectModule::where([
+                            'company_id' => $companyId
+                        ])->first();
+                    }
+                }
+            } else {
+                if ($request->user->user_type < 4) {
+                    //admin
+                    if(ProjectModule::where(['company_id' => $request->user->company_id])->count() > 0)
+                        $res['module_status'] = ProjectModule::where([
+                            'company_id' => $request->user->company_id
+                        ])->first();
+
+                } else {
+                    // end user
+                    if(ProjectModule::where(['company_id' => $companyId])->count()>0) {
+                        $res['module_status'] = ProjectModule::where([
+                            'company_id' => $companyId
+                        ])->first();
+                        $res['module_lock'] = $res['module_status'];
+                    }
+                }
+            }
+
+            $company_ids = Company_customer::where('company_id',$request->user->company_id)
+            ->pluck('customer_id')->toArray();
+            array_push($company_ids, $request->user->company_id);
 
             $partner_ids = Partner::where('company_id', $companyId)
                 ->pluck('partner_id')->toArray();
@@ -646,6 +703,7 @@ class ProjectController extends Controller
             $labelIds = Product_label_value::whereIn('product_id',$productIds)->pluck('label_id');
             $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
             $res['project_id'] = $id;
+            $res['project_pages'] = ProjectPage::where('project_id',$id)->orderBy('order_no')->get();
         } else {
             $user_company_id = $request->user->company_id;
             if (Company_customer::where('customer_id', $user_company_id)->count() > 0) {
@@ -702,11 +760,15 @@ class ProjectController extends Controller
             $res['client_users'] = User::whereIn('user_type',[5,6])->where('status',1)->where('company_id',$request->user->company_id)->get();
             $res['assign_users'] = User::where('company_id',$request->user->company_id)->whereIn('user_type',[0,1,3])->where('status',1)->get();
         }
+        $user_company_id = $request->user->company_id;
+        if (Company_customer::where('customer_id', $user_company_id)->count() > 0) {
+            $user_company_id = Company_customer::where('customer_id', $user_company_id)->first()->company_id;
+        }
         $res['form_fields'] = Form_field::get();
-        $res['location_form_rows'] = New_form::where('form_type',0)->get();
-        $res['signoff_form_rows'] = New_form::where('form_type',3)->get();
-        $res['test_forms'] = New_form::where('form_type', 1)->get();
-        $res['com_forms'] = New_form::where('form_type', 2)->get();
+        $res['location_form_rows'] = New_form::where('created_by',$user_company_id)->where('form_type',0)->get();
+        $res['signoff_form_rows'] = New_form::where('created_by',$user_company_id)->where('form_type',3)->get();
+        $res['test_forms'] = New_form::where('created_by',$user_company_id)->where('form_type', 1)->get();
+        $res['com_forms'] = New_form::where('created_by',$user_company_id)->where('form_type', 2)->get();
         $res['product_labels'] = Product_label::get();
         $res['qr_option'] = Qr_option::first();
         // for offline mode
@@ -1142,6 +1204,28 @@ class ProjectController extends Controller
             $id = $request->id;
 
         Project::whereId($id)->update(['project_name'=>$request->project_name]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeProjectRef(request $request){
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        if($request->project_ref)
+        Project::whereId($id)->update(['project_ref'=>$request->project_ref]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeProjectDate(request $request){
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+        Project::whereId($id)->update(['survey_start_date'=>$request->project_date]);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
@@ -1659,8 +1743,10 @@ class ProjectController extends Controller
     public function getProjectModule(request $request){
         
         $res = array();
-        if(ProjectModule::where('user_id',$request->user->id)->count()>0)
-            $res['module_status'] = ProjectModule::where('user_id',$request->user->id)->first();
+        if(ProjectModule::where([
+            'company_id' => $request->user->company_id
+        ])->count()>0)
+            $res['module_status'] = ProjectModule::where('company_id',$request->user->company_id)->first();
         else
             $res['module_status'] = array();
         $res['status'] = 'success';
@@ -1674,8 +1760,13 @@ class ProjectController extends Controller
             if(ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$request->project_id])->count()>0)
                 ProjectModule::where(['user_id'=>$request->user->id,'project_id'=>$request->project_id])->update($data);
             else{
-                if(ProjectModule::where(['user_id'=>$request->user->id])->count()>0){
-                    $data = ProjectModule::where(['user_id'=>$request->user->id])->first();
+                $company_id=$request->user->company_id;
+                if (Company_customer::where('customer_id',$company_id)->count() > 0) {
+                    $company_id = Company_customer::where('customer_id',$company_id)->first()->company_id;
+                }
+
+                if(ProjectModule::where(['company_id'=>$company_id])->count()>0){
+                    $data = ProjectModule::where(['company_id'=>$company_id])->first();
                     $data[$request->caption] = $request->value;
                     unset($data['id']);
                     unset($data['created_at']);
@@ -1719,8 +1810,13 @@ class ProjectController extends Controller
                     if(ProjectModule::where(['user_id'=>$user,'project_id'=>$request->project_id])->count()>0)
                         ProjectModule::where(['user_id'=>$user,'project_id'=>$request->project_id])->update($data);
                     else{
-                        if(ProjectModule::where(['user_id'=>$user])->count()>0){
-                            $data = ProjectModule::where(['user_id'=>$user])->first();
+                        $company_id=$request->user->company_id;
+                        if (Company_customer::where('customer_id',$company_id)->count() > 0) {
+                            $company_id = Company_customer::where('customer_id',$company_id)->first()->company_id;
+                        }
+        
+                        if(ProjectModule::where(['company_id'=>$company_id])->count()>0){
+                            $data = ProjectModule::where(['company_id'=>$company_id])->first();
                             $data[$request->caption] = $request->value;
                             unset($data['id']);
                             unset($data['created_at']);
@@ -1739,16 +1835,29 @@ class ProjectController extends Controller
         } else {
             $data['user_id'] = $request->user->id;
             $data['task'] = $request->task;
+            $data['task_lock'] = $request->task_lock;
             $data['version'] = $request->version;
+            $data['version_lock'] = $request->version_lock;
             $data['schedule'] = $request->schedule;
+            $data['schedule_lock'] = $request->schedule_lock;
             $data['calendar'] = $request->calendar;
+            $data['calendar_lock'] = $request->calendar_lock;
             $data['chat'] = $request->chat;
+            $data['chat_lock'] = $request->chat_lock;
             $data['product'] = $request->product;
+            $data['product_lock'] = $request->product_lock;
             $data['activity'] = $request->activity;
-            if(ProjectModule::where('user_id',$request->user->id)->count()>0)
-                ProjectModule::where('user_id',$request->user->id)->update($data);
+            $data['activity_lock'] = $request->activity_lock;
+            $data['company_id'] = $request->user->company_id;
+            $data['user_id']= $request->user->id;
+            
+            if(ProjectModule::where([
+                'company_id' => $request->user->company_id
+            ])->count() > 0)
+                ProjectModule::where([
+                    'company_id' => $request->user->company_id
+                ])->update($data);
             else{
-                $data['user_id']= $request->user->id;
                 ProjectModule::create($data);
             }
         }
@@ -1818,5 +1927,58 @@ class ProjectController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
+    public function addProjectPage(request $request){
+        $order_no = intval(ProjectPage::where('project_id',$request->project_id)->max('order_no'));
+        $page = array();
+        $page['project_id'] = $request->project_id;
+        $page['page_name'] = $request->page_name;
+        $page['root_type'] = $request->root_type;
+        $page['sub_id'] = $request->sub_id;
+        $page['option_1'] = $request->option_1;
+        $page['option_2'] = $request->option_2;
+        $page['option_3'] = $request->option_3;
+        $page['option_4'] = $request->option_4;
+        $page['link_url'] = $request->link_url;
+        $page['created_by'] = $request->user->id;
+        $page['order_no'] = $order_no+1;
+        $page = ProjectPage::create($page);
+        $res = array();
+        $res['status'] = 'success';
+        $res['page'] = $page;
+        return response()->json($res);
+    }
+    public function removeProjectPage(request $request){
+        $res = array();
+        ProjectPage::whereId($request->id)->delete();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 
+    public function createSubscription(request $request) {
+        $res = array();
+        $res['subscription'] = json_decode($request->subscription);
+        $res['status'] = "success";
+        return response()->json($res);
+    }
+    public function changeOrderProjectPage(request $request){
+        $res = array();
+        $ordered_id = json_decode($request->ordered_id,true);
+        foreach($ordered_id as $key=> $orderId)
+        {
+            ProjectPage::whereId($orderId)->update(['order_no'=>$key+1]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeTopMenu(request $request){
+        $res = array();
+        $menu = array();
+        $menu['quote'] = $request->quote;
+        $menu['install'] = $request->install;
+        $menu['signoff'] = $request->signoff;
+        $menu['archive'] = $request->archive;
+        ProjectTopMenu::whereId($request->id)->update($menu);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 }

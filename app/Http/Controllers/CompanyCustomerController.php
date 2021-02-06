@@ -60,6 +60,10 @@ class CompanyCustomerController extends Controller
             $company['parent_id']  = $request->post("parent_id");
         $company['company_email']  = $request->post("company_email");
         $company['address']  = $request->post("address");
+        $company['address2']  = $request->post("address1");
+        $company['telephone']  = $request->post("phone_number");
+        $company['country']  = $request->post("country");
+        $company['county']  = $request->post("county");
         $company['city']  = $request->post("city");
         $company['postcode']  = $request->post("postcode");
         $company['company_type']  = 3;

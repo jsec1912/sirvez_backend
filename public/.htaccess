@@ -3,12 +3,7 @@
         Options -MultiViews -Indexes
     </IfModule>
 
-    <IfModule mod_headers.c>
-        Header set Access-Control-Allow-Credentials true
-        Header set Access-Control-Allow-Origin "*"
-        Header set Access-Control-Allow-Headers "Origin, Content-Type, Accept, X-Request-With"
-    </IfModule>
-
+    
     RewriteEngine On
 
     # Handle Authorization Header
@@ -27,3 +22,10 @@
 
     
 </IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(svg|pdf|JPEG|jpg|gif|png|bmp|ttf|otf|eot|woff|woff2)$">
+        Header set Access-Control-Allow-Origin "*"
+    </FilesMatch>
+</IfModule>
+
