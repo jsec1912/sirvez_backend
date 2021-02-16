@@ -21,6 +21,7 @@ use App\Task_top_menu;
 use App\Task_label_value;
 use App\Partner;
 use Mail;
+use App\Events\NotificationEvent;
 use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
@@ -96,6 +97,24 @@ class TaskController extends Controller
                     }
                 }
             }
+
+            $notification = array();
+            $project = Project::where('id', $task->project_id)->first();
+            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added you to a new task: ' . $task->task . ' for project: ' . $project->project_name . ' for ';
+            $notification['title'] = 'Sirvez | New Task';
+            $notification['text1'] = $text;
+            $notification['text2'] = '.';
+            $notification['id'] = 'task-' . $task->id;
+            $notification['image'] = $request->user->profile_pic;
+            $users = Project_user::where('project_id', $task->id)->where('type', '2')->pluck('user_id')->toArray();
+            $users = array_map(function ($value) {
+                return intval($value);
+            }, $users);
+            $notification['user_id'] = $users;
+            $notification['created_by'] = $request->user->id;
+            $notification['action_link'] = '/app/task-manager/my-tasks/' . $task->id;
+
+            broadcast(new NotificationEvent($notification))->toOthers();
         }
         else{
             $task['updated_by'] = $request->user->id;
@@ -169,6 +188,26 @@ class TaskController extends Controller
                 'archived_id'=>$request->user->id,
                 'archived_day'=>date('Y-m-d')]);
         //Task::where(['id'=>$request->id])->delete();
+
+        if ($request->archived == 1) {
+            $notification = array();
+            $project = Project::where('id', $task->project_id)->first();
+            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has completed task ' . $task->task . ' for project: ' . $project->project_name . ' for ';
+            $notification['title'] = 'Sirvez | Completed Task';
+            $notification['text1'] = $text;
+            $notification['text2'] = '.';
+            $notification['id'] = 'task-complete-' . $task->id;
+            $notification['image'] = $request->user->profile_pic;
+            $users = Project_user::where('project_id', $task->id)->where('type', '2')->pluck('user_id')->toArray();
+            $users = array_map(function ($value) {
+                return intval($value);
+            }, $users);
+            $notification['user_id'] = $users;
+            $notification['created_by'] = $request->user->id;
+            $notification['action_link'] = '/app/task-manager/my-tasks/' . $task->id;
+
+            broadcast(new NotificationEvent($notification))->toOthers();
+        }
         $res["status"] = "success";
 
         return response()->json($res);
@@ -735,17 +774,57 @@ class TaskController extends Controller
                 }
             }
         }
+        $notification = array();
+
         if($request->has('commentUserList'))
         {
             Task_comment_user::where(['comment_id'=>$task->id])->delete();
             $array_res = array();
             $array_res =json_decode($request->commentUserList,true);
             if($array_res){
+                $users = array();
                 foreach($array_res as $row)
                 {
                     Task_comment_user::create(['comment_id'=>$task->id,'user_id'=>$row]);
+                    $users[] = $row;
                 }
+
+                $project = Task::where('tasks.id', $task->task_id)
+                    ->leftJoin('projects', 'tasks.project_id', '=', 'projects.id')
+                    ->select('tasks.*', 'projects.project_name')->first();
+                $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added you to a new task: To Do for project: ' . $project->project_name . ' for ';
+                $notification['title'] = 'Sirvez | New To Do';
+                $notification['text1'] = $text;
+                $notification['text2'] = ' Deadline: ' . $task->deadline;
+                $notification['id'] = 'task-comment-user-' . $task->id;
+                $notification['image'] = $request->user->profile_pic;
+                $notification['user_id'] = $users;
+                $notification['created_by'] = $request->user->id;
+                $notification['action_link'] = '/app/task-manager/my-tasks/' . $task->task_id;
+    
+                broadcast(new NotificationEvent($notification))->toOthers();
             }
+        }
+
+        if (count($notification) == 0) {
+            $project = Task::where('tasks.id', $task->task_id)
+                ->leftJoin('projects', 'tasks.project_id', '=', 'projects.id')
+                ->select('tasks.*', 'projects.project_name')->first();
+            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added a new task comment to ' . $project->task . ' for project: ' . $project->project_name . ' for ';
+            $notification['title'] = 'Sirvez | New Task comment';
+            $notification['text1'] = $text;
+            $notification['text2'] = '.';
+            $notification['id'] = 'task-comment-' . $task->id;
+            $notification['image'] = $request->user->profile_pic;
+            $users = Project_user::where('project_id', $task->task_id)->where('type', '2')->pluck('user_id')->toArray();
+            $users = array_map(function ($value) {
+                return intval($value);
+            }, $users);
+            $notification['user_id'] = $users;
+            $notification['created_by'] = $request->user->id;
+            $notification['action_link'] = '/app/task-manager/my-tasks/' . $task->task_id;
+
+            broadcast(new NotificationEvent($notification))->toOthers();
         }
         $res = array();
         $res['comments'] = TaskComment::where('task_comments.task_id',$task['task_id'])
@@ -859,12 +938,35 @@ class TaskController extends Controller
     public function commentComplete(request $request){
         $res = array();
         TaskComment::where('id',$request->id)->update(['complete'=>$request->complete]);
+        if ($request->complete == 1) {
+            $notification = array();
+            $task_comment = TaskComment::where('id', $request->id)->first();
+            $project = Task::where('tasks.id', '=', $task_comment->task_id)
+                ->leftJoin('projects', 'tasks.project_id', '=', 'projects.id')
+                ->select('tasks.*', 'projects.project_name')->first();
+            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has completed task to do ' . $task_comment->comment . ' for project: ' . $project->project_name . ' for ';
+            $notification['title'] = 'Sirvez | Completed To Do';
+            $notification['text1'] = $text;
+            $notification['text2'] = ' Deadline: ' . $task_comment->deadline . '.';
+            $notification['id'] = 'task-comment-complete-' . $task_comment->task_id;
+            $notification['image'] = $request->user->profile_pic;
+            $users = Project_user::where('project_id', $task_comment->task_id)->where('type', '2')->pluck('user_id')->toArray();
+            $users = array_map(function ($value) {
+                return intval($value);
+            }, $users);
+            $notification['user_id'] = $users;
+            $notification['created_by'] = $request->user->id;
+            $notification['action_link'] = '/app/task-manager/my-tasks/' . $task_comment->task_id;
+
+            broadcast(new NotificationEvent($notification))->toOthers();
+        }
         $res['status'] = 'success';
         return response()->json($res);
     }
     public function addCommentUser(request $request){
         $res = array();
         Task_comment_user::Create(['comment_id'=>$request->comment_id,'user_id'=>$request->user_id]);
+
         $res['status'] = 'success';
         return response()->json($res);
     }

@@ -9,6 +9,8 @@ use App\Events\ChatEvent;
 use App\Events\OnUserEvent;
 use App\ProjectChatgroup;
 use App\ProjectChatgroupUser;
+use App\Events\NotificationEvent;
+use App\Project;
 use Mail;
 
 class ProjectChatController extends Controller
@@ -17,7 +19,9 @@ class ProjectChatController extends Controller
         $res = array();
         $chat = array();
         $onlineUsers = json_decode($request->onlineUsers);
+        $users = array();
         if($request->group_id==0){
+            $users[] = intval($request->receiver_id);
             $chat['project_id'] = $request->project_id;
             $chat['sender_id'] = $request->user->id;
             $chat['send_user'] = $request->user->first_name;
@@ -66,7 +70,8 @@ class ProjectChatController extends Controller
                                         ->where('user_id','!=',$request->user->id)
                                         ->get();
             
-            foreach($users as $user){
+            foreach($users as $key=>$user){
+                $users[] = intval($user->user_id);
                 $chat = array();
                 $chat['project_id'] = $request->project_id;
                 $chat['sender_id'] = $request->user->id;
@@ -74,6 +79,7 @@ class ProjectChatController extends Controller
                 $chat['receiver_id'] = $user->user_id;
                 $chat['message'] = $request->message;
                 $chat['group_id'] = $request->group_id;
+                $chat['send_num'] = $key;
                 $chat = Project_chat::create($chat);
                 broadcast(new ChatEvent($chat))->toOthers();
                 broadcast(new OnUserEvent($chat))->toOthers();
@@ -103,6 +109,21 @@ class ProjectChatController extends Controller
                 }
             }
         }
+
+        $project = Project::where('id', $request->project_id)->first();
+        
+        $text = $request->user->first_name . ' ' . $request->user->last_name . ' has sent a message to ';
+        $notification['title'] = 'Sirvez | Chat';
+        $notification['text1'] = $text;
+        $notification['text2'] = ' for ' . $project->project_name . ' "' . $request->message . '".';
+        $notification['id'] = 'chat-' . $chat->id;
+        $notification['image'] = $request->user->profile_pic;
+        $notification['user_id'] = $users;
+        $notification['created_by'] = $request->user->id;
+        $notification['action_link'] = '/app/project/live/' . $project->id;
+
+        broadcast(new NotificationEvent($notification))->toOthers();
+
         $res['status'] = 'success';
         return response()->json($res);
     }
@@ -143,6 +164,15 @@ class ProjectChatController extends Controller
         $data['created_by'] = $request->user->id;
         $data = ProjectChatGroup::create($data);
         ProjectChatGroupUser::create(['group_id'=>$data['id'],'user_id'=>$request->user->id,'created_by'=>$request->user->id]);
+
+        $chats = Project_chat::where('project_id',$request->project_id)->get();
+        $groups = ProjectChatgroup::where('project_id',$request->project_id)->get();
+        foreach($groups as $key=>$group){
+            $groups[$key]['group_users'] = ProjectChatgroupUser::where('group_id',$group->id)->pluck('user_id');
+        }
+        $res['chats'] = $chats;
+        $res['groups'] = $groups;
+
         $res['status'] = 'success';
         return response()->json($res);
     }
@@ -153,6 +183,23 @@ class ProjectChatController extends Controller
         $data['user_id'] = $request->user_id;
         $data['created_by'] = $request->user->id;
         ProjectChatGroupUser::create($data);
+
+        $project_group = ProjectChatGroup::where('id', $request->group_id)->first();
+        $project = Project::where('id', $project_group->project_id)->first();
+        
+        $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added you to a new chat: ' . $project_group->group_name . ' for project: ' . $project->project_name . ' for ';
+        $notification['title'] = 'Sirvez | New Chat';
+        $notification['text1'] = $text;
+        $notification['text2'] = '.';
+        $notification['id'] = 'group-chat-' . $project_group->id;
+        $notification['image'] = $request->user->profile_pic;
+        $notification['user_id'] = array(intval($request->user_id));
+        $notification['created_by'] = $request->user->id;
+        $notification['action_link'] = '/app/project/live/' . $project->id;
+
+        broadcast(new NotificationEvent($notification))->toOthers();
+
+
         $res['status'] = 'success';
         return response()->json($res);
     }

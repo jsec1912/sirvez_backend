@@ -81,8 +81,14 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::get('/project/getActivity','ProjectController@getActivity');
     Route::post('/project/addProjectPage','ProjectController@addProjectPage');
     Route::post('/project/removeProjectPage','ProjectController@removeProjectPage');
-    Route::post('/project/subscription', 'ProjectController@createSubscription');
     Route::post('/project/changeOrderProjectPage', 'ProjectController@changeOrderProjectPage');
+    Route::post('/project/addProjectTender','ProjectController@addProjectTender');
+    Route::post('/project/removeProjectTender','ProjectController@removeProjectTender');
+    Route::post('/project/changeOrderProjectTender', 'ProjectController@changeOrderProjectTender');
+    Route::post('/project/addProjectHealthy','ProjectController@addProjectHealthy');
+    Route::post('/project/removeProjectHealthy','ProjectController@removeProjectHealthy');
+    Route::post('/project/changeOrderProjectHealthy', 'ProjectController@changeOrderProjectHealthy');    
+    Route::post('/project/subscription', 'ProjectController@createSubscription');
     Route::post('/project/changeTopMenu', 'ProjectController@changeTopMenu');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
@@ -259,5 +265,13 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/page/duplicatePage','PageController@duplicatePage');///
     Route::post('/page/deletePage','PageController@deletePage');///
     Route::post('/page/uploadPdf','PageController@uploadPdf');///
+    Route::get('/page/labelList', 'PageController@labelList');
+    Route::post('/page/addLabel', 'PageController@addLabel');
+    Route::post('/page/deleteLabel', 'PageController@deleteLabel');
+    Route::post('/page/setPageLabel', 'PageController@setPageLabel');
+    Route::get('/document/documentList','PageController@documentList');///
+    Route::post('/document/updateDocument','PageController@updateDocument');///
+    Route::post('/document/removeDocumentPage','PageController@removeDocumentPage');///
+    Route::post('/document/changeOrderDocumentPage','PageController@changeOrderDocumentPage');///
 
 });

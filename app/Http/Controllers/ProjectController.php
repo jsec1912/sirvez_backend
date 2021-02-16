@@ -37,6 +37,8 @@ use App\Partner;
 use App\Calendar_event;
 use App\CalendarEventSync;
 use App\ProjectPage;
+use App\ProjectTender;
+use App\ProjectHealthy;
 use App\ProjectTopMenu;
 use App\Events\NotificationEvent;
 use App\Events\ChatEvent;
@@ -64,7 +66,6 @@ class ProjectController extends Controller
             ]);
         }
         $project = array();
-        $users = array();
 
         $id = $request->id;
         if($request->hasFile('upload_doc')){
@@ -124,7 +125,6 @@ class ProjectController extends Controller
                 foreach($array_res as $row)
                 {
                     Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>3]);
-                    $users[] = $row;
                 }
             }
 
@@ -135,7 +135,6 @@ class ProjectController extends Controller
                 foreach($array_res as $row)
                 {
                     Project_user::create(['project_id'=>$id,'user_id'=>$row,'type'=>1]);
-                    $users[] = $row;
                     if(User::where('id',$row)->count()>0)
                         $client = User::where('id',$row)->first()->first_name;
                     else
@@ -153,6 +152,24 @@ class ProjectController extends Controller
                     Notification::create($insertnotificationndata);
                 }
             }
+
+            $notification = array();
+            $text = $request->user->first_name.' '.$request->user->last_name.' has added you to '.$project['project_name'] . ' for ';
+            $notification['title'] = 'Sirvez | New Project';
+            $notification['text1'] = $text;
+            $notification['text2'] = '.';
+            $notification['id'] = 'project-'. $id;
+            $notification['image'] = $request->user->profile_pic;
+            $users = Project_user::where('project_id', $id)->where('type', '!=', '2')->pluck('user_id')->toArray();
+            $users = array_map(function ($value) {
+                return intval($value);
+            }, $users);
+            $notification['user_id'] = $users;
+            $notification['created_by'] = $request->user->id;
+            $notification['action_link'] = '/app/project/live/' . $id;
+
+            broadcast(new NotificationEvent($notification))->toOthers();
+
         } else {
             // $project_cnt = Project::where('project_name',$project['project_name'])->where('id','<>',$id)->count();
             // if($project_cnt > 0)
@@ -259,14 +276,6 @@ class ProjectController extends Controller
             }
         }
         Notification::create($insertnotificationndata);
-        if ($request->id == 140) {
-            $notification['title'] = 'Project';
-            $notification['text'] = $text;
-            $notification['project_id'] = $id;
-            $notification['user_id'] = $users;
-            // broadcast(new ChatEvent($notification))->toOthers();
-            broadcast(new NotificationEvent($notification))->toOthers();
-        }
 
         //sending gmail to user
         if($request->has('cusotmer_user'))
@@ -288,7 +297,7 @@ class ProjectController extends Controller
             }
         }
 
-        $response = ['status'=>'success', 'msg'=>'Project Saved Successfully!', 'note'=>$notification];
+        $response = ['status'=>'success', 'msg'=>'Project Saved Successfully!'];
         return response()->json($response);
     }
     public function deleteProject(Request $request)
@@ -476,6 +485,7 @@ class ProjectController extends Controller
             $project_users = Project_user::where('project_id', $id)->where('type', '!=', '2')->pluck('user_id')->toArray();
             array_push($project_users,strval($project->manager_id));
             $project['project_users'] = $project_users;
+            
             if(Company_customer::where('customer_id',$project->company_id)->count()>0)
                 $companyId = Company_customer::where('customer_id',$project->company_id)->first()->company_id;
             else
@@ -704,6 +714,8 @@ class ProjectController extends Controller
             $res['product_used_labels'] = Product_label::whereIn('id',$labelIds)->get();
             $res['project_id'] = $id;
             $res['project_pages'] = ProjectPage::where('project_id',$id)->orderBy('order_no')->get();
+            $res['project_tenders'] = ProjectTender::where('project_id',$id)->orderBy('order_no')->get();
+            $res['project_healthys'] = ProjectHealthy::where('project_id',$id)->orderBy('order_no')->get();
         } else {
             $user_company_id = $request->user->company_id;
             if (Company_customer::where('customer_id', $user_company_id)->count() > 0) {
@@ -897,6 +909,7 @@ class ProjectController extends Controller
     {
         $fileName = '';
         $project = array();
+
         if ($request->user->user_type ==6)
             $project['signed_off'] = 2;
         else
@@ -983,6 +996,31 @@ class ProjectController extends Controller
                 'is_signed'	    	=> 1,
             );
         Notification::create($insertnotificationdata);
+
+        $notification = array();
+        if ($request->user->user_type == 6) {
+            $text = $request->user->first_name.' '.$request->user->last_name.' has signed off scope of works: '. $project['project_name'] . ' for ';
+            $notification['title'] = 'Sirvez | Project signed off (SOW)';
+            $notification['id'] = 'project-signoff-'. $project->id;
+        } else {
+            $text = $request->user->first_name.' '.$request->user->last_name.' has request scope of work sign off: '. $project['project_name'] . ' for ';
+            $notification['title'] = 'Sirvez | Project sign off (SOW)';
+            $notification['id'] = 'project-signoff-request-'. $project->id;
+        }
+
+        $notification['text1'] = $text;
+        $notification['text2'] = '.';
+        $notification['image'] = $request->user->profile_pic;
+        $users = Project_user::where('project_id', $project->id)->where('type', '!=', '2')->pluck('user_id')->toArray();
+        $users = array_map(function ($value) {
+            return intval($value);
+        }, $users);
+        array_push($users, intval($project['created_by']));
+        $notification['user_id'] = $users;
+        $notification['created_by'] = $request->user->id;
+        $notification['action_link'] = '/app/project/live/' . $project->id;
+
+        broadcast(new NotificationEvent($notification))->toOthers();
 
         //send mail
         if(Project_user::where('project_id',$request->id)->where('type','3')->count() > 0){
@@ -1143,6 +1181,31 @@ class ProjectController extends Controller
                 'is_signed'	    	=> 1,
             );
         Notification::create($insertnotificationdata);
+
+        $notification = array();
+        if ($request->user->user_type == 6) {
+            $text = $request->user->first_name.' '.$request->user->last_name.' has signed off: ' . $project['project_name'] . ' for ';
+            $notification['title'] = 'Sirvez | Project signed off (final)';
+            $notification['id'] = 'project-final-'. $project->$id;
+        } else {
+            $text = $request->user->first_name.' '.$request->user->last_name.' has requested Final Sign Off: ' . $project['project_name'] . 'for';
+            $notification['title'] = 'Sirvez | Project sign off (final)';
+            $notification['id'] = 'project-final-request-'. $project->id;
+        }
+
+        $notification['text1'] = $text;
+        $notification['text2'] = '.';
+        $notification['image'] = $request->user->profile_pic;
+        $users = Project_user::where('project_id', $project->id)->where('type', '!=', '2')->pluck('user_id')->toArray();
+        $users = array_map(function ($value) {
+            return intval($value);
+        }, $users);
+        array_push($users, intval($project['created_by']));
+        $notification['user_id'] = $users;
+        $notification['created_by'] = $request->user->id;
+        $notification['action_link'] = '/app/project/live/' . $project->id;
+
+        broadcast(new NotificationEvent($notification))->toOthers();
 
         //send mail
         if(Project_user::where('project_id',$request->id)->where('type','3')->count() > 0){
@@ -1848,6 +1911,10 @@ class ProjectController extends Controller
             $data['product_lock'] = $request->product_lock;
             $data['activity'] = $request->activity;
             $data['activity_lock'] = $request->activity_lock;
+            $data['tender'] = $request->tender;
+            $data['tender_lock'] = $request->tender_lock;
+            $data['healthy'] = $request->healthy;
+            $data['healthy_lock'] = $request->healthy_lock;
             $data['company_id'] = $request->user->company_id;
             $data['user_id']= $request->user->id;
             
@@ -1938,8 +2005,12 @@ class ProjectController extends Controller
         $page['option_2'] = $request->option_2;
         $page['option_3'] = $request->option_3;
         $page['option_4'] = $request->option_4;
+        $page['page_count'] = $request->page_count;
+        $page['content'] = $request->content;
+        $page['lock_page'] = $request->lock_page;
         $page['link_url'] = $request->link_url;
         $page['created_by'] = $request->user->id;
+        $page['updated_by'] = $request->user->id;
         $page['order_no'] = $order_no+1;
         $page = ProjectPage::create($page);
         $res = array();
@@ -1954,12 +2025,6 @@ class ProjectController extends Controller
         return response()->json($res);
     }
 
-    public function createSubscription(request $request) {
-        $res = array();
-        $res['subscription'] = json_decode($request->subscription);
-        $res['status'] = "success";
-        return response()->json($res);
-    }
     public function changeOrderProjectPage(request $request){
         $res = array();
         $ordered_id = json_decode($request->ordered_id,true);
@@ -1968,6 +2033,95 @@ class ProjectController extends Controller
             ProjectPage::whereId($orderId)->update(['order_no'=>$key+1]);
         }
         $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addProjectTender(request $request){
+        $order_no = intval(ProjectTender::where('project_id',$request->project_id)->max('order_no'));
+        $page = array();
+        $page['project_id'] = $request->project_id;
+        $page['page_name'] = $request->page_name;
+        $page['root_type'] = $request->root_type;
+        $page['sub_id'] = $request->sub_id;
+        $page['option_1'] = $request->option_1;
+        $page['option_2'] = $request->option_2;
+        $page['option_3'] = $request->option_3;
+        $page['option_4'] = $request->option_4;
+        $page['page_count'] = $request->page_count;
+        $page['content'] = $request->content;
+        $page['lock_page'] = $request->lock_page;
+        $page['link_url'] = $request->link_url;
+        $page['created_by'] = $request->user->id;
+        $page['updated_by'] = $request->user->id;
+        $page['order_no'] = $order_no+1;
+        $page = ProjectTender::create($page);
+        $res = array();
+        $res['status'] = 'success';
+        $res['page'] = $page;
+        return response()->json($res);
+    }
+    public function removeProjectTender(request $request){
+        $res = array();
+        ProjectTender::whereId($request->id)->delete();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeOrderProjectTender(request $request){
+        $res = array();
+        $ordered_id = json_decode($request->ordered_id,true);
+        foreach($ordered_id as $key=> $orderId)
+        {
+            ProjectTender::whereId($orderId)->update(['order_no'=>$key+1]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addProjectHealthy(request $request){
+        $order_no = intval(ProjectHealthy::where('project_id',$request->project_id)->max('order_no'));
+        $page = array();
+        $page['project_id'] = $request->project_id;
+        $page['page_name'] = $request->page_name;
+        $page['root_type'] = $request->root_type;
+        $page['sub_id'] = $request->sub_id;
+        $page['option_1'] = $request->option_1;
+        $page['option_2'] = $request->option_2;
+        $page['option_3'] = $request->option_3;
+        $page['option_4'] = $request->option_4;
+        $page['page_count'] = $request->page_count;
+        $page['content'] = $request->content;
+        $page['lock_page'] = $request->lock_page;
+        $page['link_url'] = $request->link_url;
+        $page['created_by'] = $request->user->id;
+        $page['updated_by'] = $request->user->id;
+        $page['order_no'] = $order_no+1;
+        $page = ProjectHealthy::create($page);
+        $res = array();
+        $res['status'] = 'success';
+        $res['page'] = $page;
+        return response()->json($res);
+    }
+    public function removeProjectHealthy(request $request){
+        $res = array();
+        ProjectHealthy::whereId($request->id)->delete();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeOrderProjectHealthy(request $request){
+        $res = array();
+        $ordered_id = json_decode($request->ordered_id,true);
+        foreach($ordered_id as $key=> $orderId)
+        {
+            ProjectHealthy::whereId($orderId)->update(['order_no'=>$key+1]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    
+    public function createSubscription(request $request) {
+        $res = array();
+        $res['subscription'] = json_decode($request->subscription);
+        $res['status'] = "success";
         return response()->json($res);
     }
     public function changeTopMenu(request $request){

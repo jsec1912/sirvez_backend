@@ -35,6 +35,7 @@ use App\Product_sign;
 use App\Product_label;
 use App\Product_label_value;
 use App\Partner;
+use App\Events\NotificationEvent;
 use Mail;
 use Illuminate\Support\Facades\Storage;
 class RoomController extends Controller
@@ -147,6 +148,25 @@ class RoomController extends Controller
             );
 
             Notification::create($insertnotificationdata);
+
+            $notification = array();
+            $project = Project::where('id', $room->project_id)->first();
+            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added a new location: ' . $room->room_number . ' to ' . $project->project_name . ' for ';
+            $notification['title'] = 'Sirvez | New Project Location';
+            $notification['text1'] = $text;
+            $notification['text2'] = '.';
+            $notification['id'] = 'location-' . $room->id;
+            $notification['image'] = $request->user->profile_pic;
+            $users = Project_user::where('project_id', $project->id)->where('type', '!=', '2')->pluck('user_id')->toArray();
+            $users = array_map(function ($value) {
+                return intval($value);
+            }, $users);
+            array_push($users, intval($project['created_by']));
+            $notification['user_id'] = $users;
+            $notification['created_by'] = $request->user->id;
+            $notification['action_link'] = '/app/project/live/' . $project->id . '/' . $room->id;
+
+            broadcast(new NotificationEvent($notification))->toOthers();
         }
         else{
             // $room_cnt = Room::where('project_id',$room['project_id'])
@@ -208,20 +228,39 @@ class RoomController extends Controller
             $images = $request->file('room_img');
             $n = 0;
             if(isset($images) && count($images) > 0 ){
+                $room_photo = null;
                 foreach($images as $img_file) {
                     if (isset($img_file)) {
-
                         $n++;
                         $fileName = $img_file->getClientOriginalName();
                         $img_file->move(public_path('upload/img/'), $fileName);
-                        Room_photo::create(['room_id'=>$id,'user_id'=>$request->user->id,'img_name'=>$fileName]);
+                        $room_photo = Room_photo::create(['room_id'=>$id,'user_id'=>$request->user->id,'img_name'=>$fileName]);
+
                     }
+                }
+                if ($room_photo) {
+                    $project = Project::where('id', $room->project_id)->first();
+                    $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added a new location image: ' . $room->room_number . ' to ' . $project->project_name . ' for ';
+                    $notification['title'] = 'Sirvez | New Project Location Image';
+                    $notification['text1'] = $text;
+                    $notification['text2'] = '.';
+                    $notification['id'] = 'location-' . $room->id . '-' . $room_photo->id;
+                    $notification['image'] = $request->user->profile_pic;
+                    $notification['background'] = $room_photo->img_name;
+                    $users = Project_user::where('project_id', $project->id)->where('type', '!=', '2')->pluck('user_id')->toArray();
+                    $users = array_map(function ($value) {
+                        return intval($value);
+                    }, $users);
+                    array_push($users, intval($project['created_by']));
+                    $notification['user_id'] = $users;
+                    $notification['created_by'] = $request->user->id;
+                    $notification['action_link'] = '/app/project/live/' . $project->id . '/' . $room->id;
+                    broadcast(new NotificationEvent($notification))->toOthers();
                 }
             }
         }
 
         //$notice_type ={1:pending_user,2:createcustomer 3:project 4:site 5:room}
-
         $res['status'] = 'success';
         $res['msg'] = 'Room Saved Successfully!';
         $res['room'] = $room;
@@ -486,6 +525,7 @@ class RoomController extends Controller
                 ->where('status',1)
                 ->select('id','first_name','last_name','profile_pic')->get();
             $res['signed_cnt'] = Product::where('room_id',$room_id)->where('signed_off','<>','2')->count() - Product::where('room_id',$room_id)->where('signed_off','1')->count();
+            $res['project_users'] = Project_user::where('project_id', $room->project_id)->where('type', '!=', '2')->pluck('user_id')->toArray();
         }
         if(($request->has('project_id') && $request->project_id != 'null')||$request->has('project_name')){
             if((!$request->has('project_id') || $request->project_id =='null') && $request->has('project_name'))
@@ -507,6 +547,7 @@ class RoomController extends Controller
             $res['floors'] = Floor::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
             $res['project_id'] = $project_id;
             $res['project_signoff'] = Project::whereId($project_id)->first()->signed_off;
+            $res['project_users'] = Project_user::where('project_id', $request->project_id)->where('type', '!=', '2')->pluck('user_id')->toArray();
         }
         else if(isset($request->customer_id)&& $request->customer_id>0){
             $res['sites'] = Site::where('company_id',$request->customer_id)->orderBy('id','desc')->get();
@@ -531,10 +572,10 @@ class RoomController extends Controller
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
         $res['all_users'] = User::where('status',1)->get();
+        $res['company_customers'] = Company_customer::get();
         $res['form_fields'] = Form_field::get();
         $res['test_forms'] = New_form::where('form_type', 1)->get();
         $res['com_forms'] = New_form::where('form_type', 2)->get();
-        $res['project_users'] = Project_user::where('type', '!=', '2')->pluck('user_id')->toArray();
         $res['product_labels'] = Product_label::get();
         $res['qr_option'] = Qr_option::first();
         $res['status'] = "success";
@@ -667,7 +708,6 @@ class RoomController extends Controller
         //add task
         $task = array();
         if($request->hasFile('task_img')){
-
             $fileName = time().'task.'.$request->task_img->extension();
             $request->task_img->move(public_path('upload/img/'), $fileName);
             $task['task_img']  = $fileName;
@@ -816,6 +856,7 @@ class RoomController extends Controller
 
         $room_photo = Room_photo::whereId($request->photo_id)->first();
         $room = Room::whereId($room_photo->room_id)->first();
+
         $insertnotificationdata = array(
             'notice_type'		=> '5',
             'notice_id'			=> $room_photo->room_id,
@@ -827,6 +868,24 @@ class RoomController extends Controller
             'is_read'	    	=> 0,
         );
         Notification::create($insertnotificationdata);
+
+        $project = Project::where('id', $room->project_id)->first();
+        $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added a new location image comment: ' . $room->room_number . ' to ' . $project->project_name . ' for ';
+        $notification['title'] = 'Sirvez | New Project Location Image Comment';
+        $notification['text1'] = $text;
+        $notification['text2'] = '.';
+        $notification['id'] = 'location-' . $room->id . '-' . $comment->id;
+        $notification['image'] = $request->user->profile_pic;
+        $users = Project_user::where('project_id', $project->id)->where('type', '!=', '2')->pluck('user_id')->toArray();
+        $users = array_map(function ($value) {
+            return intval($value);
+        }, $users);
+        array_push($users, intval($project['created_by']));
+        $notification['background'] = $room_photo->img_name;
+        $notification['user_id'] = $users;
+        $notification['created_by'] = $request->user->id;
+        $notification['action_link'] = '/app/project/live/' . $project->id . '/' . $room->id;
+        broadcast(new NotificationEvent($notification))->toOthers();
 
         //sending gmail to user
         $pending_user = User::where('id',$room->created_by)->first();

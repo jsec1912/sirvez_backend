@@ -309,10 +309,12 @@ class ProductController extends Controller
                 'location id'=>'room_id',
                 'room id'=>'room_id',
                 'qty'=>'qty',
+                'quantity'=>'qty',
                 'manufacturer'=>'manufacturer',
                 'model number'=>'model_number',
                 'model'=>'model_number',
                 'description'=>'description',
+                'product description'=>'description',
                 'testing id'=>'test_form_id',
                 'commissioning id'=>'com_form_id',
                 'commisioning id'=>'com_form_id',
@@ -331,6 +333,7 @@ class ProductController extends Controller
             $value_id = array();
 
             $sum = 0; $s = 0; $i = 0;
+            $out = '';
             foreach($titles as $row) {
                 $srow = strtolower($row);
                 if (array_key_exists($srow, $header)) {
@@ -338,6 +341,7 @@ class ProductController extends Controller
                     $s = array_search($frow, $header_set);
                     $sum |= 1<<$s;
                     $value_id[$srow] = $frow;
+                    $out .= $frow . "|";
                 } else {
                     break;
                 }
@@ -347,7 +351,8 @@ class ProductController extends Controller
             if ($i < 9 || $sum != 511) {
                 $res['status'] = "error";
                 $res['msg'] = 'The excel format is not correct.' . $i . ", " . $sum;
-                return ;
+                $res['out'] = $out;
+                return response()->json($res);
             }
 
             $out = array();
