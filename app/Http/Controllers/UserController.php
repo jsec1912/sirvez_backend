@@ -385,6 +385,11 @@ class UserController extends Controller
                                 ->get();
             $res['customers'] = [];
         }
+
+        foreach($res['users'] as $user) {
+            $user['actived_at'] = Notification::where('created_by', $user->id)->max('created_at');
+        }
+        $res['current'] = date("Y-m-d H:i:s");
         
         return response()->json($res);
     }

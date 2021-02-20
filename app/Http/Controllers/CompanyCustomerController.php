@@ -79,9 +79,6 @@ class CompanyCustomerController extends Controller
             $count = 0;
             if($request->website)
                 $count += Company::where('website',$request->website)->count();
-            // if($request->company_email)
-            //     $count+= Company::where('company_email',$request->company_email)->count();
-
             if($count>0)
             {
                 $res = array();
@@ -89,35 +86,17 @@ class CompanyCustomerController extends Controller
                 $res['msg'] = 'The website has already been taken!';
                 return response()->json($res);
             }
-
-
-            // $v = Validator::make($request->all(), [
-            //     'website' => 'required|unique:companies',
-            //     'company_email' => 'email|required|unique:companies'
-            // ]);
-            // if ($v->fails())
-            // {
-            //     return response()->json([
-            //         'status' => 'error',
-            //         'msg' => 'The website or company email has already been taken!'
-            //     ]);
-            // }
             if (strlen($request->id) > 10)
                 $company['off_id']  = $request->id;
             $company = Company::create($company);
             $id = $company->id;
-            //User::whereId($company['manager'])->update(['company_id'=>$id,'user_type'=>3]);
             $flag = 1;
         }
         else{
             $count = 0;
             if($request->website)
                 $count += Company::where('id','<>',$id)->where('website',$request->website)->count();
-            // if($request->company_email)
-            //     $count += Company::where('id','<>',$id)->where('company_email',$request->company_email)->count();
-            $sel_company = Company::whereId($id)->first();
-            //User::whereId($sel_company['manager'])->update(['company_id'=>$request->user->company_id,'user_type'=>1]);
-            //User::whereId($company['manager'])->update(['company_id'=>$id,'user_type'=>3]);
+             $sel_company = Company::whereId($id)->first();
             if($count>0)
             {
                 $res = array();
@@ -146,8 +125,6 @@ class CompanyCustomerController extends Controller
             $companyCustomer->save();
             $action = "updated";
         }
-        //insert notification
-        //$notice_type ={1:pending_user,2:createcustomer}
 
         $insertnotificationndata = array(
             'notice_type'		=> '2',
@@ -163,23 +140,69 @@ class CompanyCustomerController extends Controller
         Notification::create($insertnotificationndata);
 
         //insert site
-        if($request->is_site)
+        if($request->site_name!='')
         {
-            $site['company_id'] = $id;
-            $site['site_name'] = $request->post("company_name")." Head Office";
+            $site['site_name'] = $request->post("site_name");
+            $site['address2'] = $request->post("address1");
             $site['address'] = $request->post("address");
+            $site['contact_number'] = $request->post("phone_number");
+            $site['country'] = $request->post("country");
+            $site['county'] = $request->post("county");
             $site['city'] = $request->post("city");
             $site['postcode'] = $request->post("postcode");
             $site['created_by'] = $request->user->id;
             $site['updated_by'] = $request->user->id;
             if($flag > 0){
-                if (strlen($request->id)>10)
-                    $site['off_id'] = $request->site_off_id;
+                // if (strlen($request->id)>10)
+                //     $site['off_id'] = $request->site_off_id;
+                $site['company_id'] = $id;
                 $site = Site::create($site);
             }
             else
                 $site = Site::where('company_id',$request->id)->update($site);
+        }
+        //Invite Customer User
+        $pendingUser = json_decode($request->pendingUser,true);
+        foreach($pendingUser as $key => $pending_user){
+            if(Company::whereId($id)->count()>0)
+                $company_name = Company::whereId($id)->first()->name;
+            else
+                $company_name = Company::whereId($request->user->company_id)->first()->name;
+            //add usertable new user by pending
+            $user = array();
+            $user['email'] = $pending_user['email'];
+            $user['first_name'] = $pending_user['first_name'];
+            $user['user_type'] = $pending_user['user_role'];
+            $user['company_id'] = $id;
+            $user['company_name'] = $company_name;
+            $invite_code = bcrypt($pending_user['email'].$company_name);
+            $user['invite_code'] = str_replace('/', '___', $invite_code);
+            $user['status'] = '0';
+            $res['status'] = "success";
+            $user = User::create($user);
+            $user_role = ['1'=>'super admin','2'=> 'engineer','3'=>'account admin','4'=>'admin','5'=>'admin','6'=>'nomal'];
 
+            $insertnotificationndata = array(
+                'notice_type'		=> '1',
+                'notice_id'			=> $user->id,
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$pending_user['first_name'].' as '.$user_role[$pending_user['user_role']].' in company: '.$company_name.'.',
+                'created_by'		=> $request->user->id,
+                'company_id'		=> $user['company_id'],
+                'created_date'		=> date("Y-m-d H:i:s"),
+                'is_read'	    	=> 0,
+            );
+            Notification::create($insertnotificationndata);
+            $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
+
+            //sending gmail to user
+            $to_name = $pending_user['first_name'];
+            $to_email = $pending_user['email'];
+            $data = ['name'=>$pending_user['first_name'], "pending_user" => $pending_user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
+            Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
+                $message->to($to_email, $to_name)
+                        ->subject('sirvez support team invite you. please join our site.');
+                $message->from('support@sirvez.com','support team');
+            });
         }
 
 
@@ -237,7 +260,20 @@ class CompanyCustomerController extends Controller
         $company_id = $request->id;
         $res = array();
         $res['status'] = 'success';
-        $res['company'] = Company::whereId($company_id)->first();
+        $company = Company::where('companies.id',$company_id)
+                                ->leftJoin('users','users.id','=','companies.manager')
+                                ->select('companies.*','users.first_name','users.last_name')
+                                ->first();
+
+        if (Company_customer::where('customer_id', $company->id)->count() > 0) {
+            $company_id = Company_customer::where('customer_id', $company_id)->first()->company_id;
+            $company['parent'] = Company::whereId($company_id)->first()->name;
+        }
+
+        $res['company'] = $company;
+                                
+        $co_id = Company_customer::where('customer_id',$company_id)->pluck('company_id');
+        $res['customers'] = Company::whereIn('id',$co_id)->get();
         $comIds = Company_customer::where('company_id',$company_id)->pluck('customer_id');
         
         $res['users'] = User::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->get();
@@ -358,7 +394,8 @@ class CompanyCustomerController extends Controller
     }
     public function pendingUser(request $request){
         $success_key = array();
-        foreach($request->pendingUser as $key => $pending_user){
+        $pendingUser = json_decode($request->pendingUser,true);
+        foreach($pendingUser as $key => $pending_user){
             $v = Validator::make($pending_user, [
                 //company info
                 'customer' => 'required',
@@ -389,12 +426,12 @@ class CompanyCustomerController extends Controller
             $res['status'] = "success";
 
             $user = User::create($user);
-            $user_role = ['1'=>'super admin','2'=> 'engineer','3'=>'account admin','4'=>'admin','6'=>'nomal'];
+            $user_role = ['1'=>'super admin','2'=> 'engineer','3'=>'account admin','4'=>'admin','5'=>'admin','6'=>'nomal'];
 
             $insertnotificationndata = array(
                 'notice_type'		=> '1',
                 'notice_id'			=> $user->id,
-                'notification'		=> $user['first_name'].' '.$user['last_name'].' has added '.$pending_user['first_name'].' as '.$user_role[$pending_user['user_role']].' by  '.$request->user->first_name.' '.$request->user->last_name.' in company: '.$company_name.'.',
+                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$pending_user['first_name'].' as '.$user_role[$pending_user['user_role']].' in company: '.$company_name.'.',
                 'created_by'		=> $request->user->id,
                 'company_id'		=> $user['company_id'],
                 'created_date'		=> date("Y-m-d H:i:s"),
@@ -423,8 +460,8 @@ class CompanyCustomerController extends Controller
         $res = array();
         $res['status'] = "success";
         $id = $request->user->company_id;
-        if($request->user->user_type <=3){}
         $customerId = Company_customer::where('company_id',$id)->pluck('customer_id');
+        $res['customers'] = Company::whereIn('id',$customerId)->get();
         $projects = Project::whereNull('projects.signed_off')
                                 ->where(function($q) use($customerId,$id){
                                     return $q->whereIn('projects.company_id',$customerId)

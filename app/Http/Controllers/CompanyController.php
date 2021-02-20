@@ -114,11 +114,11 @@ class CompanyController extends Controller
         $id = $request->user->company_id;
         $res = array();
         $res['status'] = 'success';
-        $res['company'] = Company::whereId($id)->first();
+        $company = Company::whereId($id)->first();
+        $res['company'] = $company
 
         $sites = Site::where('company_id',$id)->orderBy('id','desc')->get();
         foreach($sites as $key=>$site){
-
             $sites[$key]['rooms'] = Site_room::where('site_id',$site->id)->count();
             $sites[$key]['projects'] = Project::where('company_id',$id)->count();
         }
@@ -141,8 +141,18 @@ class CompanyController extends Controller
         $company['logo_img']  = $fileName;
         Company::whereId($request->company_id)->update($company);
         $res['status'] = 'success';
+        $res['logo_img'] = $fileName;
         return response()->json($res);
     }
+    public function changeName(request $request) {
+        Company::whereId($request->company_id)->update([
+            'name' => $request->company_name
+        ]);
+        $res['name'] = $request->company_name;
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
     public function setPrimaryUser(request $request){
         $id = $request->id;
         if(strlen($request->id) > 10)

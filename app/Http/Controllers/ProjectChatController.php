@@ -122,7 +122,9 @@ class ProjectChatController extends Controller
         $notification['created_by'] = $request->user->id;
         $notification['action_link'] = '/app/project/live/' . $project->id;
 
-        broadcast(new NotificationEvent($notification))->toOthers();
+        if ($request->message != '') {
+            broadcast(new NotificationEvent($notification))->toOthers();
+        }
 
         $res['status'] = 'success';
         return response()->json($res);

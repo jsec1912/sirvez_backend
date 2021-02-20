@@ -1000,4 +1000,30 @@ class ProductController extends Controller
         return response()->json($res);
 
     }
+    public function removeProductGroup(request $request){
+        $del_ids = explode(',',$request->del_ids);
+        $group_ids = explode(',',$request->group_ids);
+        Product::whereIn('id',$del_ids)->orwhereIn('group_id',$group_ids)->delete();
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function makeProductGroup(request $request){
+        $product_ids = explode(',',$request->product_ids);
+        $group_id=$request->group_id;
+        $group_name = $request->group_name;
+        Product::whereIn('id',$product_ids)->update(['group_id'=>$group_id,'group_name'=>$group_name]);
+
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function releaseProductGroup(request $request){
+        $group_ids = explode(',',$request->group_ids);
+        $room_ids = Room::where('project_id',$request->project_id)->pluck('id');
+        Product::whereIn('room_id',$room_ids)->whereIn('group_id',$group_ids)->update(['group_id'=>0,'group_name'=>null]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 }

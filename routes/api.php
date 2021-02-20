@@ -32,6 +32,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/company/saveCompany','CompanyController@saveCompany');
     Route::get('/company/getCompanyInfo','CompanyController@getCompanyInfo');
     Route::post('/company/changeLogo','CompanyController@changeLogo');
+    Route::post('/company/changeName', 'CompanyController@changeName');
     Route::get('/company/customerList','CompanyController@customerList');
     Route::post('/company/updatePartnerCompany', 'CompanyController@updatePartnerCompany');
     Route::get('/company/partnerlist', 'CompanyController@partnerlist');
@@ -82,6 +83,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/addProjectPage','ProjectController@addProjectPage');
     Route::post('/project/removeProjectPage','ProjectController@removeProjectPage');
     Route::post('/project/changeOrderProjectPage', 'ProjectController@changeOrderProjectPage');
+    Route::post('/project/changeOrderRoom', 'ProjectController@changeOrderRoom');
     Route::post('/project/addProjectTender','ProjectController@addProjectTender');
     Route::post('/project/removeProjectTender','ProjectController@removeProjectTender');
     Route::post('/project/changeOrderProjectTender', 'ProjectController@changeOrderProjectTender');
@@ -90,6 +92,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/changeOrderProjectHealthy', 'ProjectController@changeOrderProjectHealthy');    
     Route::post('/project/subscription', 'ProjectController@createSubscription');
     Route::post('/project/changeTopMenu', 'ProjectController@changeTopMenu');
+    Route::post('/project/changeLockProjectPage', 'ProjectController@changeLockProjectPage');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -161,6 +164,9 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/product/uploadBrochuresPdf', 'ProductController@uploadBrochuresPdf');
     Route::post('/product/updateScanProduct','ProductController@updateScanProduct');
     Route::post('/product/changeWarrantyTime','ProductController@changeWarrantyTime');
+    Route::post('/product/removeProductGroup','ProductController@removeProductGroup');
+    Route::post('/product/makeProductGroup','ProductController@makeProductGroup');
+    Route::post('/product/releaseProductGroup','ProductController@releaseProductGroup');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///
@@ -269,6 +275,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/page/addLabel', 'PageController@addLabel');
     Route::post('/page/deleteLabel', 'PageController@deleteLabel');
     Route::post('/page/setPageLabel', 'PageController@setPageLabel');
+    Route::post('/document/duplicateDocument','PageController@duplicateDocument');///
+    Route::post('/document/deletedocument','PageController@deletedocument');///
     Route::get('/document/documentList','PageController@documentList');///
     Route::post('/document/updateDocument','PageController@updateDocument');///
     Route::post('/document/removeDocumentPage','PageController@removeDocumentPage');///

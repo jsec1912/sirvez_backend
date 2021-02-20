@@ -593,7 +593,7 @@ class ProjectController extends Controller
                 ->leftJoin('companies','rooms.company_id','=','companies.id')
                 ->leftJoin('buildings','rooms.building_id','=','buildings.id')
                 ->select('rooms.*','sites.site_name','companies.name as company_name','buildings.building_name')
-                ->orderBy('rooms.id','desc')->get();
+                ->orderBy('order_no')->get();
             foreach($rooms as $key => $room)
             {
                 $rooms[$key]['products'] = Product::where('room_id',$room->id)->count();
@@ -2025,6 +2025,16 @@ class ProjectController extends Controller
         return response()->json($res);
     }
 
+    public function changeOrderRoom(request $request){
+        $res = array();
+        $ordered_id = json_decode($request->ordered_id,true);
+        foreach($ordered_id as $key=> $orderId)
+        {
+            Room::whereId($orderId)->update(['order_no'=>$key+1]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
     public function changeOrderProjectPage(request $request){
         $res = array();
         $ordered_id = json_decode($request->ordered_id,true);
@@ -2134,5 +2144,14 @@ class ProjectController extends Controller
         ProjectTopMenu::whereId($request->id)->update($menu);
         $res['status'] = 'success';
         return response()->json($res);
+    }
+    public function changeLockProjectPage(request $request){
+        $res = array();
+        $project_id = $request->project_id;
+        $lock_page = $request->lock_page;
+        Project::where('id',$project_id)
+            ->update(['lock_page'=>$lock_page,'lock_page_user'=>$request->user->id,'lock_page_date'=>date("Y-m-d H:i:s")]);
+        $res['status'] = 'success';
+        return response()->json($res);   
     }
 }

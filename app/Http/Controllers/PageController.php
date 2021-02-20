@@ -53,6 +53,7 @@ class PageController extends Controller
                 else if($request->doc_type==3){
                     $cur_page = ProjectHealthy::whereId($request->id)->first();
                 }
+                $cur_page->root_type = 2;
                 $cur_page->page_name = $page['page_name'];
                 $cur_page->page_count = $page['page_count'];
                 $cur_page->content = $page['content'];
@@ -73,7 +74,8 @@ class PageController extends Controller
         }
         PageLabelValue::where('page_id',$data->id)->delete();
         $array_res = array();
-        $array_res =json_decode($request->label_value,true);
+        // $array_res =json_decode($request->label_value,true);
+        $array_res = explode(",", $request->label_value);
         if($array_res){
             foreach($array_res as $row)
             {
@@ -124,6 +126,25 @@ class PageController extends Controller
         return response()->json($res);
         
     }
+    public function deleteDocument(request $request){
+        $res = array();
+        Document::whereId($request->id)->delete();
+        $res['status'] = 'success';
+        return response()->json($res);
+
+    }
+    public function duplicateDocument(request $request){
+        $res = array();
+        $page = Document::whereId($request->id)->first()->toArray();
+        unset($page['id']);
+        unset($page['created_at']);
+        unset($page['updated_at']);
+        $page['updated_by']=$request->user->id;
+        Document::create($page);
+        $res['status'] = 'success';
+        return response()->json($res);
+        
+    }
     public function uploadPdf(request $request){
         $res = array();
         if($request->id>0){
@@ -136,7 +157,7 @@ class PageController extends Controller
             else if($request->doc_type==3)
                 $page = ProjectHealthy::whereId($request->id)->first();
 
-            if($page->link_url){
+            if($page&&$page->link_url){
                 $file_path = public_path('upload/file').'/'.$page->link_url;
                 File::delete($file_path);
             }
@@ -214,11 +235,14 @@ class PageController extends Controller
     public function removeDocumentPage(request $request){
         $res = array();
         $document_page = DocumentPage::whereId($request->id)->first();
-        $page = Page::where('id',$document_page->page_id)->first();
-        $document = Document::where('id',$request->document_id)->first();
-        $document->page_count=intval($document->page_count)-intval($page->page_count);
-        $document->save();
-        DocumentPage::whereId($request->id)->delete();
+        if($document_page)
+        {
+            $page = Page::where('id',$document_page->page_id)->first();
+            $document = Document::where('id',$request->document_id)->first();
+            $document->page_count=intval($document->page_count)-intval($page->page_count);
+            $document->save();
+            DocumentPage::whereId($request->id)->delete();
+        }
         $res['status'] = 'success';
         return response()->json($res);
     }

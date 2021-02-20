@@ -535,11 +535,7 @@ class RoomController extends Controller
             $company_id = Project::whereId($project_id)->first()->company_id;
             $com_id = Company_customer::where('customer_id',$company_id)->first()->company_id;
             $res['engineers'] = User::where('company_id',$com_id)->where('user_type',2)->where('status',1)->select('id','first_name','last_name','profile_pic')->get();
-            if(Company_customer::where('customer_id',$company_id)->count()>0)
-                $companyId = Company_customer::where('customer_id',$company_id)->first()->company_id;
-            else
-                $companyId = '';
-            $res['sites'] = Site::where('company_id',$company_id)->orWhere('company_id',$companyId)->orderBy('id','desc')->get();
+            $res['sites'] = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
             $site_id = Site::where('company_id',$company_id)->pluck('id');
             $res['departments'] = Department::where('company_id',$company_id)->orderBy('id','desc')->get();
             $res['buildings'] = Building::whereIn('site_id',$site_id)->orderBy('id','desc')->get();
