@@ -348,9 +348,9 @@ class ProjectController extends Controller
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
             $res['customers'] = Company::get();
             $res['users'] = User::get();
-        } else if ($request->user->user_type < 4) {
+        } else if ($request->user->user_type < 2) {
+
             $id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
-    
             $partner_ids = Project_user::where([
                 'user_id' => $request->user->id,
                 'type' => 4
@@ -365,7 +365,22 @@ class ProjectController extends Controller
             ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
             $res['customers'] = Company::whereIn('id',$id)->orwhere('id',$request->user->company_id)->get();
             $res['users'] = User::whereIn('company_id',$id)->orwhere('company_id',$request->user->company_id)->get();
-        } else {
+        } else if ($request->user->user_type < 4) {
+            
+            $id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
+            $partner_ids = Project_user::whereIn('type',[1,4])
+                            ->where('user_id', $request->user->id)
+                            ->pluck('project_id');
+
+            $project_array = Project::where('manager_id',$request->user->id)
+                ->orWhereIn('projects.id', $partner_ids)
+                ->leftJoin('companies','companies.id','=','projects.company_id')
+                ->leftJoin('users','users.id','=','projects.manager_id')
+                ->select('projects.*', 'companies.name AS customer','users.first_name AS account_manager','users.profile_pic')->orderBy('id','desc')->get();
+            $res['customers'] = Company::whereIn('id',$id)->orwhere('id',$request->user->company_id)->get();
+            $res['users'] = User::whereIn('company_id',$id)->orwhere('company_id',$request->user->company_id)->get();
+        }
+         else {
             $projectIdx = Project_user::where('user_id', $request->user->id)
             ->where(function ($q) {
                 return $q->where('type', 3) // team member case

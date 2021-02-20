@@ -265,17 +265,11 @@ class CompanyCustomerController extends Controller
                                 ->select('companies.*','users.first_name','users.last_name')
                                 ->first();
 
-        if (Company_customer::where('customer_id', $company->id)->count() > 0) {
-            $company_id = Company_customer::where('customer_id', $company_id)->first()->company_id;
-            $company['parent'] = Company::whereId($company_id)->first()->name;
-        }
-
         $res['company'] = $company;
                                 
         $co_id = Company_customer::where('customer_id',$company_id)->pluck('company_id');
-        $res['customers'] = Company::whereIn('id',$co_id)->get();
-        $comIds = Company_customer::where('company_id',$company_id)->pluck('customer_id');
-        
+        $comIds = Company_customer::where('company_id',$co_id)->pluck('customer_id');
+        $res['customers'] = Company::whereIn('id',$comIds)->get();
         $res['users'] = User::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->get();
         $projects = Project::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->orderBy('id','desc')->get();
         if(!is_null($projects)){

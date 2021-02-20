@@ -42,6 +42,7 @@ class PageController extends Controller
             $page['link_url'] = $request->link_url;
         
         $page['company_id'] = $request->user->company_id;
+        $page['is_complete'] = $request->is_complete;
         if($request->id > 0){
             if ($request->has('project_id')) {
                 if($request->doc_type==1){
@@ -59,6 +60,7 @@ class PageController extends Controller
                 $cur_page->content = $page['content'];
                 $cur_page->lock_page = $page['lock_page'];
                 $cur_page->link_url = $page['link_url'];
+                $cur_page->is_complete = $page['is_complete'];
                 $cur_page->save();
 
             } else {

@@ -40,6 +40,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/company/setAllowPartner', 'CompanyController@setAllowPartner');
     Route::post('/company/setAllowPartnerRequest', 'CompanyController@setAllowPartnerRequest');
     Route::post('/company/setPrimaryUser', 'CompanyController@setPrimaryUser');
+    Route::post('/company/changeParentCompany', 'CompanyController@changeParentCompany');
     //customer
     Route::Post('/customers/company/customer-edit','CompanyCustomerController@addCompanyCustomer');///
     Route::Post('/customers/DeleteCompanyCustomer','CompanyCustomerController@DeleteCompanyCustomer');///

@@ -115,8 +115,7 @@ class CompanyController extends Controller
         $res = array();
         $res['status'] = 'success';
         $company = Company::whereId($id)->first();
-        $res['company'] = $company
-
+        $res['company'] = $company;
         $sites = Site::where('company_id',$id)->orderBy('id','desc')->get();
         foreach($sites as $key=>$site){
             $sites[$key]['rooms'] = Site_room::where('site_id',$site->id)->count();
@@ -374,6 +373,11 @@ class CompanyController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
-    
+    public function changeParentCompany(request $request){
+        $res= array();
+        Company::whereId($request->id)->update(['parent_id'=>$request->parent_id]);
+        $res['status'] = 'success';
+        return response()->json();
+    }
 
 }

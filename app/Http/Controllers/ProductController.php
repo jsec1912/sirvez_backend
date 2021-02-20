@@ -356,6 +356,11 @@ class ProductController extends Controller
             }
 
             $out = array();
+            if($request->has('product_name')){
+                $max_group_id==Product::max('group_id')+1;
+                $product['group_id'] = $max_group_id;
+                $product['group_name'] = $request->group_name;
+            }
 
             foreach($product_list as $row) {
                 $ok = 1;
@@ -1010,7 +1015,7 @@ class ProductController extends Controller
     }
     public function makeProductGroup(request $request){
         $product_ids = explode(',',$request->product_ids);
-        $group_id=$request->group_id;
+        $group_id=Product::max('group_id')+1;
         $group_name = $request->group_name;
         Product::whereIn('id',$product_ids)->update(['group_id'=>$group_id,'group_name'=>$group_name]);
 
