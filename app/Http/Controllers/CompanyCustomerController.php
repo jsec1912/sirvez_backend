@@ -270,8 +270,8 @@ class CompanyCustomerController extends Controller
         $co_id = Company_customer::where('customer_id',$company_id)->pluck('company_id');
         $comIds = Company_customer::where('company_id',$co_id)->pluck('customer_id');
         $res['customers'] = Company::whereIn('id',$comIds)->get();
-        $res['users'] = User::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->get();
-        $projects = Project::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->orderBy('id','desc')->get();
+        $res['users'] = User::where('company_id',$company_id)->get();
+        $projects = Project::where('company_id',$company_id)->orderBy('id','desc')->get();
         if(!is_null($projects)){
             foreach($projects as $key=>$project){
                 if(User::whereId($project->manager_id)->count() > 0)
@@ -282,7 +282,7 @@ class CompanyCustomerController extends Controller
             }
         }
         $res['projects'] = $projects;
-        $sites = Site::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->orderBy('id','desc')->get();
+        $sites = Site::where('company_id',$company_id)->orderBy('id','desc')->get();
         foreach($sites as $key=>$site){
 
             $sites[$key]['rooms'] = Site_room::where('site_id',$site->id)->count();
@@ -294,7 +294,7 @@ class CompanyCustomerController extends Controller
         $res['sites'] =$sites;
         $res['rooms'] = Site_room::whereIn('site_rooms.company_id',$comIds)->orWhere('site_rooms.company_id',$company_id)
             ->leftJoin('sites','site_rooms.site_id','=','sites.id')->select('site_rooms.*','sites.site_name')->orderBy('id','desc')->get();
-        $roomIdx = Room::whereIn('company_id',$comIds)->orWhere('company_id',$company_id)->pluck('id');
+        $roomIdx = Room::where('company_id',$company_id)->pluck('id');
         $products = Product::whereIn('products.room_id',$roomIdx)->where('action','<','3')->get();
         $productIds = Product::whereIn('products.room_id',$roomIdx)->where('action','<','3')->pluck('id');
         foreach($products as $key => $product)

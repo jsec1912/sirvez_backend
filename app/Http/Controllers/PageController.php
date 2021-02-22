@@ -42,11 +42,11 @@ class PageController extends Controller
             $page['link_url'] = $request->link_url;
         
         $page['company_id'] = $request->user->company_id;
-        $page['is_complete'] = $request->is_complete;
         if($request->id > 0){
             if ($request->has('project_id')) {
                 if($request->doc_type==1){
                     $cur_page = ProjectPage::whereId($request->id)->first();
+                    $cur_page['is_complete'] = $request->is_complete;
                 }
                 else if($request->doc_type==2){
                     $cur_page = ProjectTender::whereId($request->id)->first();
@@ -76,8 +76,8 @@ class PageController extends Controller
         }
         PageLabelValue::where('page_id',$data->id)->delete();
         $array_res = array();
-        // $array_res =json_decode($request->label_value,true);
-        $array_res = explode(",", $request->label_value);
+        $array_res =json_decode($request->label_value,true);
+        //$array_res = explode(",", $array_res);
         if($array_res){
             foreach($array_res as $row)
             {
