@@ -58,6 +58,19 @@
                                                 font-size: 16px;border-radius: 4px;">Click here to download PDF</a>
                                             </td>
                                         </tr>
+                                        <?php if (isset($Link_xlsx)) {?>
+                                        <tr>
+                                            <td colspan="2" align="center"><a href="{{$Link_xlsx}}" style="background-color: #3f51b5; 
+                                                border: none;
+                                                color: white;
+                                                padding: 15px 32px;
+                                                text-align: center;
+                                                text-decoration: none;
+                                                display: inline-block;
+                                                font-size: 16px;border-radius: 4px;">Click here to download XLSX file</a>
+                                            </td>
+                                        </tr>
+                                        <?php }?>
         
                                         <tr>
                                             <td colspan="2">&nbsp;</td>

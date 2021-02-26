@@ -1008,7 +1008,9 @@ class ProductController extends Controller
     public function removeProductGroup(request $request){
         $del_ids = explode(',',$request->del_ids);
         $group_ids = explode(',',$request->group_ids);
-        Product::whereIn('id',$del_ids)->orwhereIn('group_id',$group_ids)->delete();
+        Product::whereIn('id',$del_ids)->delete();
+        if($group_ids[0]!=null)
+            Product::whereIn('group_id',$group_ids)->delete();
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);

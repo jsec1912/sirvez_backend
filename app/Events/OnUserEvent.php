@@ -14,7 +14,7 @@ class OnUserEvent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
     public $chat;
-    public function __construct(Project_chat $chat)
+    public function __construct($chat)
     {
         $this->chat = $chat;
     }

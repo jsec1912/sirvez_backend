@@ -13,6 +13,7 @@ use App\Events\NotificationEvent;
 use App\Project;
 use Mail;
 
+
 class ProjectChatController extends Controller
 {
     public function sendMessage(Request $request){
@@ -28,32 +29,37 @@ class ProjectChatController extends Controller
             $chat['receiver_id'] = $request->receiver_id;
             $chat['message'] = $request->message;
             $chat['group_id'] = $request->group_id;
-            $chat = Project_chat::create($chat);
+            $chat['created_at'] = date("Y-m-d H:i:s");
             broadcast(new ChatEvent($chat))->toOthers();
             broadcast(new OnUserEvent($chat))->toOthers();
-            $cnt = 0;
-            foreach($onlineUsers as $key){
-                if(strval($key->id)==$request->receiver_id)
-                {
-                    $cnt=1;
-                    break;
-                }
-            }
-           
-            if($cnt==0 && User::whereId($request->receiver_id)->count()>0){
-                $pending_user=User::whereId($request->receiver_id)->first();
-                $to_name = $pending_user['first_name'];
-                $to_email = $pending_user['email'];
-                $content = $request->user->first_name.' '.$request->user->last_name.' sent message to you in the project.';
-                $task_img = '';
-                $invitationURL = "https://app.sirvez.com/app/project/live/".$request->project_id;
-                $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>'Project Chat',"description" =>$request->message,"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view message'];
 
-                Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
-                    $message->to($to_email, $to_name)
-                            ->subject('sirvez notification.');
-                    $message->from('support@sirvez.com','sirvez support team');
-                });
+            if ($request->message != ''){
+                unset($chat['created_at']);
+                $chat = Project_chat::create($chat);
+                $cnt = 0;
+                foreach($onlineUsers as $key){
+                    if(strval($key->id)==$request->receiver_id)
+                    {
+                        $cnt=1;
+                        break;
+                    }
+                }
+            
+                if($cnt==0 && User::whereId($request->receiver_id)->count()>0){
+                    $pending_user=User::whereId($request->receiver_id)->first();
+                    $to_name = $pending_user['first_name'];
+                    $to_email = $pending_user['email'];
+                    $content = $request->user->first_name.' '.$request->user->last_name.' sent message to you in the project.';
+                    $task_img = '';
+                    $invitationURL = "https://app.sirvez.com/app/project/live/".$request->project_id;
+                    $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>'Project Chat',"description" =>$request->message,"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view message'];
+
+                    Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                        $message->to($to_email, $to_name)
+                                ->subject('sirvez notification.');
+                        $message->from('support@sirvez.com','sirvez support team');
+                    });
+                } 
             }
         }
         else{
@@ -80,49 +86,49 @@ class ProjectChatController extends Controller
                 $chat['message'] = $request->message;
                 $chat['group_id'] = $request->group_id;
                 $chat['send_num'] = $key;
-                $chat = Project_chat::create($chat);
+                $chat['created_at'] = date("Y-m-d H:i:s");
                 broadcast(new ChatEvent($chat))->toOthers();
                 broadcast(new OnUserEvent($chat))->toOthers();
-
-                $cnt =0;
-                foreach($onlineUsers as $key){
-                    if($key->id==$user->user_id)
-                    {
-                        $cnt=1;
-                        break;
+                if($request->message != ''){
+                    $chat['created_at'] = new DateTime();
+                    $chat = Project_chat::create($chat);
+                    $cnt =0;
+                    foreach($onlineUsers as $key){
+                        if($key->id==$user->user_id)
+                        {
+                            $cnt=1;
+                            break;
+                        }
                     }
-                }
-                if($cnt ==0 && User::whereId($user->user_id)->count()>0){
-                    $pending_user=User::whereId($user->user_id)->first();
-                    $to_name = $pending_user['first_name'];
-                    $to_email = $pending_user['email'];
-                    $content = $request->user->first_name.' '.$request->user->last_name.' sent message to you in the project.';
-                    $task_img = '';
-                    $invitationURL = "https://app.sirvez.com/app/project/live/".$request->project_id;
-                    $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>'Project Chat',"description" =>$request->message,"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view message'];
-    
-                    Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
-                        $message->to($to_email, $to_name)
-                                ->subject('sirvez notification.');
-                        $message->from('support@sirvez.com','sirvez support team');
-                    });
+                    if($cnt ==0 && User::whereId($user->user_id)->count()>0){
+                        $pending_user=User::whereId($user->user_id)->first();
+                        $to_name = $pending_user['first_name'];
+                        $to_email = $pending_user['email'];
+                        $content = $request->user->first_name.' '.$request->user->last_name.' sent message to you in the project.';
+                        $task_img = '';
+                        $invitationURL = "https://app.sirvez.com/app/project/live/".$request->project_id;
+                        $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>'Project Chat',"description" =>$request->message,"img"=>$task_img,"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view message'];
+        
+                        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                            $message->to($to_email, $to_name)
+                                    ->subject('sirvez notification.');
+                            $message->from('support@sirvez.com','sirvez support team');
+                        });
+                    }
                 }
             }
         }
-
-        $project = Project::where('id', $request->project_id)->first();
-        
-        $text = $request->user->first_name . ' ' . $request->user->last_name . ' has sent a message to ';
-        $notification['title'] = 'Sirvez | Chat';
-        $notification['text1'] = $text;
-        $notification['text2'] = ' for ' . $project->project_name . ' "' . $request->message . '".';
-        $notification['id'] = 'chat-' . $chat->id;
-        $notification['image'] = $request->user->profile_pic;
-        $notification['user_id'] = $users;
-        $notification['created_by'] = $request->user->id;
-        $notification['action_link'] = '/app/project/live/' . $project->id;
-
-        if ($request->message != '') {
+        if($request->message != ''){
+            $project = Project::where('id', $request->project_id)->first();
+            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has sent a message to ';
+            $notification['title'] = 'Sirvez | Chat';
+            $notification['text1'] = $text;
+            $notification['text2'] = ' for ' . $project->project_name . ' "' . $request->message . '".';
+            $notification['id'] = 'chat-' . $chat->id;
+            $notification['image'] = $request->user->profile_pic;
+            $notification['user_id'] = $users;
+            $notification['created_by'] = $request->user->id;
+            $notification['action_link'] = '/app/project/live/' . $project->id;
             broadcast(new NotificationEvent($notification))->toOthers();
         }
 

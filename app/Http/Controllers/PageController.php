@@ -46,7 +46,6 @@ class PageController extends Controller
             if ($request->has('project_id')) {
                 if($request->doc_type==1){
                     $cur_page = ProjectPage::whereId($request->id)->first();
-                    $cur_page['is_complete'] = $request->is_complete;
                 }
                 else if($request->doc_type==2){
                     $cur_page = ProjectTender::whereId($request->id)->first();
@@ -60,33 +59,44 @@ class PageController extends Controller
                 $cur_page->content = $page['content'];
                 $cur_page->lock_page = $page['lock_page'];
                 $cur_page->link_url = $page['link_url'];
-                $cur_page->is_complete = $page['is_complete'];
+                if ($request->is_complete)
+                $cur_page->is_complete = $request->is_complete;
                 $cur_page->save();
 
             } else {
                 $page['updated_by'] = $request->user->id;
                 Page::whereId($request->id)->update($page);
                 $data = Page::whereId($request->id)->first();
+                PageLabelValue::where('page_id',$data->id)->delete();
+                $array_res = array();
+                $array_res =json_decode($request->label_value,true);
+                if($array_res){
+                    foreach($array_res as $row)
+                    {
+                        PageLabelValue::create(['page_id'=>$data->id,'label_id'=>$row]);
+                    }
+                }
             }
         }
         else{
             $page['created_by'] = $request->user->id;
             $page['updated_by'] = $request->user->id;
             $data = Page::create($page);
-        }
-        PageLabelValue::where('page_id',$data->id)->delete();
-        $array_res = array();
-        $array_res =json_decode($request->label_value,true);
-        //$array_res = explode(",", $array_res);
-        if($array_res){
-            foreach($array_res as $row)
-            {
-                PageLabelValue::create(['page_id'=>$data->id,'label_id'=>$row]);
+            $array_res = array();
+            $array_res =json_decode($request->label_value,true);
+            if($array_res){
+                foreach($array_res as $row)
+                {
+                    PageLabelValue::create(['page_id'=>$data->id,'label_id'=>$row]);
+                }
             }
         }
+       
+            
+      
         $res = array();
         $res['status'] = 'success';
-        $res['page'] = $data;
+        //$res['page'] = $data;
         return response()->json($res);
     }
 

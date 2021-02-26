@@ -94,6 +94,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/subscription', 'ProjectController@createSubscription');
     Route::post('/project/changeTopMenu', 'ProjectController@changeTopMenu');
     Route::post('/project/changeLockProjectPage', 'ProjectController@changeLockProjectPage');
+    Route::post('/project/signOffAllLocaton', 'ProjectController@signOffAllLocaton');
+    Route::post('/project/moveInstallStage', 'ProjectController@moveInstallStage');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///

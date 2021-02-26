@@ -476,7 +476,7 @@ class ProjectController extends Controller
             $project = Project::where('projects.id',$id)
                 ->leftJoin('companies','projects.company_id','=','companies.id')
                 ->leftJoin('users','users.id','=','projects.created_by')
-                ->select('projects.*','companies.logo_img','companies.name AS company_name','users.first_name')->first();
+                ->select('projects.*','companies.logo_img','companies.name AS company_name','companies.website AS company_website','companies.telephone AS company_phone','users.first_name')->first();
             
             /////  check permission
             if ($this->project_check($project, $request) == 0) {
@@ -677,7 +677,6 @@ class ProjectController extends Controller
                                     return $q->where('project_id',$id)
                                         ->where('action',3);
                                     })
-                                ->orderBy('id','desc')
                                 ->get();
             foreach($products as $key => $product)
             {
@@ -718,7 +717,7 @@ class ProjectController extends Controller
             
             $res['customer_userlist'] = User::whereIn('user_type',[5,6])->where('status',1)->where('company_id',$project->company_id)->select('id','first_name','last_name')->get();
             $res['off_form_values'] = Form_value::where('form_type', 3)
-                ->where('parent_id',$project['signoff_form_id'])->get();
+                ->where('parent_id',$request->project_id)->get();
             $productIds = Product::whereIn('room_id',$room_ids)
             ->orWhere(function($q) use($id){
                 return $q->where('project_id',$id)
@@ -922,6 +921,7 @@ class ProjectController extends Controller
 
     public function signOff(request $request)
     {
+        
         $fileName = '';
         $project = array();
 
@@ -1074,47 +1074,50 @@ class ProjectController extends Controller
         }
 
         //invite user
-        if($request->user->user_type ==6){
-            if ($request->sign_user_id>0){
-                $pending_user = User::whereId($request->sign_user_id)->first();
-                $to_name = $pending_user['first_name'];
-                $to_email = $pending_user['email'];
-                $content = 'you have been added as a site contact for '.$project['project name'].' Please view details here.. ';
-                $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
-                $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
-                Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
-                    $message->to($to_email, $to_name)
-                            ->subject('sirvez notification.');
-                    $message->from('support@sirvez.com','support team');
-                });
-
-            }
-            else{
-                $company_name = Company::whereId($project['company_id'])->first()->name;
-                $user = array();
-                $user['email'] = $project['sign_contact_email'];
-                $user['first_name'] = $project['sign_first_name'];
-                $user['user_type'] = 6;
-                $user['company_id'] = $project['company_id'];
-                $user['company_name'] = $company_name;
-                $invite_code = bcrypt($user['email'].$company_name);
-                $user['invite_code'] = str_replace('/', '___', $invite_code);
-                $user['status'] = '0';
-
-                $user = User::create($user);
-                $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
-
-                //sending gmail to user
-                $to_name = $user['first_name'];
-                $to_email = $user['email'];
-                $data = ['name'=>$user['first_name'], "pending_user" => $user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
-                Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
-                    $message->to($to_email, $to_name)
-                            ->subject('sirvez support team invite you. please join our site.');
-                    $message->from('support@sirvez.com','support team');
-                });
+        if($request->signoff_form==0){
+            if($request->user->user_type ==6){
+                if ($request->sign_user_id>0){
+                    $pending_user = User::whereId($request->sign_user_id)->first();
+                    $to_name = $pending_user['first_name'];
+                    $to_email = $pending_user['email'];
+                    $content = 'you have been added as a site contact for '.$project['project name'].' Please view details here.. ';
+                    $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
+                    $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
+                    Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
+                        $message->to($to_email, $to_name)
+                                ->subject('sirvez notification.');
+                        $message->from('support@sirvez.com','support team');
+                    });
+    
+                }
+                else{
+                    $company_name = Company::whereId($project['company_id'])->first()->name;
+                    $user = array();
+                    $user['email'] = $project['sign_contact_email'];
+                    $user['first_name'] = $project['sign_first_name'];
+                    $user['user_type'] = 6;
+                    $user['company_id'] = $project['company_id'];
+                    $user['company_name'] = $company_name;
+                    $invite_code = bcrypt($user['email'].$company_name);
+                    $user['invite_code'] = str_replace('/', '___', $invite_code);
+                    $user['status'] = '0';
+    
+                    $user = User::create($user);
+                    $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
+    
+                    //sending gmail to user
+                    $to_name = $user['first_name'];
+                    $to_email = $user['email'];
+                    $data = ['name'=>$user['first_name'], "pending_user" => $user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
+                    Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
+                        $message->to($to_email, $to_name)
+                                ->subject('sirvez support team invite you. please join our site.');
+                        $message->from('support@sirvez.com','support team');
+                    });
+                }
             }
         }
+        
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
@@ -1129,6 +1132,16 @@ class ProjectController extends Controller
             $project['final_signoff'] = 2;
         else
             $project['final_signoff'] = 1;
+        if($request->hasFile('sign_file')){
+            $fileName = time().'.'.$request->sign_file->extension();
+            $request->sign_file->move(public_path('upload/file/'), $fileName);
+            $project['final_sign_file']  = $fileName;
+        }
+        if($request->hasFile('sign_xlsx')){
+            $fileXlsx = time().'.'.$request->sign_xlsx->extension();
+            $request->sign_xlsx->move(public_path('upload/file/'), $fileXlsx);
+            $project['final_sign_xlsx']  = $fileXlsx;
+        }
         $project['final_signoff_date'] = date("Y-m-d H:i:s");
         $project['final_signoff_user'] = $request->user->id;
         $project['final_signoff_form_id']= $request->signoff_form;
@@ -1233,8 +1246,9 @@ class ProjectController extends Controller
                     $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
                     $to_name = $pending_user['first_name'];
                     $to_email = $pending_user['email'];
-                    $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
-                    $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
+                    $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['final_sign_file'];
+                    $Link_xlsx = 'https://app.sirvez.com/upload/file/'.$project['final_sign_xlsx'];
+                    $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf,"Link_xlsx"=>$Link_xlsx];
                     Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
                         $message->to($to_email, $to_name)
                                 ->subject('sirvez notification.');
@@ -1248,7 +1262,7 @@ class ProjectController extends Controller
                 $content = "Project was signed off by ".$request->user->first_name.". ".date("d-m-Y H:i:s");
                 $to_name = $pending_user['first_name'];
                 $to_email = $pending_user['email'];
-                $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['sign_file'];
+                $Link_pdf = 'https://app.sirvez.com/upload/file/'.$project['final_sign_file'];
                 $data = ['name'=>$pending_user['first_name'], "content" => $content,"project"=>$project,"Link_pdf"=>$Link_pdf];
                 Mail::send('projectSign', $data, function($message) use ($to_name, $to_email,$project) {
                     $message->to($to_email, $to_name)
@@ -2164,9 +2178,49 @@ class ProjectController extends Controller
         $res = array();
         $project_id = $request->project_id;
         $lock_page = $request->lock_page;
+        if($request->doc_type=='1')
+            Project::where('id',$project_id)
+                ->update(['lock_page'=>$lock_page,'lock_page_user'=>$request->user->id,'lock_page_date'=>date("Y-m-d H:i:s")]);
+        else if($request->doc_type=='2')
         Project::where('id',$project_id)
-            ->update(['lock_page'=>$lock_page,'lock_page_user'=>$request->user->id,'lock_page_date'=>date("Y-m-d H:i:s")]);
+                ->update(['lock_tender'=>$lock_page,'lock_tender_user'=>$request->user->id,'lock_tender_date'=>date("Y-m-d H:i:s")]);
+        else if($request->doc_type=='3')
+        Project::where('id',$project_id)
+                ->update(['lock_healthy'=>$lock_page,'lock_healthy_user'=>$request->user->id,'lock_healthy_date'=>date("Y-m-d H:i:s")]);
         $res['status'] = 'success';
         return response()->json($res);   
+    }
+    public function signOffAllLocaton(request $request){
+        $res = array();
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::where('project_id',$id)->where('signed_off',0)->update([
+            'signed_off'=>1,
+            'completed_date'=>date("Y-m-d H:i:s"),
+            'completed_by'=>$request->user->id
+        ]);
+        $res['status'] = "success";
+        return response()->json($res);
+    }
+    public function moveInstallStage(request $request){
+        $res = array();
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        Room::where('project_id',$id)->where('signed_off',0)->update([
+            'signed_off'=>1,
+            'completed_date'=>date("Y-m-d H:i:s"),
+            'completed_by'=>$request->user->id
+        ]);
+        Project::whereId($id)->update([
+            'signed_off'=>2,
+            'signoff_date'=>date("Y-m-d H:i:s"),
+            'signoff_user'=>$request->user->id,
+        ]);
+        $res['status'] = "success";
+        return response()->json($res);
     }
 }
