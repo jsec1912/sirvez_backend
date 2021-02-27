@@ -164,6 +164,8 @@ class CompanyCustomerController extends Controller
         //Invite Customer User
         $pendingUser = json_decode($request->pendingUser,true);
         foreach($pendingUser as $key => $pending_user){
+            
+            if($pending_user['email']=='') break;
             if(Company::whereId($id)->count()>0)
                 $company_name = Company::whereId($id)->first()->name;
             else
