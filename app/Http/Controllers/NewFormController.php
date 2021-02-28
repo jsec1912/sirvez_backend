@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\New_form;
 use App\Form_field;
 use App\Form_value;
+use App\User;
 use App\Company_customer;
 use Illuminate\Support\Facades\Validator;
 
@@ -37,6 +38,7 @@ class NewFormController extends Controller
                 $form['off_id'] = $id;
             $form['created_by'] = $request->user->company_id;
             $form['user_id'] = $request->user->id;
+            $form['updated_by'] = $request->user->id;
             $form['form_type'] = $request->form_type;
             $form['form_name'] = $request->form_name;
             $form['form_data']  = $request->form_data;
@@ -54,7 +56,12 @@ class NewFormController extends Controller
                 Form_field::create($field);
             }
         } else {
-            New_form::whereId($id)->update(['form_data'=>$request->form_data,'form_name'=>$request->form_name,'form_type'=>$request->form_type]);
+            New_form::whereId($id)->update([
+                'form_data'=>$request->form_data,
+                'form_name'=>$request->form_name,
+                'form_type'=>$request->form_type,
+                'updated_by'=>$request->user->id
+                ]);
             $fields = array();
             $fields = json_decode($request->form_fields);
             $field = array();
@@ -76,11 +83,16 @@ class NewFormController extends Controller
         $comId = array();
         if($request->user->user_type < 6)
             $comId = Company_customer::where('company_id',$request->company_id)->pluck('customer_id');
-        $res['forms'] = New_form::whereIn('new_forms.created_by',$comId)
+        $forms = New_form::whereIn('new_forms.created_by',$comId)
                                 ->orWhere('new_forms.created_by', $request->user->company_id)
                                 ->leftJoin('users','users.id','=','new_forms.user_id')
                                 ->select('new_forms.*','users.profile_pic','users.first_name')
                                 ->get();
+        foreach($forms as $key=>$form){
+            $forms[$key]['created_user'] = User::where('id',$form->user_id)->first();
+            $forms[$key]['updated_user'] = User::where('id',$form->updated_by)->first();
+        }
+        $res['forms'] =$forms;
         $res['status'] = "success";
         return response()->json($res);
     }

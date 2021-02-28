@@ -36,6 +36,14 @@ class PageController extends Controller
             $page['page_count'] = $request->page_count;
         else
             $page['page_count'] = 1; 
+        if($request->word_count > 0)
+            $page['word_count'] = $request->word_count;
+        else
+            $page['word_count'] = 0; 
+        if($request->character_count > 0)
+            $page['character_count'] = $request->character_count;
+        else
+            $page['character_count'] = 0; 
         $page['content'] = $request->content;
         $page['lock_page'] = $request->lock_page;
         if($request->link_url)
@@ -56,6 +64,8 @@ class PageController extends Controller
                 $cur_page->root_type = 2;
                 $cur_page->page_name = $page['page_name'];
                 $cur_page->page_count = $page['page_count'];
+                $cur_page->word_count = $page['word_count'];
+                $cur_page->character_count = $page['character_count'];
                 $cur_page->content = $page['content'];
                 $cur_page->lock_page = $page['lock_page'];
                 $cur_page->link_url = $page['link_url'];
