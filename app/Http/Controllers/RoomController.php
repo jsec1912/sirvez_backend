@@ -133,8 +133,30 @@ class RoomController extends Controller
                         ->select('rooms.*','projects.project_name','users.first_name','users.last_name')
                         ->first();
             $action = "created";
-            if(!$request->room_site_id)
-            Site_room::create(['company_id'=>$room['company_id'],'site_id'=>$room['site_id'],'room_number'=>$room['room_number']]);
+            if($request->room_site_id==-1){
+                if(Building::where('site_id',$room['site_id'])->first())
+                    $room_building_id = Building::where('site_id',$room['site_id'])->first()->id;
+                else $room_building_id==0;
+                if($request->floor_id>0){
+                    $room_floor_id = $request->floor_id;
+                }
+                else{
+                    $floor = Floor::create([
+                        'site_id'=>$room['site_id'],
+                        'building_id'=>$room_building_id,
+                        'floor_name'=>$request->floor_name,
+                        'created_by'=>$request->user->id,
+                        'updated_by'=>$request->user->id
+                    ]);
+                    $room_floor_id = $floor->id;
+                }
+                Site_room::create([
+                    'company_id'=>$room['company_id'],
+                    'site_id'=>$room['site_id'],
+                    'building_id'=>$room_building_id,
+                    'floor_id'=>$room_floor_id,
+                    'room_number'=>$room['room_number']]);
+            }
 
             $insertnotificationdata = array(
                 'notice_type'		=> '5',
@@ -264,7 +286,14 @@ class RoomController extends Controller
         $res['status'] = 'success';
         $res['msg'] = 'Room Saved Successfully!';
         $res['room'] = $room;
-        $res['rooms'] = Room_photo::where('room_id',$id)->get();
+        $images = Room_photo::where('room_id',$id)->get();
+        foreach($images as $key => $image){
+            $images[$key]['comments'] = Room_comment::where('photo_id',$image->id) 
+                ->leftJoin('users','users.id','=','room_comments.created_by')
+                ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
+                ->get();
+        }
+        $res['img_files']  = $images;
         //$response = ['status'=>'success', 'msg'=>'Room Saved Successfully!'];
         return response()->json($res);
     }
@@ -838,8 +867,11 @@ class RoomController extends Controller
             ]);
         }
         $comment = array();
-       
-        $comment['photo_id'] = $request->photo_id;
+        $photo_id = $request->photo_id;
+        if(strlen($request->photo_id)>10){
+            $photo_id = Room_photo::where('img_name',$request->photo_id)->first()->id;
+        }
+        $comment['photo_id'] = $photo_id;
         $comment['created_by'] = $request->user->id;
         $comment['comment']  = $request->message;
         
@@ -850,7 +882,7 @@ class RoomController extends Controller
             ->select('room_comments.*','users.first_name','users.last_name','users.profile_pic')
             ->get();
 
-        $room_photo = Room_photo::whereId($request->photo_id)->first();
+        $room_photo = Room_photo::whereId($photo_id)->first();
         $room = Room::whereId($room_photo->room_id)->first();
 
         $insertnotificationdata = array(

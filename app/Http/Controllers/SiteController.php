@@ -252,14 +252,16 @@ class SiteController extends Controller
                                 ->leftJoin('departments','departments.id','=','site_rooms.department_id')
                                 ->select('site_rooms.*','buildings.building_name','floors.floor_name','floors.upload_img','departments.department_name','departments.colour')
                                 ->first(); 
-        $roomIds = Room::where('room_site_id',$room->id)->pluck('id');
-        $room['products_count'] = Product::whereIn('room_id',$roomIds)->count();
-        $res['room'] = $room;
-        $res['rooms'] = Site_room::where('floor_id',$room->floor_id)
+        if($room){
+            $roomIds = Room::where('room_site_id',$room->id)->pluck('id');
+            $room['products_count'] = Product::whereIn('room_id',$roomIds)->count();
+            $res['room'] = $room;
+            $res['rooms'] = Site_room::where('floor_id',$room->floor_id)
                                 ->with('point')
                                 ->leftJoin('departments','departments.id','=','site_rooms.department_id')
                                 ->select('site_rooms.*','departments.colour')
                                 ->get();
+        }
         $res['status'] = 'success';
         return response()->json($res);
     }

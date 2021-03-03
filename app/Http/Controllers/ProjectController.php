@@ -476,7 +476,7 @@ class ProjectController extends Controller
             $project = Project::where('projects.id',$id)
                 ->leftJoin('companies','projects.company_id','=','companies.id')
                 ->leftJoin('users','users.id','=','projects.created_by')
-                ->select('projects.*','companies.logo_img','companies.name AS company_name','companies.website AS company_website','companies.telephone AS company_phone','users.first_name')->first();
+                ->select('projects.*','companies.logo_img','companies.address','companies.name AS company_name','companies.website AS company_website','companies.telephone AS company_phone','users.first_name')->first();
             
             /////  check permission
             if ($this->project_check($project, $request) == 0) {
@@ -557,10 +557,14 @@ class ProjectController extends Controller
             $allow_customers = User::where('company_id', $project->company_id)
                 ->where('status', 1)->whereIn('user_type', [5, 6])
                 ->pluck('id')->toArray();
+            $allow_engineer = User::where('company_id', $companyId)
+                ->where('status', 1)->where('user_type', 2)
+                ->pluck('id')->toArray();
 
             $res['allow_users'] = User::whereIn('users.id', $allow_partners)
                 ->orWhereIn('users.id', $allow_teams)
                 ->orWhereIn('users.id', $allow_customers)
+                ->orWhereIn('users.id', $allow_engineer)
                 ->leftJoin('companies', 'users.company_id', '=', 'companies.id')
                 ->select('users.*', 'companies.name as company_name')
                 ->get();
@@ -569,9 +573,10 @@ class ProjectController extends Controller
                     $res['allow_users'][$key]['type'] = 4;
                 } else if (in_array($user['id'], $allow_teams)) {
                     $res['allow_users'][$key]['type'] = 1;
-                } else {
+                } else if (in_array($user['id'], $allow_customers)) {
                     $res['allow_users'][$key]['type'] = 3;
-                }
+                } else
+                    $res['allow_users'][$key]['type'] = 2;
             }
 
             $partner_users = Project_user::where([
@@ -1433,6 +1438,8 @@ class ProjectController extends Controller
         $res['all_users'] = User::where('status',1)->get();
         $res['status'] = 'success';
         $events = array();
+        if($request->room_id)
+            $roomIds = Room::where('id',$request->room_id)->pluck('id');
         if($request->project_id)
             $roomIds = Room::where('project_id',$request->project_id)->pluck('id');
         else
@@ -1468,7 +1475,20 @@ class ProjectController extends Controller
                                 ]);
         }
         $taskIds = Project_user::where('user_id',$request->user->id)->where('type',2)->pluck('project_id');
-        if($request->project_id)
+        if($request->room_id){
+            $tasks = Task::where('tasks.room_id',$request->room_id)
+            ->whereNotNull('tasks.due_by_date')
+            ->where(function($q) use($request,$taskIds){
+                return $q->whereIn('tasks.id',$taskIds)
+                ->orwhere('tasks.created_by',$request->user->id);
+            })
+            ->leftJoin('users','users.id','=','tasks.created_by')
+            ->leftJoin('projects','projects.id','=','tasks.project_id')
+            ->leftJoin('companies','companies.id','=','tasks.company_id')
+            ->select('tasks.*','users.first_name','users.last_name','users.profile_pic','companies.name as company_name','projects.project_name')
+            ->get();
+        }
+        else if($request->project_id)
             $tasks = Task::where('tasks.project_id',$request->project_id)
                                 ->whereNotNull('tasks.due_by_date')
                                 ->where(function($q) use($request,$taskIds){
@@ -1516,7 +1536,9 @@ class ProjectController extends Controller
                                 'type' => 2
                                 ]);
         }
-        if($request->project_id)
+        if($request->room_id)
+            $taskIds = Task::where('room_id',$request->room_id)->pluck('id');
+        else if($request->project_id)
             $taskIds = Task::where('project_id',$request->project_id)->pluck('id');
         else
             $taskIds = Task::whereIn('company_id',$customerIds)->pluck('id');
@@ -1552,7 +1574,18 @@ class ProjectController extends Controller
                                 ]);
         }
         $projectIds = Project_user::where('user_id',$request->user->id)->where('type',3)->pluck('project_id');
-        if($request->project_id)
+        if($request->room_id){
+            $project_id = Room::whereId($request->room_id)->first()->project_id;
+            $projects = Project::where('projects.id',$project_id)
+            ->where(function($q) use($request,$projectIds){
+                return $q->whereIn('projects.id',$projectIds)
+                ->orwhere('projects.created_by',$request->user->id);
+            })
+            ->leftJoin('users','users.id','=','projects.created_by')
+            ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
+            ->get();
+        }
+        else if($request->project_id)
             $projects = Project::where('projects.id',$request->project_id)
                                 ->where(function($q) use($request,$projectIds){
                                     return $q->whereIn('projects.id',$projectIds)
@@ -1590,7 +1623,20 @@ class ProjectController extends Controller
                                 ]);
         }
         $projectIds = Project_user::where('user_id',$request->user->id)->where('type',3)->pluck('project_id');
-        if($request->project_id)
+        if($request->room_id){
+            $project_id = Room::whereId($request->room_id)->first()->project_id;
+            $projects = Project::where('projects.id',$project_id)
+            ->where(function($q) use($request,$projectIds){
+                return $q->whereIn('projects.id',$projectIds)
+                ->orwhere('projects.created_by',$request->user->id);
+            })
+            ->where('projects.signed_off',2)
+            ->whereNotNull('projects.signoff_date')
+            ->leftJoin('users','users.id','=','projects.created_by')
+            ->select('projects.*','users.first_name','users.last_name','users.profile_pic')
+            ->get();
+        }
+        else if($request->project_id)
              $projects = Project::where('projects.id',$request->project_id)
                             ->where(function($q) use($request,$projectIds){
                                 return $q->whereIn('projects.id',$projectIds)
@@ -1631,7 +1677,15 @@ class ProjectController extends Controller
                                 'type' => 5
                                 ]);
         }
-        if($request->project_id)
+        if($request->room_id)
+            $calendar_events = Calendar_event::where('calendar_events.users','like','%,'.$request->user->id.',%')
+            ->where('calendar_events.project_id',$request->project_id)
+            ->where('calendar_events.room_id','like','%'.$request->room_id.'%')
+            ->leftJoin('users','users.id','=','calendar_events.created_by')
+            ->leftJoin('projects','projects.id','=','calendar_events.project_id')
+            ->select('calendar_events.*','users.first_name','users.last_name','users.profile_pic','projects.project_name')
+            ->get();
+        else if($request->project_id)
             $calendar_events = Calendar_event::where('calendar_events.users','like','%,'.$request->user->id.',%')
                                 ->where('calendar_events.project_id',$request->project_id)
                                 ->leftJoin('users','users.id','=','calendar_events.created_by')
@@ -2008,7 +2062,7 @@ class ProjectController extends Controller
         
         $event_users = json_decode($request->event_users,true);
         array_push($event_users,strval($request->user->id));
-        Calendar_event::create([
+        $event = Calendar_event::create([
             'title'=>$request->title,
             'description'=>$request->description,
             'start'=>$request->start_date,
@@ -2018,7 +2072,22 @@ class ProjectController extends Controller
             'room_id'=>$request->room_ids,
             'users'=>','.join(',',$event_users).','
             ]);
-       
+        if($request->is_sendEmail){
+            $project_name=Project::whereId($request->project_id)->first()->project_name;
+            $pending_users = User::whereIn('id',$event_users)->get();
+            foreach($pending_users as $pending_user){
+                $to_name = $pending_user['first_name'];
+                $to_email = $pending_user['email'];
+                $content = $request->user->first_name.' '.$request->user->last_name.' has been invite you to a new event on'.$request->start_date.'in '.$project_name.'.';
+                $invitationURL = "https://app.sirvez.com/app/calendar";
+                $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>'Event Invitation',"description" =>$request->title,"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view event'];
+                Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                    $message->to($to_email, $to_name)
+                            ->subject('sirvez notification.');
+                    $message->from('support@sirvez.com','sirvez support team');
+                });
+            }
+        }
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);

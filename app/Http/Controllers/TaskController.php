@@ -32,7 +32,7 @@ class TaskController extends Controller
             'company_id' => 'required',
             'project_id' => 'required',
             //'site_id' => 'required',
-            'room_id' => 'required',
+            //'room_id' => 'required',
             'due_by_date' => 'required',
             'priority' => 'required'
         ]);
@@ -50,16 +50,21 @@ class TaskController extends Controller
         $task['company_id'] = $request->company_id;
         $task['project_id']  = $request->project_id;
         //$task['site_id']  = $request->site_id;
+        if($request->room_id>0)
         $task['room_id']  = $request->room_id;
         $task['due_by_date']  = $request->due_by_date;
         $task['priority']  = $request->priority;
+        $task['snagging']  = $request->snagging;
         $task['description']  = $request->description;
         if ($request->has('favourite')) {
             $task['favourite'] = $request->favourite;
         }
         if ($request->has('archived')) {
-            $task['archived'] = $request->archived;
-            $task['archived_day'] = date('Y-m-d');
+            if($request->archived=='1'){
+                $task['archived'] = $request->archived;
+                $task['archived_day'] = date('Y-m-d');
+                $task['archived_id'] = $request->user->id;
+            }
         }
         $action = "updated";
         if($request->hasFile('task_img')){
@@ -181,13 +186,15 @@ class TaskController extends Controller
                 'archived'=>$request->archived,
                 'archived_id'=>$request->user->id,
                 'archived_day'=>date('Y-m-d')]);
+            $task = Task::where('off_id',$id)->first();
         }
-        else
+        else{
             Task::whereId($id)->update([
                 'archived'=>$request->archived,
                 'archived_id'=>$request->user->id,
                 'archived_day'=>date('Y-m-d')]);
-        //Task::where(['id'=>$request->id])->delete();
+            $task = Task::where(['id'=>$request->id])->first();
+            }
 
         if ($request->archived == 1) {
             $notification = array();
@@ -305,7 +312,7 @@ class TaskController extends Controller
                     'msg' => 'You do not have permission to view tasks of this location.'
                 ]);
             }
-            if ($request->user->user_type > 1) {
+            if ($request->user->user_type > 0) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -381,7 +388,7 @@ class TaskController extends Controller
                     'msg' => 'You do not have permission to view tasks of this location.'
                 ]);
             }
-            if ($request->user->user_type > 1) {
+            if ($request->user->user_type > 0) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                     return $q->whereIn('tasks.id',$taskIdx)
@@ -455,7 +462,7 @@ class TaskController extends Controller
                 ]);
             }
             $res['project_id'] = $request->project_id;
-            if ($request->user->user_type >1) {
+            if ($request->user->user_type >0) {
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q) use($taskIdx,$request){
                                 return $q->whereIn('tasks.id',$taskIdx)
@@ -522,7 +529,7 @@ class TaskController extends Controller
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
             }
         } else {
-            if ($request->user->user_type > 1) { // end user
+            if ($request->user->user_type > 0) { // end user
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q)use($taskIdx,$request){
                             return $q->whereIn('tasks.id',$taskIdx)
@@ -581,7 +588,7 @@ class TaskController extends Controller
                                     ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
                                 })
                                 ->pluck('id');
-
+                
                 $tasks = Task::whereIn('tasks.id',$taskIds)
                     ->leftJoin('projects','projects.id','=','tasks.project_id')
                     ->leftJoin('sites','sites.id','=','tasks.site_id')

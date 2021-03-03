@@ -87,7 +87,10 @@ class BuildingController extends Controller
     }
     public function buildingInfo(Request $request){
         $res = array();
-        $res['building'] = Building::whereId($request->id)->first();
+        $res['building'] = Building::where('buildings.id',$request->id)
+                                ->leftJoin('sites','sites.id','=','buildings.site_id')
+                                ->select('buildings.*','sites.site_name','sites.country','sites.county','sites.city','sites.postcode','sites.address','sites.address2')
+                                ->first();
         
         $floors =Floor::where('building_id',$request->id)->orderBy('id','desc')->get();
         foreach($floors as $key =>$floor){

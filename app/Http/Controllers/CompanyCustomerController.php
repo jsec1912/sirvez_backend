@@ -77,35 +77,47 @@ class CompanyCustomerController extends Controller
             else $id = '';
         if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
             $count = 0;
-            if($request->website)
+            if($request->website){
                 $count += Company::where('website',$request->website)->count();
-            if($count>0)
-            {
-                $res = array();
-                $res['status'] = "error";
-                $res['msg'] = 'The website has already been taken!';
-                return response()->json($res);
+                if($count>0)
+                {
+                    $res = array();
+                    $res['status'] = "error";
+                    $res['msg'] = 'The website has already been taken!';
+                    return response()->json($res);
+                }
+                if (strlen($request->id) > 10)
+                    $company['off_id']  = $request->id;
+                $company = Company::create($company);
+                $id = $company->id;
+                $flag = 1;
             }
-            if (strlen($request->id) > 10)
-                $company['off_id']  = $request->id;
-            $company = Company::create($company);
-            $id = $company->id;
-            $flag = 1;
-        }
-        else{
-            $count = 0;
-            if($request->website)
-                $count += Company::where('id','<>',$id)->where('website',$request->website)->count();
-             $sel_company = Company::whereId($id)->first();
-            if($count>0)
-            {
-                $res = array();
+            else{
                 $res['status'] = "error";
-                $res['msg'] = 'The website has already been taken!';
+                $res['msg'] = 'You have to input website url!';
                 return response()->json($res);
             }
 
-            company::whereId($request->id)->update($company);
+        }
+        else{
+            $count = 0;
+            if($request->website){
+                $count += Company::where('id','<>',$id)->where('website',$request->website)->count();
+                $sel_company = Company::whereId($id)->first();
+                if($count>0)
+                {
+                    $res = array();
+                    $res['status'] = "error";
+                    $res['msg'] = 'The website has already been taken!';
+                    return response()->json($res);
+                }
+                company::whereId($request->id)->update($company);
+            }
+            else{
+                $res['status'] = "error";
+                $res['msg'] = 'You have to input website url!';
+                return response()->json($res);
+            }
         }
 
         //insert company_customer
@@ -157,54 +169,63 @@ class CompanyCustomerController extends Controller
                 //     $site['off_id'] = $request->site_off_id;
                 $site['company_id'] = $id;
                 $site = Site::create($site);
+                Building::create([
+                    'site_id',$site->id,
+                    'building_name',$request->buiding_name,
+                    'created_by',$request->user->id,
+                    'updated_by',$request->user->id
+                ]);
             }
             else
                 $site = Site::where('company_id',$request->id)->update($site);
+            
         }
         //Invite Customer User
-        $pendingUser = json_decode($request->pendingUser,true);
-        foreach($pendingUser as $key => $pending_user){
-            
-            if($pending_user['email']=='') break;
-            if(Company::whereId($id)->count()>0)
-                $company_name = Company::whereId($id)->first()->name;
-            else
-                $company_name = Company::whereId($request->user->company_id)->first()->name;
-            //add usertable new user by pending
-            $user = array();
-            $user['email'] = $pending_user['email'];
-            $user['first_name'] = $pending_user['first_name'];
-            $user['user_type'] = $pending_user['user_role'];
-            $user['company_id'] = $id;
-            $user['company_name'] = $company_name;
-            $invite_code = bcrypt($pending_user['email'].$company_name);
-            $user['invite_code'] = str_replace('/', '___', $invite_code);
-            $user['status'] = '0';
-            $res['status'] = "success";
-            $user = User::create($user);
-            $user_role = ['1'=>'super admin','2'=> 'engineer','3'=>'account admin','4'=>'admin','5'=>'admin','6'=>'nomal'];
+        if($request->has('pendingUser')){
+            $pendingUser = json_decode($request->pendingUser,true);
+            foreach($pendingUser as $key => $pending_user){
+                
+                if($pending_user['email']=='') break;
+                if(Company::whereId($id)->count()>0)
+                    $company_name = Company::whereId($id)->first()->name;
+                else
+                    $company_name = Company::whereId($request->user->company_id)->first()->name;
+                //add usertable new user by pending
+                $user = array();
+                $user['email'] = $pending_user['email'];
+                $user['first_name'] = $pending_user['first_name'];
+                $user['user_type'] = $pending_user['user_role'];
+                $user['company_id'] = $id;
+                $user['company_name'] = $company_name;
+                $invite_code = bcrypt($pending_user['email'].$company_name);
+                $user['invite_code'] = str_replace('/', '___', $invite_code);
+                $user['status'] = '0';
+                $res['status'] = "success";
+                $user = User::create($user);
+                $user_role = ['1'=>'super admin','2'=> 'engineer','3'=>'account admin','4'=>'admin','5'=>'admin','6'=>'nomal'];
 
-            $insertnotificationndata = array(
-                'notice_type'		=> '1',
-                'notice_id'			=> $user->id,
-                'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$pending_user['first_name'].' as '.$user_role[$pending_user['user_role']].' in company: '.$company_name.'.',
-                'created_by'		=> $request->user->id,
-                'company_id'		=> $user['company_id'],
-                'created_date'		=> date("Y-m-d H:i:s"),
-                'is_read'	    	=> 0,
-            );
-            Notification::create($insertnotificationndata);
-            $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
+                $insertnotificationndata = array(
+                    'notice_type'		=> '1',
+                    'notice_id'			=> $user->id,
+                    'notification'		=> $request->user->first_name.' '.$request->user->last_name.' has added '.$pending_user['first_name'].' as '.$user_role[$pending_user['user_role']].' in company: '.$company_name.'.',
+                    'created_by'		=> $request->user->id,
+                    'company_id'		=> $user['company_id'],
+                    'created_date'		=> date("Y-m-d H:i:s"),
+                    'is_read'	    	=> 0,
+                );
+                Notification::create($insertnotificationndata);
+                $invitationURL = env('APP_URL')."/company/usersignup/".$user['invite_code'];
 
-            //sending gmail to user
-            $to_name = $pending_user['first_name'];
-            $to_email = $pending_user['email'];
-            $data = ['name'=>$pending_user['first_name'], "pending_user" => $pending_user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
-            Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
-                $message->to($to_email, $to_name)
-                        ->subject('sirvez support team invite you. please join our site.');
-                $message->from('support@sirvez.com','support team');
-            });
+                //sending gmail to user
+                $to_name = $pending_user['first_name'];
+                $to_email = $pending_user['email'];
+                $data = ['name'=>$pending_user['first_name'], "pending_user" => $pending_user,'user_info'=>$request->user,'invitationURL'=>$invitationURL];
+                Mail::send('mail', $data, function($message) use ($to_name, $to_email) {
+                    $message->to($to_email, $to_name)
+                            ->subject('sirvez support team invite you. please join our site.');
+                    $message->from('support@sirvez.com','support team');
+                });
+            }
         }
 
 

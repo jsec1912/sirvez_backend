@@ -610,7 +610,7 @@ class UserController extends Controller
     public function getProjectTaskCount(request $request){
         $res = array();
         if($request->user->user_type==0){
-            $res['project_count'] = Project::count();
+            $res['project_count'] = Project::where('archived',0)->count();
         }
         else if($request->user->user_type< 4){
             $id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
@@ -622,7 +622,7 @@ class UserController extends Controller
             $res['project_count'] = Project::where(function ($q) use($id, $partner_ids) {
                 return $q->whereIn('projects.company_id',$id)
                 ->orWhereIn('projects.id', $partner_ids);
-            })->count();
+            })->where('archived',0)->count();
         }else{
             $projectIdx = Project_user::where('user_id', $request->user->id)
             ->where(function ($q) {
@@ -630,9 +630,12 @@ class UserController extends Controller
                 ->orWhere('type', 4); // partner user case
             })
             ->pluck('project_id');
-            $res['project_count'] = Project::whereIn('projects.id',$projectIdx)->count();
+            $res['project_count'] = Project::whereIn('projects.id',$projectIdx)->where('archived',0)->count();
+            $res['signoff_count'] = Project::whereIn('projects.id',$projectIdx)->where('archived',0)
+                                        ->where('signed_off',1)
+                                        ->count();
         }
-        if($request->user->user_type<=1){
+        if($request->user->user_type<1){
             $customer_id = Company_customer::where('company_id',$request->user->company_id)
             ->pluck('customer_id')->toArray();
             array_push($customer_id, $request->user->company_id);
@@ -648,30 +651,23 @@ class UserController extends Controller
             ])->pluck('partner_id')->toArray();
             $company_ids = array_merge($customer_id, $partner_company_ids);
             $res['task_count'] = Task::whereIn('tasks.company_id',$company_ids)
-                            ->where(function($q){
-                                return $q->where('tasks.archived',0)
-                                ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
-                            })->count();
+                            ->where('archived',0)
+                            ->count();
         }else{
             $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
             $taskIds = Task::where(function($q)use($taskIdx,$request){
                         return $q->whereIn('tasks.id',$taskIdx)
                         ->orwhere('tasks.created_by',$request->user->id);
                     })
-                    ->where(function($q){
-                        return $q->where('tasks.archived',0)
-                        ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
-                    })
+                    ->where('archived',0)
                     ->pluck('id');
-            $res['task_count'] = Task::where(function($q)use($taskIdx,$request){
-                                return $q->whereIn('tasks.id',$taskIdx)
-                                ->orwhere('tasks.created_by',$request->user->id);
-                            })
-                ->where(function($q){
-                    return $q->where('tasks.archived',0)
-                    ->orwhere('tasks.archived_day', '>', date('Y-m-d', strtotime("-15 days")));
-                })->count();
-        }
+            $res['task_count'] = Task::where(function($q)use($taskIds,$request){
+                                        return $q->whereIn('tasks.id',$taskIds)
+                                        ->orwhere('tasks.created_by',$request->user->id);
+                                    })
+                                ->where('archived',0)
+                                ->count();
+                }
         $res['status'] = 'success';
         return response()->json($res);
     }
