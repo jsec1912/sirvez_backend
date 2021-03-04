@@ -1714,6 +1714,37 @@ class ProjectController extends Controller
                                 'type' => 6
                                 ]);
         }
+        foreach($events as $key=> $event){
+            if($event['project_id']>0){
+                if(Project::whereId($event['project_id'])->first()){
+                    $customer_id = Project::whereId($event['project_id'])->first()->company_id;
+                    if(Company::whereId($customer_id)->first()){
+                        $customer = Company::whereId($customer_id)->first();
+                        $events[$key]['address'] = $customer->address.' '.$customer->address2.' '.$customer->city.' '.$customer->county.' '.$customer->country.' '.$customer->postcode;
+                    }
+                    else
+                        $events[$key]['address']='';
+                }
+                else
+                    $events[$key]['address']='';
+            }
+            else
+                $events[$key]['address']='';
+            $events[$key]['room_number']='';
+            if(strlen($event['room_id'])>0){
+                $roomIds = explode(",", $event['room_id']);
+                foreach($roomIds as $room_id)
+                if(Room::whereId($room_id)->first()){
+                    if(strlen($events[$key]['room_number']) > 0) 
+                        $events[$key]['room_number'] .= ', ';
+                    $events[$key]['room_number'] .= Room::whereId($room_id)->first()->room_number;
+                }
+                else
+                    $events[$key]['room_number'].='';
+            }
+            else
+                $events[$key]['room_number']='';
+        }
         $res['events'] = $events;
         $res['eventsyncs'] = CalendarEventSync::all();
         return response()->json($res);
@@ -1723,19 +1754,21 @@ class ProjectController extends Controller
         if ($request->has('google_event_id')) {
             if (CalendarEventSync::where([
                 'event_id' => $request->event_id,
-                'event_type' => $request->event_type
+                'event_type' => $request->event_type,
             ])->count() > 0) {
                 CalendarEventSync::where([
                     'event_id' => $request->event_id,
                     'event_type' => $request->event_type,
                 ])->update([
-                    'google_event_id' => $request->google_event_id
+                    'google_event_id' => $request->google_event_id,
+                    'google_event' => $request->google_event
                 ]);
             } else {
                 $sync = CalendarEventSync::create([
                     'event_id' => $request->event_id,
                     'event_type' => $request->event_type,
-                    'google_event_id' => $request->google_event_id
+                    'google_event_id' => $request->google_event_id,
+                    'google_event' => $request->google_event
                 ]);
                 $res['sync'] = $sync;
             }
@@ -1749,13 +1782,15 @@ class ProjectController extends Controller
                     'event_id' => $request->event_id,
                     'event_type' => $request->event_type
                 ])->update([
-                    'office365_event_id' => $request->office365_event_id
+                    'office365_event_id' => $request->office365_event_id,
+                    'office365_event' => $request->office365_event
                 ]);
             } else {
-                $sync = CalendarEventSync::creat([
+                $sync = CalendarEventSync::create([
                     'event_id' => $request->event_id,
                     'event_type' => $request->event_type,
-                    'office365_event_id' => $request->office365_event_id
+                    'office365_event_id' => $request->office365_event_id,
+                    'office365_event' => $request->office365_event
                 ]);
                 $res['sync'] = $sync;
             }
@@ -1937,24 +1972,26 @@ class ProjectController extends Controller
                 Company_customer::where('customer_id',$project->company_id)->first()->company_id;
                 $admin_users = User::where('company_id', $project_company)
                     ->where('status', 1)->whereIn('user_type', [1, 3])
-                    ->pluck('id')->toArray();
+                    ->get();
+                foreach($admin_users as $cur_user){
+                    array_push($project_users,$cur_user->id);
+                }
 
                 // super super admin
                 $super_users = User::where('status', 1)->where('user_type', 0)
-                    ->pluck('id')->toArray();
-
+                    ->get();
+                foreach($super_users as $cur_user){
+                    array_push($project_users,$cur_user->id);
+                }
                 // account manager
                 $account_manager = $project->manager_id;
-
-                array_push($project_users, $admin_users);
-                array_push($project_users, $super_users);
                 array_push($project_users, $account_manager);
-
                 foreach ($project_users as $user) {
                     $data = array();
                     $data[$request->caption] = $request->value;
-                    if(ProjectModule::where(['user_id'=>$user,'project_id'=>$request->project_id])->count()>0)
+                    if(ProjectModule::where(['user_id'=>$user,'project_id'=>$request->project_id])->count()>0){
                         ProjectModule::where(['user_id'=>$user,'project_id'=>$request->project_id])->update($data);
+                    }
                     else{
                         $company_id=$request->user->company_id;
                         if (Company_customer::where('customer_id',$company_id)->count() > 0) {
@@ -2066,7 +2103,7 @@ class ProjectController extends Controller
             'title'=>$request->title,
             'description'=>$request->description,
             'start'=>$request->start_date,
-            'end'=>$request->is_fullDay==0?$request->end_date:$request->start_date,
+            'end'=>$request->end_date,
             'created_by'=>$request->user->id,
             'project_id'=>$request->project_id,
             'room_id'=>$request->room_ids,

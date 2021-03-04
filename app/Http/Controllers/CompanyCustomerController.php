@@ -170,10 +170,10 @@ class CompanyCustomerController extends Controller
                 $site['company_id'] = $id;
                 $site = Site::create($site);
                 Building::create([
-                    'site_id',$site->id,
-                    'building_name',$request->buiding_name,
-                    'created_by',$request->user->id,
-                    'updated_by',$request->user->id
+                    'site_id'=>$site->id,
+                    'building_name'=>$request->building_name,
+                    'created_by'=>$request->user->id,
+                    'updated_by'=>$request->user->id
                 ]);
             }
             else
