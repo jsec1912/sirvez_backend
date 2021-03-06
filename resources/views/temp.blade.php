@@ -43,6 +43,46 @@
                                         <tr>
                                             <td colspan="2">- {{$description}}</td>
                                         </tr>
+                                        <?php if (isset($sow_file)) {?>
+                                        <tr>
+                                            <td colspan="2">
+                                            Scope Of Works File:
+                                            <a href = "{{$sow_file}}" style="margin-left:10px;" rel = "">download</a>
+                                            </td>
+                                        </tr>
+                                        <?php }?>
+                                        <?php if (isset($tender_file)) {?>
+                                        <tr>
+                                            <td colspan="2">
+                                            Tender Response Document:
+                                            <a href = "{{$tender_file}}" style="margin-left:10px;" rel = "">download</a>
+                                            </td>
+                                        </tr>
+                                        <?php }?>
+                                        <?php if (isset($healthy_file)) {?>
+                                        <tr>
+                                            <td colspan="2">
+                                            Health & Safety Document:
+                                            <a href = "{{$healthy_file}}" style="margin-left:10px;" rel = "">download</a>
+                                            </td>
+                                        </tr>
+                                        <?php }?>
+                                        <?php if (isset($install_file)) {?>
+                                        <tr>
+                                            <td colspan="2">
+                                            Installation Job Document:
+                                            <a href = "{{$install_file}}" style="margin-left:10px;" rel = "">download</a>
+                                            </td>
+                                        </tr>
+                                        <?php }?>
+                                        <?php if (isset($upload_file)) {?>
+                                        <tr>
+                                            <td colspan="2">
+                                            Upload File:
+                                            <a href = "{{$upload_file}}" style="margin-left:10px;" rel = "">download</a>
+                                            </td>
+                                        </tr>
+                                        <?php }?>
                                         <?php if (isset($img)) {?>
                                         <tr>
                                             <td colspan="2" align="center">

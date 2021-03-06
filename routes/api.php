@@ -96,6 +96,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/changeLockProjectPage', 'ProjectController@changeLockProjectPage');
     Route::post('/project/signOffAllLocaton', 'ProjectController@signOffAllLocaton');
     Route::post('/project/moveInstallStage', 'ProjectController@moveInstallStage');
+    Route::post('/project/changePageFile', 'ProjectController@changePageFile');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -260,6 +261,8 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/calendar/saveNewEvent','ProjectController@saveNewEvent');///
     Route::post('/calendar/deleteEvent','ProjectController@deleteEvent');///
     Route::post('/calendar/saveEventID', 'ProjectController@saveEventID');
+    Route::post('/calendar/removeEventID', 'ProjectController@removeEventID');
+    Route::post('/calendar/addNewNotes', 'ProjectController@addNewNotes');
 
     Route::post('/chat/sendMessage','ProjectChatController@sendMessage');///
     Route::get('/chat/getChats','ProjectChatController@getChats');///

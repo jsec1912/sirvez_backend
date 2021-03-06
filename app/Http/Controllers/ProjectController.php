@@ -35,6 +35,7 @@ use App\Task_label_value;
 use App\Product_label_value;
 use App\Partner;
 use App\Calendar_event;
+use App\CalendarEventsNote;
 use App\CalendarEventSync;
 use App\ProjectPage;
 use App\ProjectTender;
@@ -42,6 +43,7 @@ use App\ProjectHealthy;
 use App\ProjectTopMenu;
 use App\Events\NotificationEvent;
 use App\Events\ChatEvent;
+use Illuminate\Support\Facades\File; 
 use Mail;
 
 class ProjectController extends Controller
@@ -468,7 +470,6 @@ class ProjectController extends Controller
         $res = array();
         $res['status'] = "success";
         if($request->project_id){
-        
             if(strlen($request->project_id) > 10)
                 $id = Project::where('off_id',$request->project_id)->first()->id;
             else
@@ -1247,6 +1248,7 @@ class ProjectController extends Controller
                 $customer_users = Project_user::where('project_id',$request->id)->where('type','3')->pluck('user_id');
                 foreach($customer_users as $row){
                     $pending_user = User::where('id',$row)->first();
+                    if(!$pending_user) continue;
                     //$pending_user = $project['customer_user'];
                     $content = $request->user->first_name. " would like you to sign off the scope of works for ".$project['project_name'];
                     $to_name = $pending_user['first_name'];
@@ -1711,10 +1713,21 @@ class ProjectController extends Controller
                                 'profile_pic'=>$calendar_event->profile_pic,
                                 'users'=>$calendar_event->users.',',
                                 'id'=>$calendar_event->id,
+                                'is_provisional'=>$calendar_event->is_provisional,
+                                'sow_file'=>$calendar_event->sow_file,
+                                'tender_file'=>$calendar_event->tender_file,
+                                'healthy_file'=>$calendar_event->healthy_file,
+                                'install_file'=>$calendar_event->install_file,
+                                'upload_file'=>$calendar_event->fileName,
                                 'type' => 6
                                 ]);
         }
         foreach($events as $key=> $event){
+            $events[$key]['notes'] = CalendarEventsNote::where('calendar_events_notes.type',$event['type'])
+                                        ->where('calendar_events_notes.event_id',$event['id'])
+                                        ->leftJoin('users','users.id','=','calendar_events_notes.created_by')
+                                        ->select('calendar_events_notes.note','users.profile_pic','users.first_name as created_user')
+                                        ->get();
             if($event['project_id']>0){
                 if(Project::whereId($event['project_id'])->first()){
                     $customer_id = Project::whereId($event['project_id'])->first()->company_id;
@@ -1798,6 +1811,42 @@ class ProjectController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
+
+    public function removeEventID(request $request) {
+        $res = array();
+        if ($request->has('event_remove')) {
+            if ($request->event_remove == 'office365') {
+                if (CalendarEventSync::where([
+                    'event_id' => $request->event_id,
+                    'event_type' => $request->event_type
+                ])->count() > 0) {
+                    CalendarEventSync::where([
+                        'event_id' => $request->event_id,
+                        'event_type' => $request->event_type
+                    ])->update([
+                        'office365_event_id' => '',
+                        'office365_event' => ''
+                    ]);
+                }
+            } else if ($request->event_remove == 'google') {
+                if (CalendarEventSync::where([
+                    'event_id' => $request->event_id,
+                    'event_type' => $request->event_type
+                ])->count() > 0) {
+                    CalendarEventSync::where([
+                        'event_id' => $request->event_id,
+                        'event_type' => $request->event_type
+                    ])->update([
+                        'google_event_id' => '',
+                        'google_event' => ''
+                    ]);
+                }
+            }
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
     public function saveEvent(request $request){
         $res = array();
         $event_users = json_decode($request->added_users,true);
@@ -1871,12 +1920,8 @@ class ProjectController extends Controller
             }
             else{
                 $event = Calendar_event::whereId($request->id)->first();
-                //$calender_user = $event->users;
-                // foreach($deleted_users as $user){
-                //     str_replace(','.$user.',',',',$calender_user);
-                // }
                 $users =  explode(',',$event->users);
-                $users = array_diff($user,$deleted_users);
+                $users = array_diff($users,$deleted_users);
                 $event_users = array_merge($users,$event_users);
                 Calendar_event::whereId($request->id)->update([
                     'title'=>$request->title,
@@ -1884,7 +1929,44 @@ class ProjectController extends Controller
                     'end'=>$request->is_fullDay==0?$request->end:$request->start,
                     'created_by'=>$request->user->id,
                     'users'=>join(',',$event_users).','
-                    ]);
+                ]);
+                if($request->is_sendEmail){
+                    $event = Calendar_event::whereId($request->id)->first();
+                    $project_name=Project::whereId($event->project_id)->first()->project_name;
+                    $pending_users = User::whereIn('id',$event_users)->get();
+                    foreach($pending_users as $pending_user){
+                        $to_name = $pending_user['first_name'];
+                        $to_email = $pending_user['email'];
+                        if($event->sow_file)
+                            $sow_file = 'https://app.sirvez.com/upload/file/'.$event->sow_file;
+                        if($event->tender_file)
+                            $tender_file = 'https://app.sirvez.com/upload/file/'.$event->tender_file;
+                        if($event->healthy_file)
+                            $healthy_file = 'https://app.sirvez.com/upload/file/'.$event->healthy_file;
+                        if($event->install_file)
+                            $install_file = 'https://app.sirvez.com/upload/file/'.$event->install_file;
+                        if($event->upload_file)
+                            $upload_file = 'https://app.sirvez.com/upload/file/'.$event->upload_file;
+                        $content = $request->user->first_name.' '.$request->user->last_name.' has been invite you to a new event on'.$request->start_date.'in '.$project_name.'.';
+                        $invitationURL = "https://app.sirvez.com/app/calendar";
+                        $data = [
+                            'name'=>$pending_user['first_name'],
+                            "content" => $content,"title" =>'Event Invitation',
+                            "description" =>$request->title,"img"=>'',
+                            "sow_file"=>$sow_file,
+                            "tender_file"=>$tender_file,
+                            "healthy_file"=>$healthy_file,
+                            "install_file"=>$install_file,
+                            "upload_file"=>$upload_file,
+                            "invitationURL"=>$invitationURL,
+                            "btn_caption"=>'Click here to view event'];
+                        Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
+                            $message->to($to_email, $to_name)
+                                    ->subject('sirvez notification.');
+                            $message->from('support@sirvez.com','sirvez support team');
+                        });
+                    }
+                }
             }
         }
         $res['status'] = 'success';
@@ -2098,6 +2180,11 @@ class ProjectController extends Controller
     public function saveNewEvent(request $request){
         
         $event_users = json_decode($request->event_users,true);
+        $fileName = '';
+        if ($request->has('upload_file') && isset($request->upload_file) && $request->upload_file!='null') {
+            $fileName = time().'.'.$request->upload_file->extension();
+            $request->upload_file->move(public_path('upload/file'), $fileName);
+        }
         array_push($event_users,strval($request->user->id));
         $event = Calendar_event::create([
             'title'=>$request->title,
@@ -2107,7 +2194,13 @@ class ProjectController extends Controller
             'created_by'=>$request->user->id,
             'project_id'=>$request->project_id,
             'room_id'=>$request->room_ids,
-            'users'=>','.join(',',$event_users).','
+            'users'=>','.join(',',$event_users).',',
+            'is_provisional'=>$request->is_provisional,
+            'sow_file'=>$request->sow_file,
+            'tender_file'=>$request->tender_file,
+            'healthy_file'=>$request->healthy_file,
+            'install_file'=>$request->install_file,
+            'upload_file'=>$fileName,
             ]);
         if($request->is_sendEmail){
             $project_name=Project::whereId($request->project_id)->first()->project_name;
@@ -2115,9 +2208,29 @@ class ProjectController extends Controller
             foreach($pending_users as $pending_user){
                 $to_name = $pending_user['first_name'];
                 $to_email = $pending_user['email'];
+                if($request->sow_file)
+                    $sow_file = 'https://app.sirvez.com/upload/file/'.$request->sow_file;
+                if($request->tender_file)
+                    $tender_file = 'https://app.sirvez.com/upload/file/'.$request->tender_file;
+                if($request->healthy_file)
+                    $healthy_file = 'https://app.sirvez.com/upload/file/'.$request->healthy_file;
+                if($request->install_file)
+                    $install_file = 'https://app.sirvez.com/upload/file/'.$request->install_file;
+                if($fileName)
+                    $upload_file = 'https://app.sirvez.com/upload/file/'.$fileName;
                 $content = $request->user->first_name.' '.$request->user->last_name.' has been invite you to a new event on'.$request->start_date.'in '.$project_name.'.';
                 $invitationURL = "https://app.sirvez.com/app/calendar";
-                $data = ['name'=>$pending_user['first_name'], "content" => $content,"title" =>'Event Invitation',"description" =>$request->title,"img"=>'',"invitationURL"=>$invitationURL,"btn_caption"=>'Click here to view event'];
+                $data = [
+                    'name'=>$pending_user['first_name'],
+                    "content" => $content,"title" =>'Event Invitation',
+                    "description" =>$request->title,"img"=>'',
+                    "sow_file"=>$sow_file,
+                    "tender_file"=>$tender_file,
+                    "healthy_file"=>$healthy_file,
+                    "install_file"=>$install_file,
+                    "upload_file"=>$upload_file,
+                    "invitationURL"=>$invitationURL,
+                    "btn_caption"=>'Click here to view event'];
                 Mail::send('temp', $data, function($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)
                             ->subject('sirvez notification.');
@@ -2141,16 +2254,19 @@ class ProjectController extends Controller
         $page['option_3'] = $request->option_3;
         $page['option_4'] = $request->option_4;
         $page['page_count'] = $request->page_count;
+        $page['word_count'] = $request->word_count;
+        $page['character_count'] = $request->character_count;
+        $page['is_complete']=0;
         $page['content'] = $request->content;
         $page['lock_page'] = $request->lock_page;
         $page['link_url'] = $request->link_url;
         $page['created_by'] = $request->user->id;
         $page['updated_by'] = $request->user->id;
         $page['order_no'] = $order_no+1;
-        $page = ProjectPage::create($page);
+        $updatedpage = ProjectPage::create($page);
         $res = array();
         $res['status'] = 'success';
-        $res['page'] = $page;
+        $res['page'] = $updatedpage;
         return response()->json($res);
     }
     public function removeProjectPage(request $request){
@@ -2192,16 +2308,19 @@ class ProjectController extends Controller
         $page['option_3'] = $request->option_3;
         $page['option_4'] = $request->option_4;
         $page['page_count'] = $request->page_count;
+        $page['word_count'] = $request->word_count;
+        $page['character_count'] = $request->character_count;
+        $page['is_complete']=0;
         $page['content'] = $request->content;
         $page['lock_page'] = $request->lock_page;
         $page['link_url'] = $request->link_url;
         $page['created_by'] = $request->user->id;
         $page['updated_by'] = $request->user->id;
         $page['order_no'] = $order_no+1;
-        $page = ProjectTender::create($page);
+        $updatedpage = ProjectTender::create($page);
         $res = array();
         $res['status'] = 'success';
-        $res['page'] = $page;
+        $res['page'] = $updatedpage;
         return response()->json($res);
     }
     public function removeProjectTender(request $request){
@@ -2233,16 +2352,19 @@ class ProjectController extends Controller
         $page['option_3'] = $request->option_3;
         $page['option_4'] = $request->option_4;
         $page['page_count'] = $request->page_count;
+        $page['word_count'] = $request->word_count;
+        $page['character_count'] = $request->character_count;
+        $page['is_complete']=0;
         $page['content'] = $request->content;
         $page['lock_page'] = $request->lock_page;
         $page['link_url'] = $request->link_url;
         $page['created_by'] = $request->user->id;
         $page['updated_by'] = $request->user->id;
         $page['order_no'] = $order_no+1;
-        $page = ProjectHealthy::create($page);
+        $updatedpage = ProjectHealthy::create($page);
         $res = array();
         $res['status'] = 'success';
-        $res['page'] = $page;
+        $res['page'] = $updatedpage;
         return response()->json($res);
     }
     public function removeProjectHealthy(request $request){
@@ -2327,6 +2449,42 @@ class ProjectController extends Controller
             'signoff_user'=>$request->user->id,
         ]);
         $res['status'] = "success";
+        return response()->json($res);
+    }
+    public function changePageFile(request $request){
+        if ($request->has('page_file') && isset($request->page_file) && $request->page_file!='null') {
+            $fileName = time().'.'.$request->page_file->extension();
+            $request->page_file->move(public_path('upload/file'), $fileName);
+        }
+        $project = Project::whereId($request->project_id)->first();
+        if($request->doc_type==1){
+            $link_file = $project->lock_page_file;
+            $project->lock_page_file = $fileName;
+        }
+        else if($request->doc_type==2){
+            $link_file = $project->lock_tender_file;
+            $project->lock_tender_file = $fileName;
+        }
+        else if($request->doc_type==3){
+            $link_file = $project->lock_healthy_file;
+            $project->lock_healthy_file = $fileName;
+        }
+        $project->save();
+        $file_path = public_path('upload/file').'/'.$link_file;
+        File::delete($file_path);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addNewNotes(request $request){
+        $res = array();
+        CalendarEventsNote::create([
+            'event_id'=>$request->event_id,
+            'type'=>$request->type,
+            'note'=>$request->note,
+            'created_by'=>$request->user->id
+        ]);
+        $res['status'] = 'success';
         return response()->json($res);
     }
 }

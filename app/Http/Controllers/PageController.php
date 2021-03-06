@@ -68,7 +68,8 @@ class PageController extends Controller
                 $cur_page->character_count = $page['character_count'];
                 $cur_page->content = $page['content'];
                 $cur_page->lock_page = $page['lock_page'];
-                $cur_page->link_url = $page['link_url'];
+                if($page['link_url'])
+                    $cur_page->link_url = $page['link_url'];
                 if ($request->is_complete)
                 $cur_page->is_complete = $request->is_complete;
                 $cur_page->save();
@@ -83,7 +84,11 @@ class PageController extends Controller
                 if($array_res){
                     foreach($array_res as $row)
                     {
-                        PageLabelValue::create(['page_id'=>$data->id,'label_id'=>$row]);
+                        PageLabelValue::create([
+                            'page_id'=>$data->id,
+                            'label_id'=>$row,
+                            'created_by'=>$request->user->id
+                            ]);
                     }
                 }
             }
@@ -97,7 +102,11 @@ class PageController extends Controller
             if($array_res){
                 foreach($array_res as $row)
                 {
-                    PageLabelValue::create(['page_id'=>$data->id,'label_id'=>$row]);
+                    PageLabelValue::create([
+                        'page_id'=>$data->id,
+                        'label_id'=>$row,
+                        'created_by'=>$request->user->id
+                        ]);
                 }
             }
         }
