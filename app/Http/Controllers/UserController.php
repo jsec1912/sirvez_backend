@@ -632,7 +632,10 @@ class UserController extends Controller
             ->pluck('project_id');
             $res['project_count'] = Project::whereIn('projects.id',$projectIdx)->where('archived',0)->count();
             $res['signoff_count'] = Project::whereIn('projects.id',$projectIdx)->where('archived',0)
-                                        ->where('signed_off',1)
+                                        ->where(function ($q) {
+                                            return $q->where('projects.signed_off',1)
+                                            ->orWhere('projects.final_signoff', 1);
+                                        })
                                         ->count();
         }
         if($request->user->user_type<1){

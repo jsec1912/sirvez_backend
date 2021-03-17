@@ -97,6 +97,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/project/signOffAllLocaton', 'ProjectController@signOffAllLocaton');
     Route::post('/project/moveInstallStage', 'ProjectController@moveInstallStage');
     Route::post('/project/changePageFile', 'ProjectController@changePageFile');
+    Route::post('/project/updateInstallFile', 'ProjectController@updateInstallFile');
 
     Route::post('/site/updateSite','SiteController@updateSite');///
     Route::post('/site/deleteSite','SiteController@deleteSite');///
@@ -145,6 +146,7 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/product/savecommissioningForm', 'ProductController@savecommissioningForm');
     Route::post('/product/changeProductName', 'ProductController@changeProductName');
     Route::post('/product/changeProductDescription', 'ProductController@changeProductDescription');
+    Route::post('/product/changeProductSupplier', 'ProductController@changeProductSupplier');
     Route::post('/product/changeModelNumber', 'ProductController@changeModelNumber');
     Route::post('/product/changeManufacturer', 'ProductController@changeManufacturer');
     Route::post('/product/changeTestingFormId', 'ProductController@changeTestingFormId');
@@ -171,6 +173,10 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/product/removeProductGroup','ProductController@removeProductGroup');
     Route::post('/product/makeProductGroup','ProductController@makeProductGroup');
     Route::post('/product/releaseProductGroup','ProductController@releaseProductGroup');
+    Route::post('/product/madeDelivery','ProductController@madeDelivery');
+    Route::post('/product/changeTopMenu','ProductController@changeTopMenu');
+    Route::post('/product/addProductToGroup','ProductController@addProductToGroup');
+    Route::post('/product/removeProductFromGroup','ProductController@removeProductFromGroup');
 
     Route::post('/room/updateRoom','RoomController@updateRoom');///
     Route::post('/room/deleteRoom','RoomController@deleteRoom');///
@@ -210,7 +216,22 @@ Route::group(['middleware' => ['jwt-auth','api-header','cors']], function () {
     Route::post('/task/setDueByDate', 'TaskController@setDueByDate');
     Route::post('/task/changeTopMenu', 'TaskController@changeTopMenu');
     Route::post('/task/modifyComment', 'TaskController@modifyComment');
-
+    Route::post('/task/addNewBoard', 'TaskController@addNewBoard');
+    Route::post('/task/addNewBucket', 'TaskController@addNewBucket');
+    Route::post('/task/duplicateTask', 'TaskController@duplicateTask');
+    Route::post('/task/setBucket', 'TaskController@setBucket');
+    Route::post('/task/changeBucketOrder', 'TaskController@changeBucketOrder');
+    Route::post('/task/changeTaskOrder', 'TaskController@changeTaskOrder');
+    Route::post('/task/saveBucketName', 'TaskController@saveBucketName');
+    Route::post('/task/saveBucketLock', 'TaskController@saveBucketLock');
+    Route::post('/task/deleteBucket', 'TaskController@deleteBucket');
+    Route::post('/task/deleteBoard', 'TaskController@deleteBoard');
+    Route::post('/task/updateTaskCustomer', 'TaskController@updateTaskCustomer');
+    Route::post('/task/updateTaskProject', 'TaskController@updateTaskProject');
+    Route::post('/task/updateTaskRoom', 'TaskController@updateTaskRoom');
+    Route::post('/task/removeComment', 'TaskController@removeComment');
+    Route::post('/task/changeDeadline', 'TaskController@changeDeadline');
+    Route::post('/task/addAttachFile', 'TaskController@addAttachFile');
 
     Route::post('/user/updateUser','UserController@CustomerUpdateUser');///
     Route::post('/user/deleteUser','UserController@DeleteUser');///

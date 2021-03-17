@@ -25,6 +25,7 @@ use App\Barcode;
 use App\Product_sign;
 use App\Product_label;
 use App\Product_label_value;
+use App\ProductTopMenu;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Response;
 use DateTime;
@@ -64,6 +65,7 @@ class ProductController extends Controller
             $product['description']  = $request->description;
             $product['action']  = $request->action;
             $product['qty']  = 1;
+            $product['supplier']  = $request->supplier;
             $product['test_form_id'] = $request->test_form_id;
             $product['com_form_id'] = $request->com_form_id;
             if(strlen($request->to_room_id) > 10){
@@ -322,7 +324,8 @@ class ProductController extends Controller
                 'warranty(year)'=>'warranty_time',
                 'warranty time'=>'warranty_time',
                 'action'=>'action',
-                'product_action'=>'action'
+                'product_action'=>'action',
+                'supplier'=>'supplier',
             );
             $header_set = array('product_name', 'room_id', 'qty', 'manufacturer',
                 'model_number', 'description', 'test_form_id', 'com_form_id', 'action');
@@ -599,6 +602,18 @@ class ProductController extends Controller
             $id = $request->id;
 
             Product::whereId($id)->update(['description'=>$request->product_description]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function changeProductSupplier(request $request){
+        if(strlen($request->id) > 10)
+            $id = Product::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+
+            Product::whereId($id)->update(['supplier'=>$request->product_supplier]);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);
@@ -1029,6 +1044,51 @@ class ProductController extends Controller
         $group_ids = explode(',',$request->group_ids);
         $room_ids = Room::where('project_id',$request->project_id)->pluck('id');
         Product::whereIn('room_id',$room_ids)->whereIn('group_id',$group_ids)->update(['group_id'=>0,'group_name'=>null]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function madeDelivery(request $request){
+        $product_ids = explode(',',$request->product_ids);
+        $fileName = '';
+        if($request->hasFile('delivery_file')){
+            $fileName = time().'.'.$request->delivery_file->extension();
+            $request->delivery_file->move(public_path('upload/file/'), $fileName);
+        }
+        Product::whereIn('id',$product_ids)
+                ->update([
+                    'is_delivery'=>1,
+                    'delivery_signby'=>$request->delivery_signby,
+                    'delivery_time'=>$request->delivery_time,
+                    'delivery_notes'=>$request->delivery_notes,
+                    'delivery_file'=>$fileName
+                ]);
+        $res=array();
+        $res['status']='success';
+        return response()->json($res);
+    }
+    public function changeTopMenu(request $request){
+        $res = array();
+        $id = $request->id;
+        if(strlen($id)>10){
+            ProductTopMenu::where('off_id',$id)->update(['is_show'=>$request->is_show]);
+        }
+        else
+            ProductTopMenu::whereId($id)->update(['is_show'=>$request->is_show]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addProductToGroup(request $request){
+        $product_ids = explode(',',$request->product_ids);
+        $group_name = $request->group_name;
+        Product::whereIn('id',$product_ids)->update(['group_id'=>$request->group_id,'group_name'=>$group_name]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function removeProductFromGroup(request $request){
+        $product_ids = explode(',',$request->product_ids);
+        Product::whereIn('id',$product_ids)->update(['group_id'=>0,'group_name'=>'']);
         $res = array();
         $res['status'] = 'success';
         return response()->json($res);

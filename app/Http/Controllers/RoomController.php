@@ -34,6 +34,7 @@ use App\Qr_option;
 use App\Product_sign;
 use App\Product_label;
 use App\Product_label_value;
+use App\ProductTopMenu;
 use App\Partner;
 use App\Events\NotificationEvent;
 use Mail;
@@ -596,6 +597,8 @@ class RoomController extends Controller
             $res['buildings'] = Building::where('site_id',$request->site_id)->orderBy('id','desc')->get();
             $res['floors'] = Floor::where('building_id',$request->building_id)->orderBy('id','desc')->get();
         }
+        $res['location_form_rows'] = New_form::where('created_by',$request->user->company_id)->where('form_type',0)->get();
+        $res['product_top_menu'] = ProductTopMenu::get();
         $res['all_users'] = User::where('status',1)->get();
         $res['company_customers'] = Company_customer::get();
         $res['form_fields'] = Form_field::get();

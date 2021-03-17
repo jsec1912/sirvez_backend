@@ -19,18 +19,22 @@ use App\Task_comment_user;
 use App\Task_label;
 use App\Task_top_menu;
 use App\Task_label_value;
+use App\TaskBoard;
+use App\TaskBucket;
 use App\Partner;
+use App\Customer_partner;
 use Mail;
 use App\Events\NotificationEvent;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\File; 
 
 class TaskController extends Controller
 {
     public function updateTask(Request $request){
         $v = Validator::make($request->all(), [
             'task' =>'required',
-            'company_id' => 'required',
-            'project_id' => 'required',
+            //'company_id' => 'required',
+            //'project_id' => 'required',
             //'site_id' => 'required',
             //'room_id' => 'required',
             'due_by_date' => 'required',
@@ -105,7 +109,11 @@ class TaskController extends Controller
 
             $notification = array();
             $project = Project::where('id', $task->project_id)->first();
-            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added you to a new task: ' . $task->task . ' for project: ' . $project->project_name . ' for ';
+            if($project)
+            $project_name = $project->project_name;
+            else
+            $project_name = '';
+            $text = $request->user->first_name . ' ' . $request->user->last_name . ' has added you to a new task: ' . $task->task . ' for project: ' . $project_name;
             $notification['title'] = 'Sirvez | New Task';
             $notification['text1'] = $text;
             $notification['text2'] = '.';
@@ -257,6 +265,9 @@ class TaskController extends Controller
         } else if ($request->user->user_type < 4) {
             $company_ids = Company_customer::where('company_id', $request->user->company_id)
                 ->pluck('customer_id')->toArray();
+            $partnerIds = Partner::where('partner_id',$request->user->company_id)->where('is_allowed',2)->pluck('id');
+            $partner_comIds = Customer_partner::where('partner_id',$partnerIds)->pluck('customer_id')->toArray();
+            $company_ids = array_merge($company_ids,$partner_comIds);
             array_push($company_ids, $request->user->company_id);
             if (in_array($request['customer_id'], $company_ids)) {
                 return 2; // super admin
@@ -301,7 +312,7 @@ class TaskController extends Controller
     }
 
     public function taskList(Request $request){
-        //return response()->json($request);
+        
         $res = array();
         if($request->has('room_id') && $request->room_id != 'undefined' && $request->room_id){
             $res['room_id'] = $request->room_id;
@@ -345,7 +356,12 @@ class TaskController extends Controller
                     ->orderBy('tasks.id','desc')
                     ->get();
                 //$res['users'] = User::where('company_id',$request->user->company_id)->get();
-                $res['customers'] = Company::where('id',$request->user->company_id)->get();
+                if($request->user->type>4)
+                    $res['customers'] = Company::where('id',$com_id)->get();    
+                else{
+                    $customer_id = Company_customer::where('company_id',$com_id)->pluck('customer_id');
+                    $res['customers'] = Company::whereIn('id',$customer_id)->get();
+                }
                 //$res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['projects'] = array();
                 $res['customerId'] = Room::where('id',$request->room_id)->first()->company_id;
@@ -384,7 +400,7 @@ class TaskController extends Controller
             $res['project_id'] = '';
             if ($this->tasklist_of_company_check($request) == 0) {
                 return response()->json([
-                    'status' => 'success',
+                    'status' => 'error',
                     'msg' => 'You do not have permission to view tasks of this location.'
                 ]);
             }
@@ -422,7 +438,13 @@ class TaskController extends Controller
                     ->get();
 
                 //$res['users'] = User::where('company_id',$request->user->company_id)->get();
-                $res['customers'] = Company::where('id',$request->customer_id)->get();
+                $com_id=$request->user->company_id;
+                if($request->user->type>4)
+                    $res['customers'] = Company::where('id',$com_id)->get();    
+                else{
+                    $customer_id = Company_customer::where('company_id',$com_id)->pluck('customer_id');
+                    $res['customers'] = Company::whereIn('id',$customer_id)->get();
+                }
                 $res['projects'] = Project::where('company_id',$request->customer_id)->get();
                 $res['customerId'] = $request->customer_id;
             } else {
@@ -496,7 +518,13 @@ class TaskController extends Controller
                     ->get();
 
                 //$res['users'] = User::where('company_id',$request->user->company_id)->get();
-                $res['customers'] = Company::where('id',$request->user->company_id)->get();
+                $com_id=$request->user->company_id;
+                if($request->user->type>4)
+                    $res['customers'] = Company::where('id',$com_id)->get();    
+                else{
+                    $customer_id = Company_customer::where('company_id',$com_id)->pluck('customer_id');
+                    $res['customers'] = Company::whereIn('id',$customer_id)->get();
+                }
                 $res['projects'] = Project::where('id',$request->project_id)->get();
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
             } else {
@@ -529,7 +557,7 @@ class TaskController extends Controller
                 $res['customerId'] = Project::where('id',$request->project_id)->first()->company_id;
             }
         } else {
-            if ($request->user->user_type > 0) { // end user
+            if ($request->user->user_type > 0) { 
                 $taskIdx = Project_user::where(['user_id'=>$request->user->id,'type'=>'2'])->pluck('project_id');
                 $taskIds = Task::where(function($q)use($taskIdx,$request){
                             return $q->whereIn('tasks.id',$taskIdx)
@@ -561,8 +589,18 @@ class TaskController extends Controller
                     ->get();
 
                 //$res['users'] = User::where('company_id',$request->user->company_id)->get();
-                $res['customers'] = Company::where('id',$request->user->company_id)->get();
-                $res['projects'] = Project::where('company_id',$request->user->company_id)->get();
+                $com_id=$request->user->company_id;
+                if($request->user->type>4){
+                    $res['customers'] = Company::where('id',$com_id)->get();   
+                    $res['projects'] = Project::where('company_id',$com_id)->get(); 
+                    $res['rooms'] = Room::where('company_id',$com_id)->get(); 
+                }
+                else{
+                    $customer_id = Company_customer::where('company_id',$com_id)->pluck('customer_id');
+                    $res['customers'] = Company::whereIn('id',$customer_id)->get();
+                    $res['projects'] = Project::whereIn('company_id',$customer_id)->get();
+                    $res['rooms'] = Room::whereIn('company_id',$customer_id)->get();  
+                }
             } else {
                 $customer_id = Company_customer::where('company_id',$request->user->company_id)
                 ->pluck('customer_id')->toArray();
@@ -604,9 +642,11 @@ class TaskController extends Controller
                 //$res['users'] = User::where('company_id',$request->user->company_id)->get();
                 $res['customers'] = Company::whereIn('id',$customer_id)->get();
                 $res['projects'] = Project::whereIn('company_id',$customer_id)->get();
+                $res['rooms'] = Room::whereIn('company_id',$customer_id)->get();  
             }
         }
-        foreach($tasks as $key=>$row){
+        
+        foreach($tasks as $key=>$row){            
             $tasks[$key]['label_value'] = Task_label_value::where('task_id',$row->id)->pluck('label_id');
             $room = Room::where('id',$row->site_id)->first();
             if(Site::where('id',$row->site_id)->count() > 0 )
@@ -649,7 +689,7 @@ class TaskController extends Controller
                 $task_comments[$key1]['now_time'] = date("Y-m-d H:i:s");
             }
             $tasks[$key]['comments'] = $task_comments;
-        }
+        } 
         $customer_id = Company_customer::where('company_id',$request->user->company_id)->pluck('customer_id');
         $res['users'] = User::whereIn('company_id',$customer_id)->orwhere('company_id',$request->user->company_id)->get();
         $labelIds = Task_label_value::whereIn('task_id',$taskIds)->pluck('label_id');
@@ -658,15 +698,14 @@ class TaskController extends Controller
         $res['all_users'] = User::get();
         $res['project_users'] = Project_user::where('type', '!=', '2')->get();
         $res['tasks'] = $tasks;
-        // $online_users = array();
-        // $users = User::get();
-        // foreach ($users as $user) {
-        //     if (Cache::has('user-is-online-'.$user->id)){
-        //         array_push($online_users,strval($user->id));
-        //     }
-        // }
-        // $res['online_users'] = $online_users;
-        $res['top_memus_value'] = Task_top_menu::get();
+        if($request->user->user_type>4)
+            $com_id = Company_customer::where('customer_id',$request->user->company_id)->first()->company_id;
+        else 
+            $com_id = $request->user->company_id;
+        $res['boards'] = TaskBoard::where('company_id',$com_id)->get();
+        $board_ids = TaskBoard::where('company_id',$com_id)->pluck('id');
+        $res['buckets'] = TaskBucket::whereIn('board_id',$board_ids)->get();
+        $res['top_menus_value'] = Task_top_menu::get();
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -923,8 +962,8 @@ class TaskController extends Controller
             $id = $request->id;
         Task_label_value::where('task_id',$id)->delete();
         $array_res = array();
-        $array_res =json_decode($request->label_value,true);
-        if($array_res){
+        $array_res = json_decode($request->label_value,true);
+        if ($array_res) {
             foreach($array_res as $row)
             {
                 Task_label_value::create(['task_id'=>$id,'label_id'=>$row]);
@@ -1009,4 +1048,218 @@ class TaskController extends Controller
         $res['status'] = 'success';
         return response()->json($res);
     }
+    public function addNewBoard(request $request){
+        $order_no = intval(TaskBoard::where('company_id',$request->company_id)->max('order_no'));
+        $res = array();
+        if ($request->board_id > 0) {
+            TaskBoard::whereId($request->board_id)->update([
+                'board_name' => $request->board_name
+            ]);
+        } else {
+            TaskBoard::create([
+                'board_name'=>$request->board_name,
+                'company_id'=>$request->user->company_id,
+                'created_by'=>$request->user->id,
+                'order_no'=>$order_no+1,
+            ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addNewBucket(request $request){
+        $order_no = intval(TaskBucket::where('board_id',$request->board_id)->max('order_no'));
+        $res = array();
+        TaskBucket::create([
+            'board_id'=>$request->board_id,
+            'bucket_name'=>$request->bucket_name,
+            'created_by'=>$request->user->id,
+            'order_no'=>$order_no+1,
+        ]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function duplicateTask(request $request){
+        $res = array();
+        $task = Task::whereId($request->id)->first()->toArray();
+        unset($task['id']);
+        unset($task['created_at']);
+        unset($task['updated_at']);
+        unset($task['off_id']);
+        $task['updated_by']=$request->user->id;
+        $task['task'] = $task['task'].'_copy';
+        $task = Task::create($task);
+        $project_users = Project_user::where('project_id',$request->id)->where('type',2)->get();
+        foreach($project_users as $row){
+            $field['project_id'] = $task->id;
+            $field['user_id'] = $row->user_id;
+            $field['type'] = 2;
+            Project_user::create($field);
+        }
+        $comments = TaskComment::where('task_id',$request->id)->get();
+        foreach($comments as $row){
+            $comment['task_id'] = $task->id;
+            $comment['comment'] = $row->comment;
+            $comment['deadline'] = $row->deadline;
+            $comment['complete'] = $row->complete;
+            $comment['created_by'] = $row->created_by;
+            $comment['attach_file'] = $row->attach_file;
+            $comment['file_size'] = $row->file_size;
+            $comment['parent_id'] = $row->parent_id;
+            $added_comment = TaskComment::create($comment);
+            $comment_users = Task_comment_user::where('comment_id',$row->id)->get();
+            foreach($comment_users as $user){
+                $comment_user['comment_id'] = $added_comment->id;
+                $comment_user['user_id'] = $user->user_id;
+                Task_comment_user::create($comment_user);
+            }
+
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function setBucket(request $request){
+        $res = array();
+        $order_no = 0;
+        if($request->bucket_id>0)
+        $order_no = intval(Task::where('bucket_id',$request->bucket)->max('order_no'));
+        Task::whereId($request->id)->update([
+            'board_id'=>$request->board_id,
+            'bucket_id'=>$request->bucket_id,
+            'order_no'=>$order_no+1
+        ]);
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeBucketOrder(request $request){
+        $res = array();
+        $ordered_id = json_decode($request->ordered_id,true);
+        foreach($ordered_id as $key=> $orderId)
+        {
+            TaskBucket::whereId($orderId)->update(['order_no'=>$key+1]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeTaskOrder(request $request){
+        $res = array();
+        $ordered_id = json_decode($request->ordered_id,true);
+        foreach($ordered_id as $key=> $orderId)
+        {
+            Task::whereId($orderId)->update([
+                'bucket_id' => $request->bucket_id,
+                'order_no' => $key+1
+            ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function saveBucketName(request $request) {
+        $res = array();
+        if (TaskBucket::whereId($request->bucket_id)->count() > 0) {
+            TaskBucket::whereId($request->bucket_id)->update([
+                'bucket_name' => $request->bucket_name
+            ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function saveBucketLock(request $request) {
+        $res = array();
+        if (TaskBucket::whereId($request->bucket_id)->count() > 0) {
+            TaskBucket::whereId($request->bucket_id)->update([
+                'is_lock' => $request->is_lock
+            ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function deleteBucket(request $request) {
+        $res = array();
+        $res['status'] = 'success';
+        if (TaskBucket::whereId($request->bucket_id)->count() > 0) {
+            TaskBucket::whereId($request->bucket_id)->delete();
+        }
+        Task::where('bucket_id',$request->bucket)->update(['bucket_id'=>0]);
+        return response()->json($res);
+    }
+
+    public function deleteBoard(request $request) {
+        $res = array();
+        $res['status'] = 'success';
+        if (TaskBoard::whereId($request->board_id)->count() > 0) {
+            TaskBoard::whereId($request->board_id)->delete();
+        }
+        $bucketIdx = TaskBucket::where('board_id',$request->board_id)->pluck('id');
+        TaskBucket::where('board_id',$request->board_id)->delete();
+        Task::whereIn('bucket_id',$bucketIdx)->orWhere('board_id',$request->board_id)->update(['board_id'=>0,'bucket_id'=>0]);
+        return response()->json($res);
+    }
+
+    public function updateTaskProject(request $request) {
+        $res = array();
+        if (Task::whereId($request->task_id)->count() > 0) {
+            Task::whereId($request->task_id)->update([
+                'project_id' => $request->project_id
+            ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function updateTaskCustomer(request $request) {
+        $res = array();
+        if (Task::whereId($request->task_id)->count() > 0) {
+            Task::whereId($request->task_id)->update([
+                'company_id' => $request->customer_id
+            ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+
+    public function updateTaskRoom(request $request) {
+        $res = array();
+        if (Task::whereId($request->task_id)->count() > 0) {
+            Task::whereId($request->task_id)->update([
+                'room_id' => $request->room_id
+            ]);
+        }
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function addAttachFile(request $request){
+        $comment = TaskComment::whereId($request->id)->first();
+        $file_name = $comment->attach_file;
+        if($file_name){
+            $file_path = public_path('upload/file/').'/'.$file_name;
+            File::delete($file_path);
+        }
+        if($request->hasFile('attach_file')){
+            $fileName = time().'comment.'.$request->attach_file->extension();
+            $request->attach_file->move(public_path('upload/file/'), $fileName);
+            $comment->attach_file = $fileName;
+            $comment->file_size = number_format($request->attach_file->getSize()/1024,2);
+            $comment->save();
+        }
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function changeDeadline(request $request){
+        TaskComment::whereId($request->id)->update(['deadline'=>$request->deadline]);
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function removeComment(request $request){
+        TaskComment::whereId($request->id)->delete();
+        Task_comment_user::where('comment_id',$request->id)->delete();
+        $res = array();
+        $res['status'] = 'success';
+        return response()->json($res);
+    }
 }
+

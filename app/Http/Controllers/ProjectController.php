@@ -17,6 +17,7 @@ use App\Room;
 use App\Room_photo;
 use App\Company;
 use App\Product;
+use App\ProductTopMenu;
 use App\Company_customer;
 use App\Project_user;
 use App\ProjectModule;
@@ -424,7 +425,7 @@ class ProjectController extends Controller
                 $project_array[$key]['partner_logos'] = Company::whereIn('id', $partner_company_ids)->get();
             }
         }
-        $res['top_memus_value'] = ProjectTopMenu::get();
+        $res['top_menus_value'] = ProjectTopMenu::get();
         $res["projects"] = $project_array;
         $res['status'] = "success";
         return response()->json($res);
@@ -477,7 +478,7 @@ class ProjectController extends Controller
             $project = Project::where('projects.id',$id)
                 ->leftJoin('companies','projects.company_id','=','companies.id')
                 ->leftJoin('users','users.id','=','projects.created_by')
-                ->select('projects.*','companies.logo_img','companies.address','companies.name AS company_name','companies.website AS company_website','companies.telephone AS company_phone','users.first_name')->first();
+                ->select('projects.*','companies.logo_img','companies.address','companies.name AS company_name','companies.parent_id AS company_parent','companies.website AS company_website','companies.telephone AS company_phone','users.first_name')->first();
             
             /////  check permission
             if ($this->project_check($project, $request) == 0) {
@@ -488,7 +489,10 @@ class ProjectController extends Controller
             }
             /////  end check permission
 
-            
+            if($project->company_parent>0&&Company::whereId($project->company_parent)->count())
+                $project['parent_name'] = Company::whereId($project->company_parent)->first()->name;
+            else
+                $project['parent_name']='';
             //$project['survey_start_date'] = date('d-m-Y', strtotime($project['survey_start_date']));
             $res['notification'] = Notification::where('notice_type','6')->where('notice_id',$id)->orderBy('id','desc')->get();
             $project['site_count'] = Project_site::where('project_id',$project['id'])->count();
@@ -591,7 +595,6 @@ class ProjectController extends Controller
                 $project['is_partner'] = 0;
             }
             if ($project['is_partner'] == 1){
-                
                 $companyIds = Company_customer::where('customer_id',$project['company_id'])->pluck('company_id');
                 if(count($companyIds)>0)
                     $project['partner_logos'] = Company::whereIn('id', $companyIds)->get();
@@ -608,7 +611,12 @@ class ProjectController extends Controller
                 $project['owner'] = Company::whereId($project->company_id)->first();
             $res["project"] = $project;
 
-            $res['sites'] = Site::where('company_id',$project->company_id)->orWhere('company_id',$companyId)->orderBy('id','desc')->get();
+            $res['sites'] = Site::where('sites.company_id',$project->company_id)
+                                ->orWhere('sites.company_id',$companyId)
+                                ->orderBy('sites.id','desc')
+                                ->leftJoin('buildings','buildings.site_id','=','sites.id')
+                                ->select('sites.*','buildings.building_name')
+                                ->get();
             $rooms = Room::where('rooms.project_id',$id)
                 ->leftJoin('sites','rooms.site_id','=','sites.id')
                 ->leftJoin('companies','rooms.company_id','=','companies.id')
@@ -802,11 +810,13 @@ class ProjectController extends Controller
         $res['test_forms'] = New_form::where('created_by',$user_company_id)->where('form_type', 1)->get();
         $res['com_forms'] = New_form::where('created_by',$user_company_id)->where('form_type', 2)->get();
         $res['product_labels'] = Product_label::get();
+        $res['product_top_menu'] = ProductTopMenu::get();
         $res['qr_option'] = Qr_option::first();
         // for offline mode
         $res['all_users'] = User::where('status',1)->get();
         if ( ! $request->project_id) {
             $res['company_customers'] = Company_customer::get();
+            $res['all_customers'] = Company::get();
             $res['all_sites'] = Site::get();
             $res['all_site_rooms'] = Site_room::get();
             $res['all_partners'] = Partner::get();
@@ -1220,7 +1230,7 @@ class ProjectController extends Controller
         if ($request->user->user_type == 6) {
             $text = $request->user->first_name.' '.$request->user->last_name.' has signed off: ' . $project['project_name'] . ' for ';
             $notification['title'] = 'Sirvez | Project signed off (final)';
-            $notification['id'] = 'project-final-'. $project->$id;
+            $notification['id'] = 'project-final-'. $project->id;
         } else {
             $text = $request->user->first_name.' '.$request->user->last_name.' has requested Final Sign Off: ' . $project['project_name'] . 'for';
             $notification['title'] = 'Sirvez | Project sign off (final)';
@@ -1857,9 +1867,11 @@ class ProjectController extends Controller
                 'note'=>$request->desc,
                 'start_date'=>$request->start,
                 'end_date'=>$request->end]);
+            if($deleted_users)
             foreach($deleted_users as $user){
                 ScheduleEngineer::where(['schedule_id'=>$request->id,'engineer_id'=>$user])->delete();
             }    
+            if($event_users)
             foreach($event_users as $user){
                 ScheduleEngineer::create(['schedule_id'=>$request->id,'engineer_id'=>$user]);
             }
@@ -1869,9 +1881,11 @@ class ProjectController extends Controller
                 'description'=>$request->desc,
                 'due_by_date'=>$request->start
                 ]);
+                if($deleted_users)
                 foreach($deleted_users as $user){
                     Project_user::where(['schedule_id'=>$request->id,'user_id'=>$user,'type'=>2])->delete();
-                }    
+                }   
+                if($event_users) 
                 foreach($event_users as $user){
                     Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>2]);
                 }
@@ -1879,9 +1893,11 @@ class ProjectController extends Controller
             TaskComment::whereId($request->id)->update([
                 'comment'=>$request->title,
                 'deadline'=>$request->start]);
+            if($deleted_users)
             foreach($deleted_users as $user){
                 Task_comment_user::where(['comment_id'=>$request->id,'user_id'=>$user])->delete();
             }   
+            if($event_users)
             foreach($event_users as $user){
                 Task_comment_user::create(['comment_id'=>$request->id,'user_id'=>$user]);
             }
@@ -1890,9 +1906,11 @@ class ProjectController extends Controller
                 'project_name'=>$request->title,
                 'project_summary'=>$request->desc,
                 'survey_start_date'=>$request->start]);
+            if($deleted_users)
             foreach($deleted_users as $user){
                 Project_user::where(['project_id'=>$request->id,'user_id'=>$user,'type'=>3])->delete();
-            }   
+            } 
+            if($event_users)  
             foreach($event_users as $user){
                 Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>3]);
             }
@@ -1901,9 +1919,11 @@ class ProjectController extends Controller
                 'project_name'=>$request->title,
                 'project_summary'=>$request->desc,
                 'signoff_date'=>$request->start]);
+            if($deleted_users)
             foreach($deleted_users as $user){
                 Project_user::where(['project_id'=>$request->id,'user_id'=>$user,'type'=>3])->delete();
-            }   
+            } 
+            if($event_users)  
             foreach($event_users as $user){
                 Project_user::create(['project_id'=>$request->id,'user_id'=>$user,'type'=>3]);
             }
@@ -1920,23 +1940,41 @@ class ProjectController extends Controller
             }
             else{
                 $event = Calendar_event::whereId($request->id)->first();
+                $fileName = '';
+                if ($request->has('upload_file') && isset($request->upload_file) && $request->upload_file!='null') {
+                    $fileName = time().'.'.$request->upload_file->extension();
+                    $request->upload_file->move(public_path('upload/file'), $fileName);
+                }
                 $users =  explode(',',$event->users);
-                $users = array_diff($users,$deleted_users);
-                $event_users = array_merge($users,$event_users);
+                if($deleted_users)
+                $users = array_diff($users,$deleted_users);                
+                if($event_users)
+                $users = array_merge($users,$event_users);
                 Calendar_event::whereId($request->id)->update([
                     'title'=>$request->title,
                     'start'=>$request->start,
                     'end'=>$request->is_fullDay==0?$request->end:$request->start,
                     'created_by'=>$request->user->id,
-                    'users'=>join(',',$event_users).','
+                    'users'=>join(',',$users).',',
+                    'is_provisional'=>$request->is_provisional,
+                    'sow_file'=>$request->sow_file,
+                    'tender_file'=>$request->tender_file,
+                    'healthy_file'=>$request->healthy_file,
+                    'install_file'=>$request->install_file,
+                    'upload_file'=>$fileName,
                 ]);
                 if($request->is_sendEmail){
                     $event = Calendar_event::whereId($request->id)->first();
                     $project_name=Project::whereId($event->project_id)->first()->project_name;
-                    $pending_users = User::whereIn('id',$event_users)->get();
+                    $pending_users = User::whereIn('id',$users)->get();
                     foreach($pending_users as $pending_user){
                         $to_name = $pending_user['first_name'];
                         $to_email = $pending_user['email'];
+                        $sow_file='';
+                        $tender_file='';
+                        $healthy_file='';
+                        $install_file='';
+                        $upload_file='';
                         if($event->sow_file)
                             $sow_file = 'https://app.sirvez.com/upload/file/'.$event->sow_file;
                         if($event->tender_file)
@@ -2424,11 +2462,20 @@ class ProjectController extends Controller
             $id = Project::where('off_id',$request->id)->first()->id;
         else
             $id = $request->id;
-        Room::where('project_id',$id)->where('signed_off',0)->update([
-            'signed_off'=>1,
-            'completed_date'=>date("Y-m-d H:i:s"),
-            'completed_by'=>$request->user->id
-        ]);
+        if($request->is_final>0){
+            Room::where('project_id',$id)->where('signed_off',0)->update([
+                'final_signoff'=>1,
+                'final_signoff_date'=>date("Y-m-d H:i:s"),
+                'final_signoff_user'=>$request->user->id
+            ]);
+        }
+        else{
+            Room::where('project_id',$id)->where('signed_off',0)->update([
+                'signed_off'=>1,
+                'completed_date'=>date("Y-m-d H:i:s"),
+                'completed_by'=>$request->user->id
+            ]);
+        }
         $res['status'] = "success";
         return response()->json($res);
     }
@@ -2485,6 +2532,25 @@ class ProjectController extends Controller
             'created_by'=>$request->user->id
         ]);
         $res['status'] = 'success';
+        return response()->json($res);
+    }
+    public function updateInstallFile(request $request){
+        $res = array();
+        if(strlen($request->id) > 10)
+            $id = Project::where('off_id',$request->id)->first()->id;
+        else
+            $id = $request->id;
+        $file_name = '';
+        if ($request->has('installFile')) {
+            $file_name = time().'.'.$request->installFile->extension();
+            $request->installFile->move(public_path('upload/file'), $file_name);
+        }
+        $link_file = Project::whereId($id)->first()->install_job_file;
+        $file_path = public_path('upload/file').'/'.$link_file;
+        File::delete($file_path);
+        Project::whereId($id)->update(['install_job_file'=>$file_name]);
+        $res['status'] = 'success';
+        $res['url_link'] = $file_name;
         return response()->json($res);
     }
 }

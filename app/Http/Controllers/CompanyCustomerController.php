@@ -22,6 +22,7 @@ use App\New_form;
 use App\Task_label_value;
 use App\Project_user;
 use App\Notification;
+use App\ProductTopMenu;
 use App\Customer_partner;
 use App\Partner;
 //use Illuminate\Support\Facades\Mail;
@@ -35,7 +36,10 @@ class CompanyCustomerController extends Controller
         $v = Validator::make($request->all(), [
             //company info
             'company_name' => 'required',
-            'manager' => 'required'
+            'manager' => 'required',
+            'address' => 'required',
+            'city' => 'required',
+            'postcode' => 'required',
         ]);
 
         if ($v->fails())
@@ -69,13 +73,21 @@ class CompanyCustomerController extends Controller
         $company['company_type']  = 3;
         $company['status']  = 1;
         $company['manager']  = $request->post("manager");
-
-        //return response()->json(strlen($request->id));
         if(strlen($request->id) > 10)
             if(company::where('off_id',$request->id)->count() > 0)
                 $id = company::where('off_id',$request->id)->first()->id;
             else $id = '';
         if(!isset($id) || $id==""|| $id=="null"|| $id=="undefined"){
+            $v = Validator::make($request->all(), [
+                'site_name' => 'required',
+            ]);
+            if ($v->fails())
+            {
+                return response()->json([
+                    'status' => 'error',
+                    'msg' => 'You must input site name in the field!'
+                ]);
+            }
             $count = 0;
             if($request->website){
                 $count += Company::where('website',$request->website)->count();
@@ -152,7 +164,8 @@ class CompanyCustomerController extends Controller
         Notification::create($insertnotificationndata);
 
         //insert site
-        if($request->site_name!='')
+        
+        if($flag > 0 && $request->site_name!='')
         {
             $site['site_name'] = $request->post("site_name");
             $site['address2'] = $request->post("address1");
@@ -237,9 +250,11 @@ class CompanyCustomerController extends Controller
     public function getCompanyCustomer(Request $request){
 
         $res = array();
-        $companyid = Company_customer::where(['company_id'=>$request->user->company_id])->pluck('customer_id');
-
+        $companyid = Company_customer::where(['company_id'=>$request->user->company_id])->pluck('customer_id')->toArray();
         $customers = array();
+        $partnerIds = Partner::where('partner_id',$request->user->company_id)->where('is_allowed',2)->pluck('id');
+        $partner_comIds = Customer_partner::where('partner_id',$partnerIds)->pluck('customer_id')->toArray();
+        $companyid = array_merge($companyid,$partner_comIds);
         $company_array = Company::whereIn('id',$companyid)->orderBy('id','desc')->get();
         foreach($company_array as $key => $row){
             $row['user_count'] = User::where('company_id',$row['id'])->where('status',1)->count();
@@ -248,11 +263,20 @@ class CompanyCustomerController extends Controller
             $row['room_count'] = Site_room::where('company_id',$row['id'])->count();
             //// partners /////
             $partner_ids = Customer_partner::where('customer_id', $row->id)->pluck('partner_id');
-            $row['partners'] = Partner::leftJoin('companies', 'companies.id', '=', 'partners.partner_id')
+            if(Company_customer::where(['company_id'=>$request->user->company_id,'customer_id'=>$row['id']])->count()>0){
+                $row['partners'] = Partner::leftJoin('companies', 'companies.id', '=', 'partners.partner_id')
                             ->WhereIn('partners.id', $partner_ids)
                             ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
-                            ->get();                                
-
+                            ->get();  
+                $row['partner_type']=0;
+            }
+            else{
+                $row['partners'] = Partner::leftJoin('companies', 'companies.id', '=', 'partners.company_id')
+                            ->WhereIn('partners.id', $partner_ids)
+                            ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
+                            ->get();   
+                $row['partner_type']=1;
+            }
             $customers[$key] = $row;
         }
         // $customers = Company::with(['company_customers'=> function ($query) use($userid) {
@@ -376,6 +400,7 @@ class CompanyCustomerController extends Controller
                         ->select('partners.*', 'companies.logo_img', 'companies.company_email', 'companies.name', 'companies.website')
                         ->get();
         $res['partners'] = $partners;
+        $res['product_top_menu'] = ProductTopMenu::get();
 
         return response()->json($res);
     }
